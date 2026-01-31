@@ -11,9 +11,11 @@ using XIVTheCalamity.Dalamud.Services;
 // Configure Serilog
 var logPath = GetLogFilePath();
 Log.Logger = new LoggerConfiguration()
-    .MinimumLevel.Debug()
-    .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Information)
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
     .MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
+    .MinimumLevel.Override("System", Serilog.Events.LogEventLevel.Warning)
+    .MinimumLevel.Override("System.Net.Http.HttpClient", Serilog.Events.LogEventLevel.Warning)
     .Enrich.FromLogContext()
     .Enrich.WithThreadId()
     .Enrich.WithMachineName()

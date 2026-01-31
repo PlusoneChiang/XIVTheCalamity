@@ -248,10 +248,6 @@ public class DalamudInjectorService
         env["COMPlus_EnableAlternateStackCheck"] = "0";  // Disable stack checks that may fail in Wine
         env["COMPlus_gcAllowVeryLargeObjects"] = "1";  // Allow large objects
         
-        // Enable detailed .NET Core Host tracing for debugging
-        env["COREHOST_TRACE"] = "1";
-        env["COREHOST_TRACEFILE"] = $"{_pathService.LogPath}/corehost.log";
-        
         // CRITICAL: Prepend system library paths for ICU
         // .NET Runtime needs libicuuc from system libraries
         if (env.ContainsKey("LD_LIBRARY_PATH"))
@@ -263,11 +259,7 @@ public class DalamudInjectorService
             env["LD_LIBRARY_PATH"] = "/usr/lib64:/usr/lib";
         }
         
-        _logger.LogDebug("[DALAMUD-INJECT] DALAMUD_RUNTIME={Path} (Wine Z:\\ path)", wineRuntimePath);
-        _logger.LogDebug("[DALAMUD-INJECT] DOTNET_ROOT={Path} (same as DALAMUD_RUNTIME)", wineRuntimePath);
-        _logger.LogDebug("[DALAMUD-INJECT] COMPlus settings configured for Wine compatibility");
-        _logger.LogDebug("[DALAMUD-INJECT] COREHOST_TRACE=1 (detailed .NET diagnostics)");
-        _logger.LogDebug("[DALAMUD-INJECT] LD_LIBRARY_PATH={Path}", env["LD_LIBRARY_PATH"]);
+        _logger.LogInformation("[DALAMUD-INJECT] Environment configured for Dalamud injection");
     }
     
     /// <summary>
@@ -341,8 +333,12 @@ public class DalamudInjectorService
     {
         var injectorPath = _pathService.InjectorPath;
         
-        // Enable Wine debugging for .NET Runtime loading
-        environment["WINEDEBUG"] = "+module,+loaddll";
+        // WINEDEBUG comes from environment service (configured in settings)
+        // Don't override it here unless it's not set
+        if (!environment.ContainsKey("WINEDEBUG"))
+        {
+            environment["WINEDEBUG"] = "-all";  // Default: suppress all Wine debug output
+        }
         
         var psi = new ProcessStartInfo
         {

@@ -182,18 +182,14 @@ public class WineConfigService
 
     /// <summary>
     /// Apply WineConfig to environment variables
-    /// </summary>
     /// <summary>
     /// Apply Wine configuration to environment variables dictionary
     /// </summary>
     public void ApplyWineConfigToEnvironment(Dictionary<string, string> env, WineConfig config)
     {
-        // Wine Debug
-        if (!string.IsNullOrWhiteSpace(config.WineDebug))
-        {
-            env["WINEDEBUG"] = config.WineDebug;
-            _logger?.LogInformation("Setting WINEDEBUG={WineDebug}", config.WineDebug);
-        }
+        // Wine Debug - default to "-all" if empty
+        env["WINEDEBUG"] = string.IsNullOrEmpty(config.WineDebug) ? "-all" : config.WineDebug;
+        _logger?.LogDebug("Setting WINEDEBUG={WineDebug}", env["WINEDEBUG"]);
         
         // Esync
         if (config.EsyncEnabled)
