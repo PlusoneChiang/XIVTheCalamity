@@ -4,24 +4,26 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using XIVTheCalamity.Core.Models;
 using XIVTheCalamity.Game.Launcher.Encryption;
-using XIVTheCalamity.Platform.MacOS.Wine;
+using XIVTheCalamity.Platform;
 
 namespace XIVTheCalamity.Game.Launcher;
 
 /// <summary>
 /// Game launch service
-/// Focuses on game launching, environment variables configured by WineConfigService
+/// Focuses on game launching, environment variables configured by IEnvironmentService
 /// </summary>
 public class GameLaunchService
 {
     private readonly ILogger<GameLaunchService> _logger;
-    private readonly WineConfigService _wineConfigService;
+    private readonly IEnvironmentService? _environmentService;
     private Process? _gameProcess;
     
-    public GameLaunchService(ILogger<GameLaunchService> logger)
+    public GameLaunchService(
+        ILogger<GameLaunchService> logger,
+        IEnvironmentService? environmentService = null)
     {
         _logger = logger;
-        _wineConfigService = new WineConfigService(null); // TODO: inject logger
+        _environmentService = environmentService;
     }
     
     /// <summary>
@@ -36,22 +38,23 @@ public class GameLaunchService
     
     /// <summary>
     /// Fake Launch - Test launch game (without Session ID)
+    /// For macOS, pass WineConfig. For Linux, pass ProtonConfig (cast to object).
     /// </summary>
     public async Task<GameLaunchResult> FakeLaunchAsync(
         string gamePath,
-        WineConfig wineConfig,
+        object? platformConfig,
         string? dalamudRuntimePath = null,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("[GAME] Starting Fake Launch (test mode)");
         
-        // Fake launch 不需要真正的 Session ID，使用假的測試 ID
+        // Fake launch doesn't need real Session ID, use fake test ID
         var fakeSessionId = "0";
         
         return await LaunchGameInternalAsync(
             gamePath,
             fakeSessionId,
-            wineConfig,
+            platformConfig,
             isFakeLaunch: true,
             dalamudRuntimePath,
             cancellationToken);
@@ -59,11 +62,12 @@ public class GameLaunchService
     
     /// <summary>
     /// Launch game officially
+    /// For macOS, pass WineConfig. For Linux, pass ProtonConfig (cast to object).
     /// </summary>
     public async Task<GameLaunchResult> LaunchGameAsync(
         string gamePath,
         string sessionId,
-        WineConfig wineConfig,
+        object? platformConfig,
         string? dalamudRuntimePath = null,
         CancellationToken cancellationToken = default)
     {
@@ -81,7 +85,7 @@ public class GameLaunchService
         return await LaunchGameInternalAsync(
             gamePath,
             sessionId,
-            wineConfig,
+            platformConfig,
             isFakeLaunch: false,
             dalamudRuntimePath,
             cancellationToken);
@@ -90,7 +94,7 @@ public class GameLaunchService
     private async Task<GameLaunchResult> LaunchGameInternalAsync(
         string gamePath,
         string sessionId,
-        WineConfig wineConfig,
+        object? platformConfig,
         bool isFakeLaunch,
         string? dalamudRuntimePath,
         CancellationToken cancellationToken)
@@ -123,7 +127,6 @@ public class GameLaunchService
                 .Append("DEV.SaveDataBankHost", "config-dl.ffxiv.com.tw");
             
             // On macOS/Linux, set UserPath (game config directory)
-            // Reference XoM LaunchServices.cs - specify config directory via UserPath parameter
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) || 
                 RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
@@ -133,7 +136,7 @@ public class GameLaunchService
                 _logger.LogInformation("[GAME] UserPath: {Path}", wineUserPath);
             }
             
-            // Taiwan server uses unencrypted arguments (reference XIVTCLauncher.Cross)
+            // Taiwan server uses unencrypted arguments
             var arguments = argumentBuilder.Build();
             _logger.LogDebug("[GAME] Launch arguments: {Args}", arguments);
             
@@ -148,15 +151,33 @@ public class GameLaunchService
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) || 
                      RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
-                // Get full environment from WineConfigService (includes Dalamud Runtime if provided)
-                var environment = _wineConfigService.GetFullEnvironment(wineConfig, dalamudRuntimePath);
+                // Use IEnvironmentService to get environment and launch
+                if (_environmentService == null)
+                {
+                    _logger.LogError("[GAME] IEnvironmentService not available");
+                    return new GameLaunchResult
+                    {
+                        Success = false,
+                        ErrorMessage = "Environment service not configured"
+                    };
+                }
                 
+                // Get environment variables
+                var baseEnvironment = _environmentService.GetEnvironment();
+                
+                // Add Dalamud runtime if provided
                 if (!string.IsNullOrEmpty(dalamudRuntimePath))
                 {
+                    baseEnvironment["DALAMUD_RUNTIME"] = dalamudRuntimePath;
                     _logger.LogInformation("[GAME] Dalamud Runtime path: {Path}", dalamudRuntimePath);
                 }
                 
-                return await LaunchWithWineAsync(exePath, workingDir, arguments, environment, cancellationToken);
+                return await LaunchWithEnvironmentServiceAsync(
+                    exePath, 
+                    workingDir, 
+                    arguments, 
+                    baseEnvironment, 
+                    cancellationToken);
             }
             else
             {
@@ -184,7 +205,22 @@ public class GameLaunchService
     private static string GetFfxivConfigPath()
     {
         var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        var appSupport = Path.Combine(homeDir, "Library", "Application Support", "XIVTheCalamity");
+        string appSupport;
+        
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            appSupport = Path.Combine(homeDir, "Library", "Application Support", "XIVTheCalamity");
+        }
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            appSupport = Path.Combine(homeDir, ".config", "XIVTheCalamity");
+        }
+        else
+        {
+            // Windows
+            appSupport = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "XIVTheCalamity");
+        }
+        
         var ffxivConfigPath = Path.Combine(appSupport, "ffxivConfig");
         
         // Ensure directory exists
@@ -242,33 +278,57 @@ public class GameLaunchService
         };
     }
     
-    private async Task<GameLaunchResult> LaunchWithWineAsync(
+    private async Task<GameLaunchResult> LaunchWithEnvironmentServiceAsync(
         string exePath,
         string workingDir,
         string arguments,
         Dictionary<string, string> environment,
         CancellationToken cancellationToken)
     {
-        // 取得 Wine 路徑
-        var winePath = GetWinePath();
-        if (string.IsNullOrEmpty(winePath) || !File.Exists(winePath))
+        // Get emulator directory and wine path from environment service
+        if (_environmentService == null)
         {
-            _logger.LogError("[GAME] Wine executable not found");
+            _logger.LogError("[GAME] Environment service not available");
             return new GameLaunchResult
             {
                 Success = false,
-                ErrorMessage = "Wine executable not found"
+                ErrorMessage = "Environment service not configured"
+            };
+        }
+        
+        var emulatorDir = _environmentService.GetEmulatorDirectory();
+        var winePath = Path.Combine(emulatorDir, "files", "bin", "wine");
+        
+        // For macOS Wine, try wine64 instead
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            var wine64Path = Path.Combine(emulatorDir, "bin", "wine64");
+            if (File.Exists(wine64Path))
+            {
+                winePath = wine64Path;
+            }
+        }
+        
+        if (string.IsNullOrEmpty(winePath) || !File.Exists(winePath))
+        {
+            _logger.LogError("[GAME] Wine executable not found: {WinePath}", winePath);
+            return new GameLaunchResult
+            {
+                Success = false,
+                ErrorMessage = $"Wine executable not found: {winePath}"
             };
         }
         
         _logger.LogInformation("[GAME] Launching with Wine: {WinePath}", winePath);
         _logger.LogInformation("[GAME] Game executable: {ExePath}", exePath);
         
-        // 記錄環境變數 (只記錄關鍵的)
+        // Log environment variables (only key ones)
         _logger.LogDebug("[GAME] Wine environment:");
         foreach (var (key, value) in environment)
         {
-            if (key.Contains("WINE") || key.Contains("DXMT") || key.Contains("DXVK") || key.Contains("MTL"))
+            if (key.Contains("WINE") || key.Contains("DXMT") || key.Contains("DXVK") || 
+                key.Contains("MTL") || key.Contains("PROTON") || key.Contains("DALAMUD") ||
+                key.Contains("LD_LIBRARY") || key.Contains("VKD3D"))
             {
                 _logger.LogDebug("[GAME]   {Key}={Value}", key, value);
             }
@@ -285,9 +345,47 @@ public class GameLaunchService
             RedirectStandardError = true
         };
         
+        // CRITICAL: Clear all inherited environment variables first
+        // This prevents system LD_LIBRARY_PATH or other vars from interfering
+        startInfo.Environment.Clear();
+        
+        // Apply our Wine environment variables
         foreach (var (key, value) in environment)
         {
             startInfo.Environment[key] = value;
+        }
+        
+        // Add essential system variables back
+        var essentialVars = new[] 
+        { 
+            "PATH", "HOME", 
+            "DISPLAY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR",  // Display server
+            "XAUTHORITY", "XDG_SESSION_TYPE",                   // X11 auth
+            "LANG", "LC_ALL"                                    // Locale
+        };
+        
+        foreach (var varName in essentialVars)
+        {
+            if (!startInfo.Environment.ContainsKey(varName))
+            {
+                var value = Environment.GetEnvironmentVariable(varName);
+                if (!string.IsNullOrEmpty(value))
+                {
+                    startInfo.Environment[varName] = value;
+                }
+            }
+        }
+        
+        // Ensure PATH is set
+        if (!startInfo.Environment.ContainsKey("PATH"))
+        {
+            startInfo.Environment["PATH"] = "/usr/bin:/bin";
+        }
+        
+        // Ensure HOME is set
+        if (!startInfo.Environment.ContainsKey("HOME"))
+        {
+            startInfo.Environment["HOME"] = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         }
         
         _gameProcess = Process.Start(startInfo);
@@ -297,14 +395,32 @@ public class GameLaunchService
             return new GameLaunchResult
             {
                 Success = false,
-                ErrorMessage = "Failed to start Wine process"
+                ErrorMessage = "Failed to start game process"
             };
         }
         
-        _logger.LogInformation("[GAME] Wine process started with PID: {Pid}", _gameProcess.Id);
+        // Capture output for debugging
+        _ = Task.Run(() =>
+        {
+            while (!_gameProcess.StandardOutput.EndOfStream)
+            {
+                var line = _gameProcess.StandardOutput.ReadLine();
+                if (!string.IsNullOrWhiteSpace(line))
+                    _logger.LogDebug("[GAME-OUT] {Line}", line);
+            }
+        });
         
-        // Write game log asynchronously
-        _ = WriteGameLogAsync(_gameProcess);
+        _ = Task.Run(() =>
+        {
+            while (!_gameProcess.StandardError.EndOfStream)
+            {
+                var line = _gameProcess.StandardError.ReadLine();
+                if (!string.IsNullOrWhiteSpace(line))
+                    _logger.LogError("[GAME-ERR] {Line}", line);
+            }
+        });
+        
+        _logger.LogInformation("[GAME] Game started with PID: {Pid}", _gameProcess.Id);
         
         await Task.CompletedTask;
         return new GameLaunchResult
@@ -401,32 +517,6 @@ public class GameLaunchService
             return File.ReadAllText(verPath).Trim();
         }
         return "2012.01.01.0000.0000"; // Default version
-    }
-    
-    private string GetWinePath()
-    {
-        try
-        {
-            // Use WinePathService to get Wine path
-            var winePathService = WinePathService.Instance;
-            if (File.Exists(winePathService.WineExecutable))
-            {
-                return winePathService.WineExecutable;
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "[GAME] Failed to get Wine path from WinePathService");
-        }
-        
-        // Fallback: use system Wine
-        var systemWine = "/usr/local/bin/wine64";
-        if (File.Exists(systemWine))
-        {
-            return systemWine;
-        }
-        
-        return string.Empty;
     }
     
     private string GetLogDirectory()

@@ -66,7 +66,7 @@ public class GameController : ControllerBase
             
             var result = await _gameLaunchService.FakeLaunchAsync(
                 config.Game.GamePath,
-                config.Wine,
+                RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? config.Proton : config.Wine,
                 dalamudRuntimePath,
                 cancellationToken);
             
@@ -202,7 +202,7 @@ public class GameController : ControllerBase
             var result = await _gameLaunchService.LaunchGameAsync(
                 config.Game.GamePath,
                 request.SessionId,
-                config.Wine,
+                RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? config.Proton : config.Wine,
                 dalamudRuntimePath,
                 cancellationToken);
             

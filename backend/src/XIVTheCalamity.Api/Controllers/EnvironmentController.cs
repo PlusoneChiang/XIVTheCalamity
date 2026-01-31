@@ -156,4 +156,46 @@ public class EnvironmentController(
             _sseLock.Release();
         }
     }
+    
+    /// <summary>
+    /// Launch diagnostic tool (winecfg, regedit, etc.)
+    /// </summary>
+    [HttpPost("launch-tool/{tool}")]
+    public async Task<IActionResult> LaunchTool(string tool, CancellationToken cancellationToken)
+    {
+        if (environmentService == null)
+        {
+            return BadRequest(new { success = false, error = "Environment service not available" });
+        }
+        
+        logger.LogInformation("[ENV-TOOL] Launching diagnostic tool: {Tool}", tool);
+        
+        try
+        {
+            // Map tool name to executable
+            var toolExe = tool.ToLowerInvariant() switch
+            {
+                "winecfg" => "winecfg.exe",
+                "regedit" => "regedit.exe",
+                "cmd" => "cmd.exe",
+                "notepad" => "notepad.exe",
+                "explorer" => "explorer.exe",
+                _ => $"{tool}.exe"
+            };
+            
+            var result = await environmentService.ExecuteAsync(toolExe, Array.Empty<string>(), cancellationToken);
+            
+            return Ok(new { 
+                success = true, 
+                exitCode = result.ExitCode,
+                stdout = result.StandardOutput,
+                stderr = result.StandardError
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[ENV-TOOL] Failed to launch tool: {Tool}", tool);
+            return StatusCode(500, new { success = false, error = ex.Message });
+        }
+    }
 }
