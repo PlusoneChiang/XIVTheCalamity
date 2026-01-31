@@ -36,12 +36,14 @@ const translations = {
     'game.stopped': '遊戲已停止',
     
     // Progress (Environment Initialization)
-    'progress.checking_proton': '檢查 Proton 狀態',
-    'progress.downloading_proton': '下載 Proton',
+    'progress.checking_wine': '檢查 Wine 狀態',
+    'progress.downloading_wine': '下載 Wine 中',
+    'progress.extracting_wine': '解壓縮 Wine',
+    'progress.installing_wine': '安裝 Wine',
     'progress.downloading': '下載中',
     'progress.extracting': '解壓縮中',
-    'progress.proton_ready': 'Proton 已就緒',
-    'progress.proton_downloaded': 'Proton 下載完成',
+    'progress.wine_ready': 'Wine 已就緒',
+    'progress.wine_downloaded': 'Wine 下載完成',
     'progress.initializing_prefix': '初始化 Wine Prefix',
     'progress.prefix_initialized': 'Wine Prefix 已就緒',
     'progress.complete': '環境初始化完成',
@@ -127,7 +129,7 @@ const translations = {
     'settings.wine.tool_failed': '無法開啟 {tool}',
     'settings.wine.launching_tool': '正在啟動 Wine 工具...',
     
-    // Proton settings (Linux)
+    // Wine-XIV settings (Linux)
     'settings.winexiv.graphics': '圖形設定',
     'settings.winexiv.dxvk_hud': 'DXVK HUD 顯示',
     'settings.winexiv.dxvk_hud_help': '顯示 DXVK 效能監控資訊',
@@ -325,7 +327,7 @@ const translations = {
     
     // API Error codes - Environment
     'error.env_init_failed': '環境初始化失敗',
-    'error.download_failed': 'Proton 下載失敗',
+    'error.download_failed': 'Wine 下載失敗',
     'error.initialization_failed': '環境初始化失敗',
     
     // API Error codes - System
@@ -366,12 +368,14 @@ const translations = {
     'game.stopped': 'Game stopped',
     
     // Progress (Environment Initialization)
-    'progress.checking_proton': 'Checking Proton status',
-    'progress.downloading_proton': 'Downloading Proton',
+    'progress.checking_wine': 'Checking Wine status',
+    'progress.downloading_wine': 'Downloading Wine',
+    'progress.extracting_wine': 'Extracting Wine',
+    'progress.installing_wine': 'Installing Wine',
     'progress.downloading': 'Downloading',
     'progress.extracting': 'Extracting',
-    'progress.proton_ready': 'Proton is ready',
-    'progress.proton_downloaded': 'Proton download complete',
+    'progress.wine_ready': 'Wine is ready',
+    'progress.wine_downloaded': 'Wine download complete',
     'progress.initializing_prefix': 'Initializing Wine Prefix',
     'progress.prefix_initialized': 'Wine Prefix is ready',
     'progress.complete': 'Environment initialization complete',
@@ -457,7 +461,7 @@ const translations = {
     'settings.wine.tool_failed': 'Failed to open {tool}',
     'settings.wine.launching_tool': 'Launching Wine tool...',
     
-    // Proton settings (Linux)
+    // Wine-XIV settings (Linux)
     'settings.winexiv.graphics': 'Graphics Settings',
     'settings.winexiv.dxvk_hud': 'DXVK HUD Display',
     'settings.winexiv.dxvk_hud_help': 'Show DXVK performance overlay',
@@ -655,7 +659,7 @@ const translations = {
     
     // API Error codes - Environment
     'error.env_init_failed': 'Environment initialization failed',
-    'error.download_failed': 'Proton download failed',
+    'error.download_failed': 'Wine download failed',
     'error.initialization_failed': 'Environment initialization failed',
     
     // API Error codes - System

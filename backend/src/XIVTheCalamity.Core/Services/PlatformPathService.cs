@@ -103,7 +103,7 @@ public class PlatformPathService
 
     /// <summary>
     /// Get Wine prefix path
-    /// All Wine/Proton prefix data stored here
+    /// All Wine/Wine-XIV prefix data stored here
     /// </summary>
     public string GetWinePrefixPath()
     {

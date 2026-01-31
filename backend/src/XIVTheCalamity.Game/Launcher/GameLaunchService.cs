@@ -38,7 +38,7 @@ public class GameLaunchService
     
     /// <summary>
     /// Fake Launch - Test launch game (without Session ID)
-    /// For macOS, pass WineConfig. For Linux, pass ProtonConfig (cast to object).
+    /// For macOS, pass WineConfig. For Linux, pass WineXIVConfig (cast to object).
     /// </summary>
     public async Task<GameLaunchResult> FakeLaunchAsync(
         string gamePath,
@@ -62,7 +62,7 @@ public class GameLaunchService
     
     /// <summary>
     /// Launch game officially
-    /// For macOS, pass WineConfig. For Linux, pass ProtonConfig (cast to object).
+    /// For macOS, pass WineConfig. For Linux, pass WineXIVConfig (cast to object).
     /// </summary>
     public async Task<GameLaunchResult> LaunchGameAsync(
         string gamePath,
@@ -333,7 +333,7 @@ public class GameLaunchService
         foreach (var (key, value) in environment)
         {
             if (key.Contains("WINE") || key.Contains("DXMT") || key.Contains("DXVK") || 
-                key.Contains("MTL") || key.Contains("PROTON") || key.Contains("DALAMUD") ||
+                key.Contains("MTL") || key.Contains("DALAMUD") ||
                 key.Contains("LD_LIBRARY") || key.Contains("VKD3D"))
             {
                 _logger.LogDebug("[GAME]   {Key}={Value}", key, value);

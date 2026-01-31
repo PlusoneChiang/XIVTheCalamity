@@ -158,16 +158,19 @@ function createWindow() {
     }
   });
   
-  // DevTools control
-  if (isDebugModeEnabled) {
-    // Open DevTools automatically in debug mode
-    mainWindow.webContents.openDevTools();
-  } else {
-    // Close DevTools immediately if opened
-    mainWindow.webContents.on('devtools-opened', () => {
-      mainWindow.webContents.closeDevTools();
-    });
-  }
+  // DevTools control - DISABLED: No longer auto-open in debug mode
+  // Use F12 or menu if needed
+  mainWindow.webContents.on('devtools-opened', () => {
+    // Allow DevTools to be manually opened if needed
+    // mainWindow.webContents.closeDevTools();
+  });
+
+  // Close settings window when main window closes
+  mainWindow.on('close', () => {
+    if (settingsWindowInstance && !settingsWindowInstance.isDestroyed()) {
+      settingsWindowInstance.close();
+    }
+  });
 }
 
 /**
@@ -213,20 +216,17 @@ function createSettingsWindow() {
   // Load settings page
   const settingsPath = path.join(__dirname, '../renderer/pages/settings/settings.html');
   settingsWindowInstance.loadFile(settingsPath);
-  
-  // Disable DevTools if not in debug mode
-  if (!isDebugModeEnabled) {
-    // Close DevTools immediately if opened
-    settingsWindowInstance.webContents.on('devtools-opened', () => {
-      settingsWindowInstance.webContents.closeDevTools();
-    });
-  }
-  
+
+  // DevTools control - Allow manual opening if needed
+  settingsWindowInstance.webContents.on('devtools-opened', () => {
+    // Allow DevTools to be manually opened if needed
+  });
+
   // Clean up reference when window is closed
   settingsWindowInstance.on('closed', () => {
     settingsWindowInstance = null;
   });
-  
+
   return settingsWindowInstance;
 }
 

@@ -197,6 +197,7 @@ public class WineXIVDownloadService(
         response.EnsureSuccessStatusCode();
         
         var totalBytes = response.Content.Headers.ContentLength ?? 0;
+        var fileName = Path.GetFileName(url);
         
         using var contentStream = await response.Content.ReadAsStreamAsync(ct);
         using var fileStream = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true);
@@ -204,24 +205,67 @@ public class WineXIVDownloadService(
         var buffer = new byte[8192];
         long totalRead = 0;
         int bytesRead;
+        var startTime = DateTime.UtcNow;
+        var lastReportTime = startTime;
+        long lastReportedBytes = 0;
         
         while ((bytesRead = await contentStream.ReadAsync(buffer, ct)) > 0)
         {
             await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
             totalRead += bytesRead;
             
-            if (totalBytes > 0)
+            // Report progress every 500ms to avoid too frequent updates
+            var now = DateTime.UtcNow;
+            if (totalBytes > 0 && (now - lastReportTime).TotalMilliseconds >= 500)
             {
+                var elapsedSeconds = (now - lastReportTime).TotalSeconds;
+                var bytesDownloadedSinceLastReport = totalRead - lastReportedBytes;
+                var downloadSpeed = elapsedSeconds > 0 ? bytesDownloadedSinceLastReport / elapsedSeconds : 0;
+                
                 var percentage = (int)(10 + (totalRead * 60.0 / totalBytes));
+                var downloadedMB = totalRead / (1024.0 * 1024.0);
+                var totalMB = totalBytes / (1024.0 * 1024.0);
+                var speedMBps = downloadSpeed / (1024.0 * 1024.0);
+                
                 progress?.Report(new DownloadProgress
                 {
                     Stage = "downloading",
                     MessageKey = "progress.downloading_wine",
                     BytesDownloaded = totalRead,
                     TotalBytes = totalBytes,
-                    Percentage = percentage
+                    Percentage = percentage,
+                    CurrentFile = fileName,
+                    DownloadedMB = downloadedMB,
+                    TotalMB = totalMB,
+                    DownloadSpeedMBps = speedMBps
                 });
+                
+                lastReportTime = now;
+                lastReportedBytes = totalRead;
             }
+        }
+        
+        // Final report
+        if (totalBytes > 0)
+        {
+            var totalElapsedSeconds = (DateTime.UtcNow - startTime).TotalSeconds;
+            var avgSpeed = totalElapsedSeconds > 0 ? totalRead / totalElapsedSeconds : 0;
+            var downloadedMB = totalRead / (1024.0 * 1024.0);
+            var totalMB = totalBytes / (1024.0 * 1024.0);
+            var speedMBps = avgSpeed / (1024.0 * 1024.0);
+            
+            progress?.Report(new DownloadProgress
+            {
+                Stage = "downloading",
+                MessageKey = "progress.downloading_wine",
+                BytesDownloaded = totalRead,
+                TotalBytes = totalBytes,
+                Percentage = 70, // Ready for extraction
+                CurrentFile = fileName,
+                DownloadedMB = downloadedMB,
+                TotalMB = totalMB,
+                DownloadSpeedMBps = speedMBps
+            });
         }
     }
     
@@ -327,6 +371,12 @@ public class DownloadProgress
     public long BytesDownloaded { get; set; }
     public long TotalBytes { get; set; }
     public double Percentage { get; set; }
+    
+    // New fields for detailed progress display
+    public double DownloadedMB { get; set; }
+    public double TotalMB { get; set; }
+    public double DownloadSpeedMBps { get; set; }
+    
     public bool IsComplete { get; set; }
     public bool HasError { get; set; }
     public string? ErrorMessage { get; set; }

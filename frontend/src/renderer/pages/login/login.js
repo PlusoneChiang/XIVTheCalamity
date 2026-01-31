@@ -716,15 +716,24 @@ function startEnvironmentInitialization() {
         const data = JSON.parse(event.data);
         console.log('[ENV-INIT] Progress data:', data);
         
-        // Get i18n message and append percentage
+        // Get i18n message
         const message = i18n.t(data.messageKey);
         const percentage = data.percentage || 0;
         const fileName = data.currentFile || '';
         
-        // Display: "Message - FileName - 45.5%" or "Message - 45.5%" if no file
-        if (fileName) {
+        // Display format based on stage
+        if (data.stage === 'downloading' && data.downloadedMB && data.totalMB) {
+          // Detailed download format:
+          // 下載WINE中 - {檔案名稱} - {已下載容量} MB/ {總容量} MB | {下載速度} MB/s - {已下載/總下載} %
+          const downloadedMB = data.downloadedMB.toFixed(2);
+          const totalMB = data.totalMB.toFixed(2);
+          const speedMBps = (data.downloadSpeedMBps || 0).toFixed(2);
+          titleBarText.textContent = `${message} - ${fileName} - ${downloadedMB} MB / ${totalMB} MB | ${speedMBps} MB/s - ${percentage.toFixed(1)}%`;
+        } else if (fileName) {
+          // Fallback: Show filename with percentage
           titleBarText.textContent = `${message} - ${fileName} - ${percentage.toFixed(1)}%`;
         } else {
+          // Basic: Just message with percentage
           titleBarText.textContent = `${message} - ${percentage.toFixed(1)}%`;
         }
         

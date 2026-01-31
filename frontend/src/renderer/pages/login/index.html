@@ -114,18 +114,20 @@
                     
                     <!-- OTP Secret Input (collapsible) -->
                     <div class="form-group otp-secret-group" id="otpSecretGroup" style="display: none;">
-                        <label for="otpSecret">OTP 金鑰 (Base32)</label>
-                        <input 
-                            type="text" 
-                            id="otpSecret" 
-                            name="otpSecret" 
-                            placeholder="JBSWY3DPEHPK3PXP"
-                            pattern="[A-Za-z2-7\s]+"
-                            title="請輸入 Base32 格式的 OTP 金鑰">
-                        <small class="help-text">請輸入您的 OTP 金鑰以啟用自動填入功能</small>
-                        <button type="button" id="confirmOTPSecretBtn" class="btn btn-secondary btn-small">
-                            確認
-                        </button>
+                        <label for="otpSecret" data-i18n="login.otpSecret">OTP 金鑰 (Base32)</label>
+                        <div class="input-with-button">
+                            <input 
+                                type="text" 
+                                id="otpSecret" 
+                                name="otpSecret" 
+                                placeholder="JBSWY3DPEHPK3PXP"
+                                pattern="[A-Za-z2-7\s]+"
+                                title="請輸入 Base32 格式的 OTP 金鑰">
+                            <button type="button" id="confirmOTPSecretBtn" class="btn-inline">
+                                確認
+                            </button>
+                        </div>
+                        <small class="help-text" data-i18n="login.otpSecret.help">請輸入您的 OTP 金鑰以啟用自動填入功能</small>
                     </div>
                     
                     <div class="form-group checkbox-group">

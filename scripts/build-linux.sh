@@ -53,8 +53,7 @@ if [ -d "$RELEASE_DIR" ]; then
   rm -rf "$RELEASE_DIR/linux-unpacked"
   # Remove old temp backend
   rm -rf "$RELEASE_DIR/temp-backend-linux"
-  # Keep proton-ge directory if exists
-  echo "   ✅ Cleaned (kept proton-ge)"
+  echo "   ✅ Cleaned release directory"
 else
   mkdir -p "$RELEASE_DIR"
   echo "   ✅ Created Release directory"
@@ -88,11 +87,19 @@ echo "📝 Updating package.json configuration..."
 
 cd "$FRONTEND_DIR"
 
+# Read version from version.json (primary source)
+VERSION=$(node -e "console.log(require('./src/renderer/version.json').version)")
+echo "   📦 Current version: $VERSION"
+
 node -e "
 const fs = require('fs');
 const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 
-// Update extraResources - exclude Proton GE (will be downloaded at runtime)
+// Read version from version.json
+const versionInfo = JSON.parse(fs.readFileSync('src/renderer/version.json', 'utf8'));
+pkg.version = versionInfo.version;
+
+// Update extraResources
 pkg.build.extraResources = [
   {
     from: '../Release/temp-backend-linux/XIVTheCalamity.Api',
@@ -100,8 +107,16 @@ pkg.build.extraResources = [
   }
 ];
 
+// Ensure Linux target configuration exists
+if (!pkg.build.linux) {
+  pkg.build.linux = {
+    target: ['AppImage'],
+    category: 'Game'
+  };
+}
+
 fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-console.log('   ✅ package.json updated');
+console.log('   ✅ package.json synced with version.json');
 "
 
 # ================== Install Frontend Dependencies ==================
@@ -117,14 +132,26 @@ fi
 
 # ================== Build AppImage ==================
 echo ""
-echo "📦 Building AppImage..."
+echo "📦 Building AppImage (version $VERSION)..."
 echo "   (This may take 5-10 minutes...)"
 echo ""
 
 # Use npx electron-builder directly instead of npm run build:linux
 npx electron-builder --linux --x64
 
-APPIMAGE=$(ls -t "$RELEASE_DIR"/*.AppImage 2>/dev/null | head -1)
+# Expected filename pattern
+EXPECTED_APPIMAGE="XIVTheCalamity-${VERSION}-linux-x86_64.AppImage"
+APPIMAGE="$RELEASE_DIR/$EXPECTED_APPIMAGE"
+
+# Fallback: find any AppImage with version
+if [ ! -f "$APPIMAGE" ]; then
+  APPIMAGE=$(ls -t "$RELEASE_DIR"/XIVTheCalamity-*-linux-*.AppImage 2>/dev/null | head -1)
+fi
+
+# Last resort: find any AppImage
+if [ ! -f "$APPIMAGE" ]; then
+  APPIMAGE=$(ls -t "$RELEASE_DIR"/*.AppImage 2>/dev/null | head -1)
+fi
 
 if [ -f "$APPIMAGE" ]; then
   chmod +x "$APPIMAGE"

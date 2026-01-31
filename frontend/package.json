@@ -1,6 +1,6 @@
 {
   "name": "xivthecalamity",
-  "version": "0.1.0",
+  "version": "1.1.0",
   "description": "Final Fantasy XIV Cross-Platform Launcher",
   "main": "src/main/index.js",
   "scripts": {
@@ -49,6 +49,12 @@
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
       "identity": null
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Game"
     }
   },
   "keywords": [
