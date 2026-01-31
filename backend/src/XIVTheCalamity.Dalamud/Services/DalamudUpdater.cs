@@ -33,7 +33,18 @@ public class DalamudUpdater
     {
         _logger = logger;
         _pathService = pathService;
-        _httpClient = new HttpClient
+        
+        // Configure HttpClient for optimal performance
+        var handler = new SocketsHttpHandler
+        {
+            PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
+            MaxConnectionsPerServer = 10,  // Allow more connections for parallel downloads
+            EnableMultipleHttp2Connections = true,  // Enable HTTP/2 multiplexing
+            AutomaticDecompression = System.Net.DecompressionMethods.All
+        };
+        
+        _httpClient = new HttpClient(handler)
         {
             Timeout = Timeout.InfiniteTimeSpan  // Use CancellationToken for timeout control instead
         };
@@ -67,11 +78,15 @@ public class DalamudUpdater
             status.RemoteVersion = remoteVersion.AssemblyVersion;
             status.SupportedGameVersion = remoteVersion.SupportedGameVer;
             
+            // Get remote Assets version
+            var remoteAssetManifest = await GetAssetManifestAsync();
+            var remoteAssetsVersion = remoteAssetManifest?.Version ?? 0;
+            
             if (status.LocalVersion == null)
             {
                 status.State = DalamudState.NotInstalled;
             }
-            else if (status.LocalVersion == remoteVersion.AssemblyVersion)
+            else if (status.LocalVersion == remoteVersion.AssemblyVersion && status.AssetsVersion == remoteAssetsVersion)
             {
                 status.State = DalamudState.UpToDate;
             }
@@ -295,32 +310,52 @@ public class DalamudUpdater
         }
         
         var localVersion = _pathService.GetLocalAssetsVersion();
-        var needsFullDownload = localVersion != manifest.Version;
-        
         var assetDir = _pathService.GetAssetsVersionPath(manifest.Version);
         Directory.CreateDirectory(assetDir);
+        
+        _logger.LogInformation("本地 Assets 版本: {LocalVersion}, 遠端版本: {RemoteVersion}", 
+            localVersion, manifest.Version);
         
         // 計算需要下載的檔案
         var filesToDownload = new List<DalamudAssetEntry>();
         foreach (var asset in manifest.Assets)
         {
             var localPath = Path.Combine(assetDir, asset.FileName);
-            if (!File.Exists(localPath) || !await VerifyFileHashAsync(localPath, asset.Hash))
+            
+            // 文件不存在 或 Hash驗證失敗 → 需要下載
+            if (!File.Exists(localPath))
             {
+                _logger.LogDebug("Asset 不存在，需要下載: {FileName}", asset.FileName);
+                filesToDownload.Add(asset);
+            }
+            else if (!await VerifyFileHashAsync(localPath, asset.Hash))
+            {
+                _logger.LogWarning("Asset Hash驗證失敗，需要重新下載: {FileName}", asset.FileName);
                 filesToDownload.Add(asset);
             }
         }
         
         if (filesToDownload.Count == 0)
         {
-            _logger.LogInformation("Assets 已是最新版本");
+            _logger.LogInformation("Assets 已是最新版本 (v{Version}, {Count} 個檔案已驗證)", 
+                manifest.Version, manifest.Assets.Count);
+            
+            // 確保版本文件存在
+            if (localVersion != manifest.Version)
+            {
+                await File.WriteAllTextAsync(_pathService.AssetsVersionFile, manifest.Version.ToString(), ct);
+                _logger.LogInformation("更新 Assets 版本文件: v{Version}", manifest.Version);
+            }
             return;
         }
         
-        _logger.LogInformation("需要下載 {Count} 個 Asset 檔案", filesToDownload.Count);
+        _logger.LogInformation("需要下載 {Count}/{Total} 個 Asset 檔案", 
+            filesToDownload.Count, manifest.Assets.Count);
         
         _currentProgress.TotalItems = filesToDownload.Count;
         _currentProgress.CompletedItems = 0;
+        ReportProgress(DalamudUpdateStage.DownloadingAssets, $"下載 Assets (0/{filesToDownload.Count})", resetProgress: false);
+        OnProgress?.Invoke(_currentProgress);
         
         // 並行下載 (最多 5 個)
         var semaphore = new SemaphoreSlim(5);
@@ -336,23 +371,61 @@ public class DalamudUpdater
                 _logger.LogDebug("開始下載 Asset: {FileName} ({Index}/{Total})", 
                     asset.FileName, Interlocked.Increment(ref downloadedCount), filesToDownload.Count);
                 
+                // 刪除已存在的不完整檔案
+                if (File.Exists(localPath))
+                {
+                    _logger.LogDebug("刪除舊檔案: {FileName}", asset.FileName);
+                    File.Delete(localPath);
+                }
+                
                 // 使用 jsDelivr CDN 加速
                 var url = ConvertToJsDelivr(asset.Url);
-                await DownloadFileSimpleAsync(url, localPath, ct);
+                if (url != asset.Url)
+                {
+                    _logger.LogDebug("使用 CDN 加速: {OriginalUrl} → {CdnUrl}", asset.Url, url);
+                }
+                
+                try
+                {
+                    await DownloadFileSimpleAsync(url, localPath, ct);
+                }
+                catch (Exception ex)
+                {
+                    // 下載失敗，刪除可能部分寫入的檔案
+                    if (File.Exists(localPath))
+                    {
+                        _logger.LogWarning("下載失敗，刪除不完整檔案: {FileName}", asset.FileName);
+                        try
+                        {
+                            File.Delete(localPath);
+                        }
+                        catch (Exception deleteEx)
+                        {
+                            _logger.LogError(deleteEx, "無法刪除不完整檔案: {FileName}", asset.FileName);
+                        }
+                    }
+                    throw new Exception($"下載失敗: {asset.FileName}", ex);
+                }
                 
                 // 驗證
                 if (!await VerifyFileHashAsync(localPath, asset.Hash))
                 {
-                    _logger.LogWarning("Asset 驗證失敗: {FileName}", asset.FileName);
+                    _logger.LogWarning("Asset Hash驗證失敗: {FileName}", asset.FileName);
                     File.Delete(localPath);
-                    throw new Exception($"Asset 驗證失敗: {asset.FileName}");
+                    throw new Exception($"Asset Hash驗證失敗: {asset.FileName}");
                 }
                 
                 _logger.LogDebug("完成下載 Asset: {FileName}", asset.FileName);
                 
-                _currentProgress.IncrementCompleted();
+                var completed = _currentProgress.IncrementCompleted();
                 _currentProgress.CurrentFile = asset.FileName;
-                OnProgress?.Invoke(_currentProgress);
+                
+                // 每 5 個檔案或最後一個檔案才報告進度，避免阻塞
+                if (completed % 5 == 0 || completed == filesToDownload.Count)
+                {
+                    _logger.LogInformation("Asset 下載進度: {Completed}/{Total}", completed, filesToDownload.Count);
+                    OnProgress?.Invoke(_currentProgress);
+                }
             }
             catch (Exception ex)
             {
@@ -368,6 +441,57 @@ public class DalamudUpdater
         _logger.LogInformation("開始並行下載 {Count} 個 Asset 檔案...", filesToDownload.Count);
         await Task.WhenAll(tasks);
         _logger.LogInformation("所有 Asset 檔案下載完成");
+        
+        // 驗證所有檔案完整性（包含子目錄）
+        _logger.LogInformation("驗證 Assets 完整性（包含子目錄）...");
+        var failedFiles = new List<string>();
+        var verifiedCount = 0;
+        
+        foreach (var asset in manifest.Assets)
+        {
+            var localPath = Path.Combine(assetDir, asset.FileName);
+            
+            // 確保父目錄存在
+            var directory = Path.GetDirectoryName(localPath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            {
+                failedFiles.Add($"{asset.FileName} (父目錄不存在: {directory})");
+                continue;
+            }
+            
+            // 檢查檔案是否存在
+            if (!File.Exists(localPath))
+            {
+                failedFiles.Add($"{asset.FileName} (檔案不存在)");
+                continue;
+            }
+            
+            // 驗證 Hash
+            if (!await VerifyFileHashAsync(localPath, asset.Hash))
+            {
+                failedFiles.Add($"{asset.FileName} (Hash驗證失敗)");
+                continue;
+            }
+            
+            verifiedCount++;
+        }
+        
+        if (failedFiles.Count > 0)
+        {
+            _logger.LogError("Assets 完整性驗證失敗，{FailedCount}/{TotalCount} 個檔案有問題:", 
+                failedFiles.Count, manifest.Assets.Count);
+            foreach (var file in failedFiles.Take(10))  // 只顯示前10個
+            {
+                _logger.LogError("  - {File}", file);
+            }
+            if (failedFiles.Count > 10)
+            {
+                _logger.LogError("  ... 還有 {Count} 個檔案", failedFiles.Count - 10);
+            }
+            throw new Exception($"Assets 完整性驗證失敗: {failedFiles.Count}/{manifest.Assets.Count} 個檔案有問題");
+        }
+        
+        _logger.LogInformation("✓ Assets 完整性驗證通過 ({Count} 個檔案，包含子目錄)", verifiedCount);
         
         // 保存版本
         await File.WriteAllTextAsync(_pathService.AssetsVersionFile, manifest.Version.ToString(), ct);
@@ -404,9 +528,10 @@ public class DalamudUpdater
     /// <summary>下載檔案 (不追蹤 bytes 進度，用於並行下載小檔案)</summary>
     private async Task DownloadFileSimpleAsync(string url, string targetPath, CancellationToken ct)
     {
-        // Use per-request timeout of 2 minutes for large files
+        // Use per-request timeout of 5 minutes for large files (17MB CJK fonts)
+        // Required speed: ~57 KB/s to download 17MB in 5 minutes
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        cts.CancelAfter(TimeSpan.FromMinutes(2));
+        cts.CancelAfter(TimeSpan.FromMinutes(5));
         
         using var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cts.Token);
         response.EnsureSuccessStatusCode();
