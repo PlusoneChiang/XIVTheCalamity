@@ -87,6 +87,12 @@ class AudioRouter {
         return AudioDeviceManager.getDeviceName(deviceID: defaultDevice)
     }
     
+    /// Force rescan audio devices
+    func forceRescan() {
+        log("Force rescanning audio devices and updating Wine registry")
+        wineRegistry.rescanDevices()
+    }
+    
     // MARK: - Private Methods
     
     /// Get or create Wine GUID for device

@@ -76,10 +76,17 @@ struct XTCAudioRouter: ParsableCommand {
         setupSignalHandlers()
         
         // Start process monitoring
-        processMonitor.start {
-            logMessage("Game process exited, shutting down...")
-            shutdown()
-        }
+        processMonitor.start(
+            onDetected: {
+                // When game process is first detected, force a rescan
+                logMessage("Game process detected, triggering initial audio device rescan...")
+                audioRouter.forceRescan()
+            },
+            onExit: {
+                logMessage("Game process exited, shutting down...")
+                shutdown()
+            }
+        )
         
         logMessage("Audio routing active. Monitoring PID \(pid)...")
         

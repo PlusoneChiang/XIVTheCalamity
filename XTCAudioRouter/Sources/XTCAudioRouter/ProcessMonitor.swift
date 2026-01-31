@@ -13,6 +13,8 @@ class ProcessMonitor {
     private let targetPID: Int32
     private var timer: DispatchSourceTimer?
     private var onProcessExit: (() -> Void)?
+    private var onProcessDetected: (() -> Void)?
+    private var hasDetectedProcess: Bool = false
     
     /// Check interval in seconds
     private let checkInterval: TimeInterval = 2.0
@@ -24,8 +26,11 @@ class ProcessMonitor {
     // MARK: - Public Methods
     
     /// Start monitoring the process
-    /// - Parameter onExit: Callback when process exits
-    func start(onExit: @escaping () -> Void) {
+    /// - Parameters:
+    ///   - onDetected: Callback when process is first detected
+    ///   - onExit: Callback when process exits
+    func start(onDetected: (() -> Void)? = nil, onExit: @escaping () -> Void) {
+        self.onProcessDetected = onDetected
         self.onProcessExit = onExit
         
         // Check if process exists initially
@@ -36,6 +41,15 @@ class ProcessMonitor {
         }
         
         log("Started monitoring PID \(targetPID)")
+        
+        // Trigger initial detection callback
+        if let onDetected = self.onProcessDetected {
+            log("Process \(targetPID) detected, triggering initial setup")
+            hasDetectedProcess = true
+            DispatchQueue.main.async {
+                onDetected()
+            }
+        }
         
         // Create timer for periodic checks
         let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .utility))
