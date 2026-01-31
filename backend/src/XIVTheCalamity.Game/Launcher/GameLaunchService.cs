@@ -166,10 +166,14 @@ public class GameLaunchService
                 var baseEnvironment = _environmentService.GetEnvironment();
                 
                 // Add Dalamud runtime if provided
+                // CRITICAL: Must convert to Wine Z:\ path format
+                // Dalamud.Boot.dll passes this to hostfxr which expects Windows paths in Wine
                 if (!string.IsNullOrEmpty(dalamudRuntimePath))
                 {
-                    baseEnvironment["DALAMUD_RUNTIME"] = dalamudRuntimePath;
-                    _logger.LogInformation("[GAME] Dalamud Runtime path: {Path}", dalamudRuntimePath);
+                    var wineDalamudPath = $"Z:{dalamudRuntimePath.Replace("/", "\\")}";
+                    baseEnvironment["DALAMUD_RUNTIME"] = wineDalamudPath;
+                    baseEnvironment["DOTNET_ROOT"] = wineDalamudPath;  // Also set DOTNET_ROOT
+                    _logger.LogInformation("[GAME] Dalamud Runtime path (Wine): {Path}", wineDalamudPath);
                 }
                 
                 return await LaunchWithEnvironmentServiceAsync(
@@ -297,16 +301,18 @@ public class GameLaunchService
         }
         
         var emulatorDir = _environmentService.GetEmulatorDirectory();
-        var winePath = Path.Combine(emulatorDir, "files", "bin", "wine");
         
-        // For macOS Wine, try wine64 instead
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        // Get wine executable path based on platform
+        string winePath;
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) || RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
-            var wine64Path = Path.Combine(emulatorDir, "bin", "wine64");
-            if (File.Exists(wine64Path))
-            {
-                winePath = wine64Path;
-            }
+            // macOS & Linux: use bin/wine64
+            winePath = Path.Combine(emulatorDir, "bin", "wine64");
+        }
+        else
+        {
+            // Fallback (should not reach here for non-Windows)
+            winePath = Path.Combine(emulatorDir, "files", "bin", "wine");
         }
         
         if (string.IsNullOrEmpty(winePath) || !File.Exists(winePath))
@@ -361,7 +367,8 @@ public class GameLaunchService
             "PATH", "HOME", 
             "DISPLAY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR",  // Display server
             "XAUTHORITY", "XDG_SESSION_TYPE",                   // X11 auth
-            "LANG", "LC_ALL"                                    // Locale
+            "LANG", "LC_ALL",                                    // Locale
+            "DALAMUD_RUNTIME"                                    // Dalamud .NET Runtime path (Unix path)
         };
         
         foreach (var varName in essentialVars)

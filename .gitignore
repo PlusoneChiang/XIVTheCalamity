@@ -5,8 +5,8 @@ Release/
 /proton/
 
 # Backend bin/obj
-backend/src/**/bin/
-backend/src/**/obj/
+backend/**/bin/
+backend/**/obj/
 
 # XTCAudioRouter (Swift)
 XTCAudioRouter/.build/

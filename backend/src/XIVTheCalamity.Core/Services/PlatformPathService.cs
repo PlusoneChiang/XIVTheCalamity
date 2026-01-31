@@ -129,18 +129,18 @@ public class PlatformPathService
     }
 
     /// <summary>
-    /// Get Proton installation directory (Linux only)
-    /// This is where Proton GE is downloaded and stored
+    /// Get Wine-XIV installation directory (Linux only)
+    /// This is where Wine-XIV is downloaded and stored
     /// </summary>
-    public string GetProtonDirectory()
+    public string GetWineXIVDirectory()
     {
-        return Path.Combine(UserDataDirectory, "proton");
+        return Path.Combine(UserDataDirectory, "wine");
     }
 
     /// <summary>
-    /// Get Wine/Proton emulator root directory
+    /// Get Wine/Wine-XIV emulator root directory
     /// macOS: Wine directory
-    /// Linux: Proton GE directory
+    /// Linux: Wine-XIV directory (~/.config/XIVTheCalamity/wine/)
     /// Windows: Empty (native execution)
     /// </summary>
     public string GetEmulatorRootDirectory()
@@ -151,7 +151,7 @@ public class PlatformPathService
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
-            return GetLinuxProtonDirectory();
+            return GetLinuxWineXIVDirectory();
         }
 
         throw new PlatformNotSupportedException(
@@ -190,59 +190,20 @@ public class PlatformPathService
     }
 
     /// <summary>
-    /// Get Linux Proton directory
-    /// Priority: 1. User data directory (downloaded), 2. Dev environment (project root), 3. Resources (AppImage)
+    /// Get Linux Wine-XIV directory
+    /// Returns: ~/.config/XIVTheCalamity/wine/
     /// </summary>
-    private string GetLinuxProtonDirectory()
+    private string GetLinuxWineXIVDirectory()
     {
-        var appDir = AppContext.BaseDirectory;
-
-        // Priority 1: User data directory (downloaded Proton)
-        var userProtonPath = GetProtonDirectory();
-        if (Directory.Exists(userProtonPath))
-        {
-            var protonDirs = Directory.GetDirectories(userProtonPath, "GE-Proton*");
-            if (protonDirs.Length > 0)
-            {
-                return protonDirs[0];
-            }
-        }
-
-        // Priority 2: Dev environment - search upward for proton-ge/ (for manual setup)
-        var currentDir = new DirectoryInfo(appDir);
-        while (currentDir != null)
-        {
-            var protonPath = Path.Combine(currentDir.FullName, "proton-ge");
-            if (Directory.Exists(protonPath))
-            {
-                var protonDirs = Directory.GetDirectories(protonPath, "GE-Proton*");
-                if (protonDirs.Length > 0)
-                {
-                    return protonDirs[0];
-                }
-            }
-            currentDir = currentDir.Parent;
-        }
-
-        // Priority 3: Production environment (AppImage) - Resources directory
-        var resourcesPath = Path.Combine(appDir, "..", "Resources", "proton");
-        if (Directory.Exists(resourcesPath))
-        {
-            var protonDirs = Directory.GetDirectories(resourcesPath, "GE-Proton*");
-            if (protonDirs.Length > 0)
-            {
-                return protonDirs[0];
-            }
-        }
-
-        throw new DirectoryNotFoundException(
-            $"Proton not found. Searched: {userProtonPath}, project root from {appDir}, Resources");
+        // Wine-XIV is always downloaded to user config directory
+        var wineRoot = Path.Combine(UserDataDirectory, "wine");
+        return wineRoot;
     }
 
     /// <summary>
-    /// Get Wine/Proton executable path
+    /// Get Wine/Wine-XIV executable path
     /// macOS: wine executable in Wine directory
-    /// Linux: wine executable in Proton GE files/bin
+    /// Linux: wine64 executable in Wine-XIV bin directory
     /// </summary>
     public string GetWineExecutable()
     {
@@ -255,8 +216,8 @@ public class PlatformPathService
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
-            // Linux Proton: proton-ge/GE-ProtonXX-XX/files/bin/wine
-            return Path.Combine(emulatorRoot, "files", "bin", "wine");
+            // Linux Wine-XIV: wine/bin/wine64
+            return Path.Combine(emulatorRoot, "bin", "wine64");
         }
 
         throw new PlatformNotSupportedException();

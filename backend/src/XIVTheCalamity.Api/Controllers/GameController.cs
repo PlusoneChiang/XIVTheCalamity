@@ -66,7 +66,7 @@ public class GameController : ControllerBase
             
             var result = await _gameLaunchService.FakeLaunchAsync(
                 config.Game.GamePath,
-                RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? config.Proton : config.Wine,
+                RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? config.WineXIV : config.Wine,
                 dalamudRuntimePath,
                 cancellationToken);
             
@@ -74,7 +74,7 @@ public class GameController : ControllerBase
             {
                 _logger.LogInformation("[GAME] Fake launch successful, PID: {Pid}", result.ProcessId);
                 
-                // Start audio router if enabled (via environment service)
+                // Start audio router if enabled (macOS only)
                 if (config.Wine?.AudioRouting == true && result.ProcessId.HasValue)
                 {
                     _environmentService.StartAudioRouter(result.ProcessId.Value, 
@@ -86,7 +86,10 @@ public class GameController : ControllerBase
                 if (config.Dalamud.Enabled)
                 {
                     _logger.LogInformation("[GAME] Dalamud enabled, starting injection...");
-                    _ = InjectDalamudAsync(config.Dalamud, cancellationToken);
+                    _ = InjectDalamudAsync(
+                        config.Dalamud, 
+                        RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? config.WineXIV : config.Wine,
+                        cancellationToken);
                 }
                 
                 _logger.LogInformation("[GAME] Waiting for game exit...");
@@ -129,21 +132,35 @@ public class GameController : ControllerBase
     /// </summary>
     private async Task InjectDalamudAsync(
         XIVTheCalamity.Core.Models.DalamudConfig dalamudConfig,
+        object? emulatorConfig,
         CancellationToken cancellationToken)
     {
         try
         {
             // Get emulator path and environment from platform service
             var emulatorDir = _environmentService.GetEmulatorDirectory();
-            var winePath = Path.Combine(emulatorDir, "files", "bin", "wine");
+            
+            // Determine wine executable path based on platform
+            string winePath;
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) || RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                // macOS: Wine, Linux: Wine-XIV
+                winePath = Path.Combine(emulatorDir, "bin", "wine64");
+            }
+            else
+            {
+                throw new PlatformNotSupportedException("Wine is only supported on macOS and Linux");
+            }
             
             if (string.IsNullOrEmpty(emulatorDir) || !System.IO.File.Exists(winePath))
             {
-                _logger.LogWarning("[GAME] Wine/Proton not available, cannot inject Dalamud");
+                _logger.LogWarning("[GAME] Wine/Wine-XIV not available, cannot inject Dalamud. Path checked: {WinePath}", winePath);
                 return;
             }
             
+            // Get environment from service (works for all platforms)
             var environment = _environmentService.GetEnvironment();
+            _logger.LogDebug("[GAME] Using environment for Dalamud injection");
             
             var options = new DalamudInjectionOptions
             {
@@ -202,7 +219,7 @@ public class GameController : ControllerBase
             var result = await _gameLaunchService.LaunchGameAsync(
                 config.Game.GamePath,
                 request.SessionId,
-                RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? config.Proton : config.Wine,
+                RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? config.WineXIV : config.Wine,
                 dalamudRuntimePath,
                 cancellationToken);
             
@@ -210,7 +227,7 @@ public class GameController : ControllerBase
             {
                 _logger.LogInformation("[GAME] Launch successful, PID: {Pid}", result.ProcessId);
                 
-                // Start audio router if enabled (via environment service)
+                // Start audio router if enabled (macOS only)
                 if (config.Wine?.AudioRouting == true && result.ProcessId.HasValue)
                 {
                     _environmentService.StartAudioRouter(result.ProcessId.Value, 
@@ -222,7 +239,10 @@ public class GameController : ControllerBase
                 if (config.Dalamud.Enabled)
                 {
                     _logger.LogInformation("[GAME] Dalamud enabled, starting injection...");
-                    _ = InjectDalamudAsync(config.Dalamud, cancellationToken);
+                    _ = InjectDalamudAsync(
+                        config.Dalamud, 
+                        RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? config.WineXIV : config.Wine,
+                        cancellationToken);
                 }
                 
                 return this.SuccessResult(new { processId = result.ProcessId });

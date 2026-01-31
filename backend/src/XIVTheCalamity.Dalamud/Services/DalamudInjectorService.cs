@@ -165,7 +165,8 @@ public class DalamudInjectorService
                 CreateNoWindow = true
             };
             
-            // Set environment variables
+            // Do NOT clear environment - inherit parent environment and override Wine variables
+            // This preserves system library loader variables that .NET Runtime needs
             foreach (var (key, value) in environment)
             {
                 psi.Environment[key] = value;
@@ -229,21 +230,44 @@ public class DalamudInjectorService
     
     /// <summary>
     /// Add Dalamud environment variables
-    /// Reference XoM UnixDalamudRunner: DALAMUD_RUNTIME uses Wine path
+    /// CRITICAL: Must use Wine Z:\ path format for DALAMUD_RUNTIME and DOTNET_ROOT
+    /// Dalamud passes this path to hostfxr, which needs Windows-style path in Wine
     /// </summary>
     private void AddDalamudEnvironment(Dictionary<string, string> env, string winePath)
     {
         var runtimePath = _pathService.RuntimePath;
-        var wineRuntimePath = ConvertToWinePath(runtimePath);
         
-        // Set .NET Runtime path (use Wine path, reference XoM UnixDalamudRunner)
+        // Convert Unix path to Wine Z:\ path
+        // Dalamud.Boot will pass this to hostfxr, which expects Windows paths
+        var wineRuntimePath = $"Z:{runtimePath.Replace("/", "\\")}";
         env["DALAMUD_RUNTIME"] = wineRuntimePath;
-        env["DOTNET_ROOT"] = wineRuntimePath;
+        env["DOTNET_ROOT"] = wineRuntimePath;  // XIVLauncher.Core sets this
         
-        // Important: set DOTNET_EnableWriteXorExecute=0 for Apple Silicon
-        env["DOTNET_EnableWriteXorExecute"] = "0";
+        // Important: .NET Runtime configuration
+        env["DOTNET_EnableWriteXorExecute"] = "0";  // Disable W^X for Apple Silicon compatibility
+        env["COMPlus_EnableAlternateStackCheck"] = "0";  // Disable stack checks that may fail in Wine
+        env["COMPlus_gcAllowVeryLargeObjects"] = "1";  // Allow large objects
         
-        _logger.LogDebug("[DALAMUD-INJECT] DALAMUD_RUNTIME={Path} (Wine: {WinePath})", runtimePath, wineRuntimePath);
+        // Enable detailed .NET Core Host tracing for debugging
+        env["COREHOST_TRACE"] = "1";
+        env["COREHOST_TRACEFILE"] = $"{_pathService.LogPath}/corehost.log";
+        
+        // CRITICAL: Prepend system library paths for ICU
+        // .NET Runtime needs libicuuc from system libraries
+        if (env.ContainsKey("LD_LIBRARY_PATH"))
+        {
+            env["LD_LIBRARY_PATH"] = $"/usr/lib64:/usr/lib:{env["LD_LIBRARY_PATH"]}";
+        }
+        else
+        {
+            env["LD_LIBRARY_PATH"] = "/usr/lib64:/usr/lib";
+        }
+        
+        _logger.LogDebug("[DALAMUD-INJECT] DALAMUD_RUNTIME={Path} (Wine Z:\\ path)", wineRuntimePath);
+        _logger.LogDebug("[DALAMUD-INJECT] DOTNET_ROOT={Path} (same as DALAMUD_RUNTIME)", wineRuntimePath);
+        _logger.LogDebug("[DALAMUD-INJECT] COMPlus settings configured for Wine compatibility");
+        _logger.LogDebug("[DALAMUD-INJECT] COREHOST_TRACE=1 (detailed .NET diagnostics)");
+        _logger.LogDebug("[DALAMUD-INJECT] LD_LIBRARY_PATH={Path}", env["LD_LIBRARY_PATH"]);
     }
     
     /// <summary>
@@ -317,6 +341,9 @@ public class DalamudInjectorService
     {
         var injectorPath = _pathService.InjectorPath;
         
+        // Enable Wine debugging for .NET Runtime loading
+        environment["WINEDEBUG"] = "+module,+loaddll";
+        
         var psi = new ProcessStartInfo
         {
             FileName = winePath,
@@ -324,14 +351,74 @@ public class DalamudInjectorService
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            CreateNoWindow = true
+            CreateNoWindow = true,
+            WorkingDirectory = Path.GetDirectoryName(injectorPath) // Set working directory to Dalamud.Injector.exe location
         };
         
-        // Set environment variables
+        // Remove potentially conflicting variables first
+        var conflictingVars = new[] 
+        { 
+            "LD_PRELOAD", "SDL_VIDEODRIVER", "QT_QPA_PLATFORM",
+            // AppImage variables that conflict with Wine
+            "APPDIR", "APPIMAGE", "ARGV0", "GSETTINGS_SCHEMA_DIR", "OWD"
+        };
+        foreach (var varName in conflictingVars)
+        {
+            psi.Environment.Remove(varName);
+        }
+        
+        // Clean PATH - remove AppImage mount point
+        if (psi.Environment.ContainsKey("PATH"))
+        {
+            var path = psi.Environment["PATH"];
+            var paths = path.Split(':')
+                .Where(p => !p.Contains(".mount_") && !p.Contains("/tmp/.mount"))
+                .ToArray();
+            psi.Environment["PATH"] = string.Join(":", paths);
+        }
+        
+        // Clean XDG_DATA_DIRS - remove AppImage mount point
+        if (psi.Environment.ContainsKey("XDG_DATA_DIRS"))
+        {
+            var xdgData = psi.Environment["XDG_DATA_DIRS"];
+            var dirs = xdgData.Split(':')
+                .Where(d => !d.Contains(".mount_") && !d.Contains("/tmp/.mount"))
+                .ToArray();
+            psi.Environment["XDG_DATA_DIRS"] = string.Join(":", dirs);
+        }
+        
+        // Override with Wine environment variables
         foreach (var (key, value) in environment)
         {
             psi.Environment[key] = value;
         }
+        
+        // Remove Wine debug now that we found the issue
+        // psi.Environment["WINEDEBUG"] = "+loaddll,+process";
+        
+        // DEBUG: Log ALL environment variables - REMOVE IN PRODUCTION
+        /* 
+        _logger.LogWarning("[DALAMUD-INJECT] === ALL ENVIRONMENT VARIABLES ===");
+        foreach (var kvp in psi.Environment.OrderBy(x => x.Key))
+        {
+            _logger.LogWarning("[DALAMUD-INJECT] {Key}={Value}", kvp.Key, kvp.Value);
+        }
+        _logger.LogWarning("[DALAMUD-INJECT] === END ENVIRONMENT ===");
+        */
+        
+        // Log environment variables for debugging
+        _logger.LogDebug("[DALAMUD-INJECT] Environment variables:");
+        foreach (var (key, value) in psi.Environment)
+        {
+            if (key.Contains("WINE") || key.Contains("DALAMUD") || key.Contains("DOTNET") || 
+                key.Contains("LD_LIBRARY") || key.Contains("VKD3D"))
+            {
+                _logger.LogDebug("[DALAMUD-INJECT]   {Key}={Value}", key, value);
+            }
+        }
+        
+        // Log exit code explicitly for debugging
+        _logger.LogDebug("[DALAMUD-INJECT] Total environment variables: {Count}", psi.Environment.Count);
         
         _logger.LogInformation("[DALAMUD-INJECT] Executing: {Wine} \"{Injector}\" {Args}", 
             winePath, injectorPath, arguments);
@@ -371,7 +458,8 @@ public class DalamudInjectorService
                 if (line != null)
                 {
                     stderr.AppendLine(line);
-                    _logger.LogDebug("[DALAMUD-INJECT] stderr: {Line}", line);
+                    // Log ALL stderr output, not just debug level
+                    _logger.LogWarning("[DALAMUD-INJECT] stderr: {Line}", line);
                 }
             }
         }, ct);

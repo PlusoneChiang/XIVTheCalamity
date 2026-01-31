@@ -1,9 +1,9 @@
 namespace XIVTheCalamity.Core.Models;
 
 /// <summary>
-/// Proton configuration (Linux)
+/// Wine-XIV configuration (Linux only)
 /// </summary>
-public class ProtonConfig
+public class WineXIVConfig
 {
     /// <summary>
     /// Enable DXVK HUD display
@@ -11,9 +11,9 @@ public class ProtonConfig
     public bool DxvkHudEnabled { get; set; } = false;
     
     /// <summary>
-    /// Enable Fsync synchronization (Linux)
+    /// Maximum framerate (30 - 240)
     /// </summary>
-    public bool FsyncEnabled { get; set; } = true;
+    public int MaxFramerate { get; set; } = 60;
     
     /// <summary>
     /// Enable Esync synchronization
@@ -21,14 +21,14 @@ public class ProtonConfig
     public bool EsyncEnabled { get; set; } = true;
     
     /// <summary>
-    /// Enable GameMode optimization
+    /// Enable Fsync synchronization (Wine-XIV specific)
     /// </summary>
-    public bool GameModeEnabled { get; set; } = true;
+    public bool FsyncEnabled { get; set; } = true;
     
     /// <summary>
-    /// Maximum framerate (30 - 240)
+    /// Enable GameMode for performance optimization (Linux only)
     /// </summary>
-    public int MaxFramerate { get; set; } = 60;
+    public bool GameModeEnabled { get; set; } = true;
     
     /// <summary>
     /// Wine debug flags (e.g., "-all,+module" or empty to disable)

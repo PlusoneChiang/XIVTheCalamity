@@ -64,9 +64,9 @@ try
     }
     else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
     {
-        // Linux: 使用 Proton
-        builder.Services.AddSingleton<XIVTheCalamity.Platform.IEnvironmentService, XIVTheCalamity.Platform.Linux.Proton.ProtonEnvironmentService>();
-        builder.Services.AddSingleton<XIVTheCalamity.Platform.Linux.Proton.ProtonDownloadService>();
+        // Linux: 使用 Wine-XIV
+        builder.Services.AddSingleton<XIVTheCalamity.Platform.IEnvironmentService, XIVTheCalamity.Platform.Linux.Wine.WineXIVEnvironmentService>();
+        builder.Services.AddSingleton<XIVTheCalamity.Platform.Linux.Wine.WineXIVDownloadService>();
     }
 
     // Configure HttpClient for TcAuthService

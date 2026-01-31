@@ -90,18 +90,19 @@ public class ConfigService
                 };
                 Console.WriteLine("[Config] Initialized Wine config with defaults");
             }
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && config.Proton == null)
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && config.WineXIV == null)
             {
-                config.Proton = new ProtonConfig
+                // Linux uses Wine-XIV
+                config.WineXIV = new WineXIVConfig
                 {
                     DxvkHudEnabled = false,
-                    FsyncEnabled = true,
-                    EsyncEnabled = true,
-                    GameModeEnabled = true,
                     MaxFramerate = 60,
+                    EsyncEnabled = true,
+                    FsyncEnabled = true,
+                    GameModeEnabled = true,
                     WineDebug = ""
                 };
-                Console.WriteLine("[Config] Initialized Proton config with defaults");
+                Console.WriteLine("[Config] Initialized WineXIV config with defaults");
             }
             
             Console.WriteLine("[Config] Config loaded successfully");
@@ -220,13 +221,14 @@ public class ConfigService
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
-            config.Proton = new ProtonConfig
+            // Linux uses Wine-XIV
+            config.WineXIV = new WineXIVConfig
             {
                 DxvkHudEnabled = false,
-                FsyncEnabled = true,
-                EsyncEnabled = true,
-                GameModeEnabled = true,  // Default enabled
                 MaxFramerate = 60,
+                EsyncEnabled = true,
+                FsyncEnabled = true,
+                GameModeEnabled = true,
                 WineDebug = ""
             };
         }

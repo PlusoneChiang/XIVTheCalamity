@@ -2,7 +2,7 @@ namespace XIVTheCalamity.Platform;
 
 /// <summary>
 /// Cross-platform environment service interface
-/// Unifies macOS Wine and Linux Proton environment management
+/// Unifies macOS Wine and Linux Wine-XIV environment management
 /// </summary>
 public interface IEnvironmentService
 {
@@ -21,7 +21,7 @@ public interface IEnvironmentService
     /// <summary>
     /// Get emulator root directory
     /// macOS: Wine directory
-    /// Linux: Proton directory
+    /// Linux: Wine-XIV directory
     /// Windows: Empty string
     /// </summary>
     string GetEmulatorDirectory();
@@ -49,7 +49,7 @@ public interface IEnvironmentService
     /// <summary>
     /// Apply platform-specific configuration
     /// macOS: Apply Wine registry settings
-    /// Linux: Apply Proton configuration
+    /// Linux: Apply Wine-XIV configuration
     /// Windows: No-op
     /// </summary>
     Task ApplyConfigAsync(CancellationToken cancellationToken = default);

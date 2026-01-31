@@ -25,7 +25,7 @@ async function init() {
   // Initialize each tab
   initGeneralTab();
   initWineTab();
-  initProtonTab();
+  initWineXIVTab();
   initDalamudTab();
   initAboutTab();
   
@@ -192,13 +192,13 @@ function collectFormData() {
       leftCommandIsCtrl: document.getElementById('leftCommandMapping').value === 'true',
       rightCommandIsCtrl: document.getElementById('rightCommandMapping').value === 'true'
     },
-    proton: {
-      dxvkHudEnabled: document.getElementById('protonDxvkHudEnabled')?.checked || false,
-      maxFramerate: parseInt(document.getElementById('protonMaxFramerate')?.value || 60),
-      gameModeEnabled: document.getElementById('protonGameModeEnabled')?.checked !== false,
-      esyncEnabled: document.getElementById('protonEsyncEnabled')?.checked !== false,
-      fsyncEnabled: document.getElementById('protonFsyncEnabled')?.checked !== false,
-      wineDebug: document.getElementById('protonWineDebug')?.value || ''
+    wineXIV: {
+      dxvkHudEnabled: document.getElementById('winexivDxvkHudEnabled')?.checked || false,
+      maxFramerate: parseInt(document.getElementById('winexivMaxFramerate')?.value || 60),
+      gameModeEnabled: document.getElementById('winexivGameModeEnabled')?.checked !== false,
+      esyncEnabled: document.getElementById('winexivEsyncEnabled')?.checked !== false,
+      fsyncEnabled: document.getElementById('winexivFsyncEnabled')?.checked !== false,
+      wineDebug: document.getElementById('winexivWineDebug')?.value || ''
     },
     dalamud: {
       enabled: document.getElementById('dalamudEnabled').checked,
@@ -529,28 +529,28 @@ async function openWineTool(tool) {
 }
 
 /**
- * Initialize Proton Tab (Linux)
+ * Initialize Wine-XIV Tab (Linux)
  */
-function initProtonTab() {
-  if (!currentConfig?.proton) {
-    console.warn('[Settings] Proton config not found');
+function initWineXIVTab() {
+  if (!currentConfig?.wineXIV) {
+    console.warn('[Settings] WineXIV config not found');
     return;
   }
   
-  const config = currentConfig.proton;
-  console.log('[Settings] Loading Proton settings:', config);
+  const config = currentConfig.wineXIV;
+  console.log('[Settings] Loading WineXIV settings:', config);
   
   // Graphics
-  document.getElementById('protonDxvkHudEnabled').checked = config.dxvkHudEnabled || false;
-  document.getElementById('protonMaxFramerate').value = config.maxFramerate || 60;
+  document.getElementById('winexivDxvkHudEnabled').checked = config.dxvkHudEnabled || false;
+  document.getElementById('winexivMaxFramerate').value = config.maxFramerate || 60;
   
   // Performance
-  document.getElementById('protonGameModeEnabled').checked = config.gameModeEnabled !== false; // default true
+  document.getElementById('winexivGameModeEnabled').checked = config.gameModeEnabled !== false; // default true
   
   // Advanced
-  document.getElementById('protonEsyncEnabled').checked = config.esyncEnabled !== false; // default true
-  document.getElementById('protonFsyncEnabled').checked = config.fsyncEnabled !== false; // default true
-  document.getElementById('protonWineDebug').value = config.wineDebug || '';
+  document.getElementById('winexivEsyncEnabled').checked = config.esyncEnabled !== false; // default true
+  document.getElementById('winexivFsyncEnabled').checked = config.fsyncEnabled !== false; // default true
+  document.getElementById('winexivWineDebug').value = config.wineDebug || '';
 }
 
 /**
