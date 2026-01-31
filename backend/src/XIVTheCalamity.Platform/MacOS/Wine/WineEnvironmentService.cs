@@ -73,7 +73,87 @@ public class WineEnvironmentService(
 
     public Dictionary<string, string> GetEnvironment()
     {
-        return _paths.GetEnvironment();
+        // Get base environment from paths
+        var env = _paths.GetEnvironment();
+        
+        // Load Wine configuration and apply it
+        var config = configService.LoadConfigAsync().GetAwaiter().GetResult();
+        var wineConfig = config.Wine;
+        
+        if (wineConfig != null)
+        {
+            ApplyWineConfigToEnvironment(env, wineConfig);
+        }
+        else
+        {
+            logger?.LogWarning("[WINE-ENV] No Wine configuration found, using defaults");
+            // Apply minimal defaults if no config
+            ApplyWineConfigToEnvironment(env, new WineConfig());
+        }
+        
+        return env;
+    }
+    
+    /// <summary>
+    /// Apply Wine configuration to environment variables
+    /// </summary>
+    private void ApplyWineConfigToEnvironment(Dictionary<string, string> env, WineConfig config)
+    {
+        // Wine Debug
+        if (!string.IsNullOrWhiteSpace(config.WineDebug))
+        {
+            env["WINEDEBUG"] = config.WineDebug;
+            logger?.LogDebug("[WINE-ENV] Setting WINEDEBUG={WineDebug}", config.WineDebug);
+        }
+        
+        // Esync
+        if (config.EsyncEnabled)
+        {
+            env["WINEESYNC"] = "1";
+            logger?.LogDebug("[WINE-ENV] Esync enabled");
+        }
+        
+        // Msync
+        if (config.Msync)
+        {
+            env["WINEMSYNC"] = "1";
+            logger?.LogDebug("[WINE-ENV] Msync enabled");
+        }
+        
+        // DXMT configuration
+        if (config.DxmtEnabled)
+        {
+            env["XL_DXMT_ENABLED"] = "1";
+            env["MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS"] = "1";
+            env["DXMT_CONFIG"] = $"d3d11.metalSpatialUpscaleFactor={config.MetalFxSpatialFactor};d3d11.preferredMaxFrameRate={config.MaxFramerate};";
+            env["DXMT_METALFX_SPATIAL_SWAPCHAIN"] = config.MetalFxSpatialEnabled ? "1" : "0";
+            logger?.LogDebug("[WINE-ENV] DXMT enabled with MetalFX={MetalFx}, Framerate={Framerate}", 
+                config.MetalFxSpatialEnabled, config.MaxFramerate);
+        }
+        else
+        {
+            env["XL_DXMT_ENABLED"] = "0";
+            logger?.LogDebug("[WINE-ENV] DXMT disabled (DXVK mode)");
+        }
+        
+        // Metal HUD
+        if (config.Metal3PerformanceOverlay)
+        {
+            env["MTL_HUD_ENABLED"] = "1";
+            logger?.LogDebug("[WINE-ENV] Metal HUD enabled");
+        }
+        
+        // Native Resolution: true = use retina mode (high res), false = use scaling
+        if (config.NativeResolution)
+        {
+            env["WINE_RETINA_MODE"] = "1";
+            logger?.LogDebug("[WINE-ENV] Retina mode enabled");
+        }
+        
+        // DLL Overrides - select based on DXMT setting
+        var dxgiOverride = config.DxmtEnabled ? "n" : "b";  // native for DXMT, builtin for DXVK
+        env["WINEDLLOVERRIDES"] = $"msquic=,mscoree=n,b;d3d9,d3d10core=n;d3d11=n;dxgi={dxgiOverride}";
+        logger?.LogDebug("[WINE-ENV] DLL overrides: dxgi={DxgiOverride}", dxgiOverride);
     }
 
     public async Task<ProcessResult> ExecuteAsync(string command, string[] args, CancellationToken cancellationToken = default)

@@ -157,8 +157,9 @@ public class WinePathService
             ["MVK_CONFIG_RESUME_LOST_DEVICE"] = "1",
             ["MVK_CONFIG_LOG_LEVEL"] = "mvk_error",
             
-            // .NET 7+ Apple Silicon support
-            ["DOTNET_EnableWriteXorExecute"] = "0",
+            // NOTE: DOTNET_EnableWriteXorExecute is NOT set here
+            // It's only needed for Dalamud and is set in GameLaunchService when Dalamud is enabled
+            // Setting it globally causes Wine processes to crash with exit code 136
         };
 
         return env;

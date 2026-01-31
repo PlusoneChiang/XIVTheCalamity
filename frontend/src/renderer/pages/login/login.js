@@ -868,31 +868,35 @@ function startEnvironmentInitialization() {
       console.error('[ENV-INIT] Error object:', err);
       console.error('[ENV-INIT] EventSource readyState:', eventSource.readyState);
       
-      // Only handle if not already completed or if backend truly disconnected
-      if (!isEnvironmentInitialized && isInitializing) {
-        console.error('[ENV-INIT] Backend connection failed during initialization');
-        const errorMsg = i18n.t('login.backend_disconnected');
-        showError(errorMsg);
-        
-        // Return to normal mode
-        titleBarCard.classList.remove('progress-mode');
-        setTimeout(() => {
-          progressFill.style.width = '0%';
-          titleBarText.textContent = appVersionText;
-        }, 2000);
-        
-        isInitializing = false;
-        // Keep button disabled on error
-        launchButton.disabled = true;
-        launchButton.textContent = i18n.t('login.backend_failed');
-        settingsBtn.disabled = false;  // Allow user to check settings even on connection error
-        
-        console.log('[ENV-INIT] ========== Connection FAILED ==========');
-        eventSource.close();
-      } else {
-        // Connection closed normally after completion
-        console.log('[ENV-INIT] EventSource closed (normal after completion or already initialized)');
-      }
+      // Wait a short moment to see if complete event arrives (race condition)
+      // The backend may send complete and close connection quickly
+      setTimeout(() => {
+        // Only handle if not already completed or if backend truly disconnected
+        if (!isEnvironmentInitialized && isInitializing) {
+          console.error('[ENV-INIT] Backend connection failed during initialization');
+          const errorMsg = i18n.t('login.backend_disconnected');
+          showError(errorMsg);
+          
+          // Return to normal mode
+          titleBarCard.classList.remove('progress-mode');
+          setTimeout(() => {
+            progressFill.style.width = '0%';
+            titleBarText.textContent = appVersionText;
+          }, 2000);
+          
+          isInitializing = false;
+          // Keep button disabled on error
+          launchButton.disabled = true;
+          launchButton.textContent = i18n.t('login.backend_failed');
+          settingsBtn.disabled = false;  // Allow user to check settings even on connection error
+          
+          console.log('[ENV-INIT] ========== Connection FAILED ==========');
+          eventSource.close();
+        } else {
+          // Connection closed normally after completion
+          console.log('[ENV-INIT] EventSource closed (normal after completion or already initialized)');
+        }
+      }, 300); // Wait 300ms for complete event
     };
   } catch (err) {
     console.error('[ENV-INIT] !! EXCEPTION creating EventSource:', err);

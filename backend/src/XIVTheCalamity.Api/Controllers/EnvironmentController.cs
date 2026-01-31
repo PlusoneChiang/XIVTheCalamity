@@ -50,23 +50,28 @@ public class EnvironmentController(
         {
             logger.LogInformation("[ENV-INIT] Starting environment initialization via IEnvironmentService");
             
+            // Track if complete event was sent
+            var completeSent = new TaskCompletionSource<bool>();
+            
             // 使用 Progress<T> 報告進度
             var progress = new Progress<EnvironmentInitProgress>(async p =>
             {
                 try
                 {
-                    logger.LogDebug("[ENV-INIT] Progress: Stage={Stage}, MessageKey={MessageKey}, Percentage={Percentage}%, Complete={Complete}, Error={Error}", 
-                        p.Stage, p.MessageKey, p.Percentage, p.IsComplete, p.HasError);
+                    logger.LogDebug("[ENV-INIT] Progress update: Stage={Stage}, MessageKey={MessageKey}, Complete={Complete}, Error={Error}", 
+                        p.Stage, p.MessageKey, p.IsComplete, p.HasError);
                     
                     if (p.HasError)
                     {
                         logger.LogError("[ENV-INIT] ERROR: {MessageKey} - {Message}", p.MessageKey, p.ErrorMessage);
                         await SendSseEvent("error", p, cancellationToken);
+                        completeSent.TrySetResult(true);
                     }
                     else if (p.IsComplete)
                     {
                         logger.LogInformation("[ENV-INIT] Initialization COMPLETE");
                         await SendSseEvent("complete", p, cancellationToken);
+                        completeSent.TrySetResult(true);
                     }
                     else
                     {
@@ -76,6 +81,7 @@ public class EnvironmentController(
                 catch (Exception ex)
                 {
                     logger.LogError(ex, "[ENV-INIT] Failed to send progress event");
+                    completeSent.TrySetException(ex);
                 }
             });
 
@@ -84,8 +90,18 @@ public class EnvironmentController(
             
             logger.LogInformation("[ENV-INIT] ========== Completed Successfully ==========");
             
-            // Wait a bit to ensure all progress callbacks are processed
-            await Task.Delay(100, cancellationToken);
+            // Wait for complete event to be sent (or timeout after 5 seconds)
+            logger.LogDebug("[ENV-INIT] Waiting for final progress event to be sent...");
+            await Task.WhenAny(completeSent.Task, Task.Delay(5000, cancellationToken));
+            
+            if (completeSent.Task.IsCompleted)
+            {
+                logger.LogDebug("[ENV-INIT] Complete event sent successfully");
+            }
+            else
+            {
+                logger.LogWarning("[ENV-INIT] Timeout waiting for complete event");
+            }
         }
         catch (OperationCanceledException)
         {

@@ -173,6 +173,16 @@ public class GameLaunchService
                     var wineDalamudPath = $"Z:{dalamudRuntimePath.Replace("/", "\\")}";
                     baseEnvironment["DALAMUD_RUNTIME"] = wineDalamudPath;
                     baseEnvironment["DOTNET_ROOT"] = wineDalamudPath;  // Also set DOTNET_ROOT
+                    
+                    // CRITICAL: Enable .NET 7+ on Apple Silicon (for Dalamud only)
+                    // This MUST be set only when Dalamud is enabled, not globally
+                    // Setting it globally causes Wine processes to crash with exit code 136
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                    {
+                        baseEnvironment["DOTNET_EnableWriteXorExecute"] = "0";
+                        _logger.LogDebug("[GAME] Set DOTNET_EnableWriteXorExecute=0 for Dalamud on Apple Silicon");
+                    }
+                    
                     _logger.LogInformation("[GAME] Dalamud Runtime path (Wine): {Path}", wineDalamudPath);
                 }
                 

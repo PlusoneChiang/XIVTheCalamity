@@ -158,11 +158,14 @@ function createWindow() {
     }
   });
   
-  // DevTools control - DISABLED: No longer auto-open in debug mode
-  // Use F12 or menu if needed
+  // DevTools control - Open automatically in development mode
+  if (isDebugModeEnabled) {
+    mainWindow.webContents.openDevTools();
+    safeLog('[Main] DevTools opened (development mode)');
+  }
+  
   mainWindow.webContents.on('devtools-opened', () => {
     // Allow DevTools to be manually opened if needed
-    // mainWindow.webContents.closeDevTools();
   });
 
   // Close settings window when main window closes
