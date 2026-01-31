@@ -46,7 +46,8 @@ public class WineEnvironmentService(
             {
                 Stage = p.Stage.ToString().ToLower(),
                 MessageKey = p.MessageKey,
-                Percent = percent,
+                CompletedItems = percent,
+                TotalItems = 100,
                 IsComplete = p.IsComplete,
                 HasError = p.HasError,
                 ErrorMessageKey = p.ErrorMessageKey,

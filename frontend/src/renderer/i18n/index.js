@@ -36,13 +36,16 @@ const translations = {
     'game.stopped': '遊戲已停止',
     
     // Progress (Environment Initialization)
-    'progress.checking_proton': '檢查 Proton 狀態...',
-    'progress.downloading': '下載 Proton 中... ({percent}%)',
-    'progress.extracting': '解壓縮 Proton 中...',
+    'progress.checking_proton': '檢查 Proton 狀態',
+    'progress.downloading_proton': '下載 Proton',
+    'progress.downloading': '下載中',
+    'progress.extracting': '解壓縮中',
     'progress.proton_ready': 'Proton 已就緒',
-    'progress.initializing_prefix': '初始化 Wine Prefix...',
+    'progress.proton_downloaded': 'Proton 下載完成',
+    'progress.initializing_prefix': '初始化 Wine Prefix',
     'progress.prefix_initialized': 'Wine Prefix 已就緒',
     'progress.complete': '環境初始化完成',
+    'progress.skip_windows': 'Windows 平台無需初始化',
     
     // Update
     'update.checking': '檢查更新中...',
@@ -345,13 +348,16 @@ const translations = {
     'game.stopped': 'Game stopped',
     
     // Progress (Environment Initialization)
-    'progress.checking_proton': 'Checking Proton status...',
-    'progress.downloading': 'Downloading Proton... ({percent}%)',
-    'progress.extracting': 'Extracting Proton...',
+    'progress.checking_proton': 'Checking Proton status',
+    'progress.downloading_proton': 'Downloading Proton',
+    'progress.downloading': 'Downloading',
+    'progress.extracting': 'Extracting',
     'progress.proton_ready': 'Proton is ready',
-    'progress.initializing_prefix': 'Initializing Wine Prefix...',
+    'progress.proton_downloaded': 'Proton download complete',
+    'progress.initializing_prefix': 'Initializing Wine Prefix',
     'progress.prefix_initialized': 'Wine Prefix is ready',
     'progress.complete': 'Environment initialization complete',
+    'progress.skip_windows': 'Windows platform requires no initialization',
     
     // Update
     'update.checking': 'Checking for updates...',

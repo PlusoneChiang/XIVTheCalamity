@@ -716,10 +716,21 @@ function startEnvironmentInitialization() {
         const data = JSON.parse(event.data);
         console.log('[ENV-INIT] Progress data:', data);
         
-        const message = data.params 
-          ? i18n.t(data.messageKey, data.params)
-          : i18n.t(data.messageKey);
-        titleBarText.textContent = message;
+        // Get i18n message and append percentage
+        const message = i18n.t(data.messageKey);
+        const percentage = data.percentage || 0;
+        const fileName = data.currentFile || '';
+        
+        // Display: "Message - FileName - 45.5%" or "Message - 45.5%" if no file
+        if (fileName) {
+          titleBarText.textContent = `${message} - ${fileName} - ${percentage.toFixed(1)}%`;
+        } else {
+          titleBarText.textContent = `${message} - ${percentage.toFixed(1)}%`;
+        }
+        
+        // Update progress bar
+        progressFill.style.width = `${percentage}%`;
+        console.log('[ENV-INIT] Progress bar updated:', percentage.toFixed(1) + '%');
       } catch (err) {
         console.error('[ENV-INIT] Failed to parse progress event:', err, 'Raw data:', event.data);
       }
@@ -754,7 +765,12 @@ function startEnvironmentInitialization() {
         settingsBtn.disabled = false;
         
         console.log('[ENV-INIT] ========== Initialization COMPLETE ==========');
-        eventSource.close();
+        
+        // Close SSE connection after a short delay to ensure all events are processed
+        setTimeout(() => {
+          eventSource.close();
+          console.log('[ENV-INIT] EventSource closed after completion');
+        }, 500);
         
         // 設置 Dalamud 更新完成回調：確保啟動按鈕狀態正確
         setOnDalamudComplete(() => {
@@ -797,6 +813,14 @@ function startEnvironmentInitialization() {
   
     eventSource.addEventListener('error', (event) => {
       console.error('[ENV-INIT] << Received "error" event');
+      
+      // Ignore error events after successful completion
+      // (Browser EventSource may trigger 'error' type event when server closes connection)
+      if (isEnvironmentInitialized) {
+        console.log('[ENV-INIT] Ignoring error event after successful completion');
+        return;
+      }
+      
       if (event.data) {
         try {
           const data = JSON.parse(event.data);

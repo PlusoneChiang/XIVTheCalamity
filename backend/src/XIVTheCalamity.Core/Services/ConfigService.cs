@@ -253,21 +253,7 @@ public class ConfigService
     /// </summary>
     private static string GetConfigFilePath()
     {
-        var appSupport = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-        {
-            appSupport = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                "Library", "Application Support");
-        }
-        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-        {
-            appSupport = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                ".config");
-        }
-        
-        return Path.Combine(appSupport, "XIVTheCalamity", "config.json");
+        var platformPaths = PlatformPathService.Instance;
+        return platformPaths.GetConfigPath("config.json");
     }
 }

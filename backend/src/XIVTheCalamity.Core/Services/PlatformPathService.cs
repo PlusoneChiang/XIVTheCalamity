@@ -103,6 +103,7 @@ public class PlatformPathService
 
     /// <summary>
     /// Get Wine prefix path
+    /// All Wine/Proton prefix data stored here
     /// </summary>
     public string GetWinePrefixPath()
     {
@@ -110,7 +111,8 @@ public class PlatformPathService
     }
 
     /// <summary>
-    /// Get game installation directory
+    /// Get game installation directory (game subdirectory from configured path)
+    /// Returns the 'game' subdirectory under the configured game path
     /// </summary>
     public string GetGameDirectory()
     {
@@ -119,10 +121,20 @@ public class PlatformPathService
 
     /// <summary>
     /// Get Dalamud directory
+    /// Includes Dalamud runtime, plugins, and assets
     /// </summary>
     public string GetDalamudDirectory()
     {
-        return Path.Combine(UserDataDirectory, "dalamud");
+        return Path.Combine(UserDataDirectory, "Dalamud");  // 大写 D，保持向后兼容
+    }
+
+    /// <summary>
+    /// Get Proton installation directory (Linux only)
+    /// This is where Proton GE is downloaded and stored
+    /// </summary>
+    public string GetProtonDirectory()
+    {
+        return Path.Combine(UserDataDirectory, "proton");
     }
 
     /// <summary>
@@ -133,8 +145,60 @@ public class PlatformPathService
     /// </summary>
     public string GetEmulatorRootDirectory()
     {
-        // Priority 1: Check user data directory (downloaded Proton)
-        var userProtonPath = Path.Combine(UserDataDirectory, "proton-ge");
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            return GetMacOSWineDirectory();
+        }
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            return GetLinuxProtonDirectory();
+        }
+
+        throw new PlatformNotSupportedException(
+            $"Emulator not supported on platform: {RuntimeInformation.OSDescription}");
+    }
+
+    /// <summary>
+    /// Get macOS Wine directory
+    /// Priority: 1. Dev environment (project root), 2. Resources (production)
+    /// </summary>
+    private string GetMacOSWineDirectory()
+    {
+        var appDir = AppContext.BaseDirectory;
+        var currentDir = new DirectoryInfo(appDir);
+
+        // Priority 1: Dev environment - search upward for wine/
+        while (currentDir != null)
+        {
+            var winePath = Path.Combine(currentDir.FullName, "wine");
+            if (Directory.Exists(winePath) && Directory.Exists(Path.Combine(winePath, "bin")))
+            {
+                return winePath;
+            }
+            currentDir = currentDir.Parent;
+        }
+
+        // Priority 2: Production environment - Resources directory
+        var resourcesPath = Path.Combine(appDir, "..", "Resources", "wine");
+        if (Directory.Exists(resourcesPath))
+        {
+            return resourcesPath;
+        }
+
+        throw new DirectoryNotFoundException(
+            $"Wine not found. Searched from: {appDir}");
+    }
+
+    /// <summary>
+    /// Get Linux Proton directory
+    /// Priority: 1. User data directory (downloaded), 2. Dev environment (project root), 3. Resources (AppImage)
+    /// </summary>
+    private string GetLinuxProtonDirectory()
+    {
+        var appDir = AppContext.BaseDirectory;
+
+        // Priority 1: User data directory (downloaded Proton)
+        var userProtonPath = GetProtonDirectory();
         if (Directory.Exists(userProtonPath))
         {
             var protonDirs = Directory.GetDirectories(userProtonPath, "GE-Proton*");
@@ -143,61 +207,36 @@ public class PlatformPathService
                 return protonDirs[0];
             }
         }
-        
-        // Priority 2: Dev environment - search upward for wine/ or proton-ge/
-        var appDir = AppContext.BaseDirectory;
-        var currentDir = new DirectoryInfo(appDir);
 
+        // Priority 2: Dev environment - search upward for proton-ge/ (for manual setup)
+        var currentDir = new DirectoryInfo(appDir);
         while (currentDir != null)
         {
-            // Check for wine directory (macOS)
-            var winePath = Path.Combine(currentDir.FullName, "wine");
-            if (Directory.Exists(winePath) && Directory.Exists(Path.Combine(winePath, "bin")))
-            {
-                return winePath;
-            }
-
-            // Check for proton-ge directory (Linux dev)
             var protonPath = Path.Combine(currentDir.FullName, "proton-ge");
             if (Directory.Exists(protonPath))
             {
-                // Find the Proton version directory
                 var protonDirs = Directory.GetDirectories(protonPath, "GE-Proton*");
                 if (protonDirs.Length > 0)
                 {
-                    // Use the first (or latest) version found
                     return protonDirs[0];
                 }
             }
-
             currentDir = currentDir.Parent;
         }
 
-        // Production environment: check Resources directory
-        var resourcesPath = Path.Combine(appDir, "..", "Resources");
+        // Priority 3: Production environment (AppImage) - Resources directory
+        var resourcesPath = Path.Combine(appDir, "..", "Resources", "proton");
         if (Directory.Exists(resourcesPath))
         {
-            // macOS bundle
-            var winePath = Path.Combine(resourcesPath, "wine");
-            if (Directory.Exists(winePath))
+            var protonDirs = Directory.GetDirectories(resourcesPath, "GE-Proton*");
+            if (protonDirs.Length > 0)
             {
-                return winePath;
-            }
-
-            // Linux AppImage
-            var protonPath = Path.Combine(resourcesPath, "proton-ge");
-            if (Directory.Exists(protonPath))
-            {
-                var protonDirs = Directory.GetDirectories(protonPath, "GE-Proton*");
-                if (protonDirs.Length > 0)
-                {
-                    return protonDirs[0];
-                }
+                return protonDirs[0];
             }
         }
 
         throw new DirectoryNotFoundException(
-            $"Wine/Proton not found. Searched from: {appDir}");
+            $"Proton not found. Searched: {userProtonPath}, project root from {appDir}, Resources");
     }
 
     /// <summary>

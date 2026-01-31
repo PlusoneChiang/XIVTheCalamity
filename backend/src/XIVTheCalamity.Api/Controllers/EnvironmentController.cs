@@ -55,8 +55,8 @@ public class EnvironmentController(
             {
                 try
                 {
-                    logger.LogDebug("[ENV-INIT] Progress: Stage={Stage}, MessageKey={MessageKey}, Percent={Percent}%, Complete={Complete}, Error={Error}", 
-                        p.Stage, p.MessageKey, p.Percent, p.IsComplete, p.HasError);
+                    logger.LogDebug("[ENV-INIT] Progress: Stage={Stage}, MessageKey={MessageKey}, Percentage={Percentage}%, Complete={Complete}, Error={Error}", 
+                        p.Stage, p.MessageKey, p.Percentage, p.IsComplete, p.HasError);
                     
                     if (p.HasError)
                     {

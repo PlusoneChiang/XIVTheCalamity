@@ -18,7 +18,8 @@ public class WindowsEnvironmentService(
         {
             Stage = "complete",
             MessageKey = "progress.skip_windows",
-            Percent = 100,
+            CompletedItems = 100,
+            TotalItems = 100,
             IsComplete = true
         });
         

@@ -33,7 +33,8 @@ public class ProtonEnvironmentService(
             {
                 Stage = "check_proton",
                 MessageKey = "progress.checking_proton",
-                Percent = 5
+                CompletedItems = 5,
+                TotalItems = 100
             });
             
             var protonStatus = await downloadService.GetStatusAsync();
@@ -48,13 +49,14 @@ public class ProtonEnvironmentService(
                 {
                     Stage = "download_proton",
                     MessageKey = "progress.downloading_proton",
-                    Percent = 10
+                    CompletedItems = 10,
+                    TotalItems = 100
                 });
                 
                 var downloadProgress = new Progress<DownloadProgress>(p =>
                 {
-                    logger?.LogDebug("[PROTON-ENV] Download progress: Stage={Stage}, Percent={Percent}%", 
-                        p.Stage, p.Percent);
+                    logger?.LogDebug("[PROTON-ENV] Download progress: Stage={Stage}, Percent={Percent:F1}%", 
+                        p.Stage, p.Percentage);
                     
                     if (p.HasError)
                     {
@@ -72,24 +74,30 @@ public class ProtonEnvironmentService(
                         {
                             Stage = "proton_downloaded",
                             MessageKey = "progress.proton_downloaded",
-                            Percent = 50
+                            CompletedItems = 50,
+                            TotalItems = 100
                         });
                     }
                     else
                     {
-                        // Map download percent (0-100) to overall progress (10-50)
-                        var overallPercent = 10 + (p.Percent * 40 / 100);
+                        // Map download progress to overall progress
+                        // Download: 0-100% → Overall: 10-50%
+                        var downloadPercent = p.Percentage;
+                        var overallPercent = 10 + (int)(downloadPercent * 40 / 100);
                         
                         progress?.Report(new EnvironmentInitProgress
                         {
                             Stage = p.Stage,
                             MessageKey = p.MessageKey,
-                            Percent = overallPercent,
+                            CurrentFile = p.CurrentFile,
+                            BytesDownloaded = p.BytesDownloaded,
+                            TotalBytes = p.TotalBytes,
+                            // Map download's 0-100% to overall 10-50% range
+                            CompletedItems = overallPercent,
+                            TotalItems = 100,
                             ExtraData = new Dictionary<string, object>
                             {
-                                ["downloadedBytes"] = p.DownloadedBytes,
-                                ["totalBytes"] = p.TotalBytes,
-                                ["downloadedMB"] = p.DownloadedBytes / 1024.0 / 1024.0,
+                                ["downloadedMB"] = p.BytesDownloaded / 1024.0 / 1024.0,
                                 ["totalMB"] = p.TotalBytes / 1024.0 / 1024.0
                             }
                         });
@@ -106,7 +114,8 @@ public class ProtonEnvironmentService(
                 {
                     Stage = "proton_ready",
                     MessageKey = "progress.proton_ready",
-                    Percent = 50
+                    CompletedItems = 50,
+                    TotalItems = 100
                 });
             }
             
@@ -115,7 +124,8 @@ public class ProtonEnvironmentService(
             {
                 Stage = "init_prefix",
                 MessageKey = "progress.initializing_prefix",
-                Percent = 60
+                CompletedItems = 60,
+                TotalItems = 100
             });
             
             await EnsurePrefixAsync(cancellationToken);
@@ -124,7 +134,8 @@ public class ProtonEnvironmentService(
             {
                 Stage = "prefix_complete",
                 MessageKey = "progress.prefix_initialized",
-                Percent = 90
+                CompletedItems = 90,
+                TotalItems = 100
             });
             
             // Step 4: Complete (100%)
@@ -132,7 +143,8 @@ public class ProtonEnvironmentService(
             {
                 Stage = "complete",
                 MessageKey = "progress.complete",
-                Percent = 100,
+                CompletedItems = 100,
+                TotalItems = 100,
                 IsComplete = true
             });
             

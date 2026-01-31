@@ -1,6 +1,8 @@
 # Build outputs
 Release/
 /wine/
+/proton-ge/
+/proton/
 
 # Backend bin/obj
 backend/src/**/bin/

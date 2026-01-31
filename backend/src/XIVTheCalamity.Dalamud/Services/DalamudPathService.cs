@@ -1,3 +1,5 @@
+using XIVTheCalamity.Core.Services;
+
 namespace XIVTheCalamity.Dalamud.Services;
 
 /// <summary>
@@ -9,9 +11,9 @@ public class DalamudPathService
     
     public DalamudPathService()
     {
-        // Use Application Support directory
-        var appSupport = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        _basePath = Path.Combine(appSupport, "XIVTheCalamity", "Dalamud");
+        // Use PlatformPathService to get correct cross-platform path
+        var platformPaths = PlatformPathService.Instance;
+        _basePath = platformPaths.GetDalamudDirectory();
     }
     
     /// <summary>Dalamud root directory</summary>
@@ -63,8 +65,8 @@ public class DalamudPathService
     {
         get
         {
-            var appSupport = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            return Path.Combine(appSupport, "XIVTheCalamity", "logs", "Dalamud");
+            var platformPaths = PlatformPathService.Instance;
+            return Path.Combine(platformPaths.LogsDirectory, "Dalamud");
         }
     }
     

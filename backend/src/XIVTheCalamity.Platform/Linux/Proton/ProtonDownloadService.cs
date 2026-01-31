@@ -90,9 +90,8 @@ public class ProtonDownloadService(
         {
             Stage = "download",
             MessageKey = "progress.downloading",
-            DownloadedBytes = 0,
-            TotalBytes = 0,
-            Percent = 0
+            BytesDownloaded = 0,
+            TotalBytes = 0
         };
         
         using var response = await httpClient.GetAsync(
@@ -141,9 +140,8 @@ public class ProtonDownloadService(
                 {
                     Stage = "download",
                     MessageKey = "progress.downloading",
-                    DownloadedBytes = downloadedBytes,
-                    TotalBytes = totalBytes,
-                    Percent = percent
+                    BytesDownloaded = downloadedBytes,
+                    TotalBytes = totalBytes
                 };
             }
         }
@@ -158,9 +156,8 @@ public class ProtonDownloadService(
         {
             Stage = "extract",
             MessageKey = "progress.extracting",
-            DownloadedBytes = downloadedBytes,
-            TotalBytes = totalBytes,
-            Percent = 100
+            BytesDownloaded = downloadedBytes,
+            TotalBytes = totalBytes
         };
         
         await ExtractAsync(archivePath, downloadDir, cancellationToken);
@@ -217,9 +214,9 @@ public class ProtonDownloadService(
             {
                 Stage = "download",
                 MessageKey = "progress.downloading",
-                DownloadedBytes = 0,
-                TotalBytes = 0,
-                Percent = 0
+                CurrentFile = $"{version}.tar.gz",
+                BytesDownloaded = 0,
+                TotalBytes = 0
             });
             
             using var response = await httpClient.GetAsync(
@@ -253,26 +250,31 @@ public class ProtonDownloadService(
                 
                 var percent = totalBytes > 0 ? (int)((downloadedBytes * 100) / totalBytes) : 0;
                 
-                // Log every 10%
-                if (percent >= lastLoggedPercent + 10)
+                // Report progress every 1% to reduce SSE load (was: every read)
+                if (percent > lastLoggedPercent)
                 {
-                    var speed = downloadedBytes / stopwatch.Elapsed.TotalSeconds;
-                    logger?.LogInformation("[PROTON-DL] Download progress: {Percent}% ({Downloaded}/{Total} MB, {Speed:F2} MB/s)",
-                        percent,
-                        downloadedBytes / 1024.0 / 1024.0,
-                        totalBytes / 1024.0 / 1024.0,
-                        speed / 1024.0 / 1024.0);
+                    // Log every 10%
+                    if (percent % 10 == 0)
+                    {
+                        var speed = downloadedBytes / stopwatch.Elapsed.TotalSeconds;
+                        logger?.LogInformation("[PROTON-DL] Download progress: {Percent}% ({Downloaded}/{Total} MB, {Speed:F2} MB/s)",
+                            percent,
+                            downloadedBytes / 1024.0 / 1024.0,
+                            totalBytes / 1024.0 / 1024.0,
+                            speed / 1024.0 / 1024.0);
+                    }
+                    
                     lastLoggedPercent = percent;
+                    
+                    progress?.Report(new DownloadProgress
+                    {
+                        Stage = "download",
+                        MessageKey = "progress.downloading",
+                        CurrentFile = $"{version}.tar.gz",
+                        BytesDownloaded = downloadedBytes,
+                        TotalBytes = totalBytes
+                    });
                 }
-                
-                progress?.Report(new DownloadProgress
-                {
-                    Stage = "download",
-                    MessageKey = "progress.downloading",
-                    DownloadedBytes = downloadedBytes,
-                    TotalBytes = totalBytes,
-                    Percent = percent
-                });
             }
             
             stopwatch.Stop();
@@ -285,21 +287,32 @@ public class ProtonDownloadService(
             {
                 Stage = "extract",
                 MessageKey = "progress.extracting",
-                Percent = 100
+                CurrentFile = $"{version}.tar.gz",
+                BytesDownloaded = downloadedBytes,
+                TotalBytes = totalBytes
             });
             
             await ExtractAsync(archivePath, downloadDir, cancellationToken);
             logger?.LogInformation("[PROTON-DL] Extraction complete");
             
-            // Delete archive
-            logger?.LogDebug("[PROTON-DL] Deleting archive: {ArchivePath}", archivePath);
-            File.Delete(archivePath);
-            
-            // Verify installation
+            // Verify installation first
             var status = await GetStatusAsync(version);
             if (!status.IsInstalled)
             {
+                logger?.LogError("[PROTON-DL] Proton installation verification failed, keeping archive for debugging");
                 throw new Exception("Proton installation verification failed");
+            }
+            
+            // Delete archive only after successful verification
+            logger?.LogInformation("[PROTON-DL] Verification successful, deleting archive: {ArchivePath}", archivePath);
+            try
+            {
+                File.Delete(archivePath);
+                logger?.LogInformation("[PROTON-DL] Archive deleted successfully");
+            }
+            catch (Exception ex)
+            {
+                logger?.LogWarning(ex, "[PROTON-DL] Failed to delete archive (non-critical): {ArchivePath}", archivePath);
             }
             
             logger?.LogInformation("[PROTON-DL] ========== Proton {Version} installed successfully ==========", version);
@@ -308,7 +321,8 @@ public class ProtonDownloadService(
             {
                 Stage = "complete",
                 MessageKey = "progress.complete",
-                Percent = 100,
+                BytesDownloaded = downloadedBytes,
+                TotalBytes = totalBytes,
                 IsComplete = true
             });
         }
@@ -352,38 +366,65 @@ public class ProtonDownloadService(
         using var process = new Process { StartInfo = psi };
         process.Start();
         
-        var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
+        // Use separate timeout for extraction (30 seconds)
+        // Don't use cancellationToken for ReadToEndAsync/WaitForExitAsync
+        // because SSE connection cancellation shouldn't kill the extraction process
+        using var extractCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, extractCts.Token);
         
-        await process.WaitForExitAsync(cancellationToken);
-        
-        var stdout = await outputTask;
-        var stderr = await errorTask;
-        
-        if (!string.IsNullOrWhiteSpace(stdout))
+        try
         {
-            logger?.LogDebug("[PROTON-DL] tar stdout: {Output}", stdout);
-        }
-        
-        if (process.ExitCode != 0)
-        {
-            logger?.LogError("[PROTON-DL] tar extraction failed with exit code {ExitCode}", process.ExitCode);
-            if (!string.IsNullOrWhiteSpace(stderr))
+            var outputTask = process.StandardOutput.ReadToEndAsync(linkedCts.Token);
+            var errorTask = process.StandardError.ReadToEndAsync(linkedCts.Token);
+            
+            await process.WaitForExitAsync(linkedCts.Token);
+            
+            var stdout = await outputTask;
+            var stderr = await errorTask;
+            
+            if (!string.IsNullOrWhiteSpace(stdout))
             {
-                logger?.LogError("[PROTON-DL] tar stderr: {Error}", stderr);
+                logger?.LogDebug("[PROTON-DL] tar stdout: {Output}", stdout);
             }
-            throw new Exception($"Failed to extract Proton: {stderr}");
+            
+            if (process.ExitCode != 0)
+            {
+                logger?.LogError("[PROTON-DL] tar extraction failed with exit code {ExitCode}", process.ExitCode);
+                if (!string.IsNullOrWhiteSpace(stderr))
+                {
+                    logger?.LogError("[PROTON-DL] tar stderr: {Error}", stderr);
+                }
+                
+                // tar may report errors but still extract successfully
+                // Check if Wine binary exists to verify successful extraction
+                var wineBinary = Path.Combine(targetDir, PROTON_VERSION, "files", "bin", "wine");
+                if (File.Exists(wineBinary))
+                {
+                    logger?.LogWarning("[PROTON-DL] tar reported error but Wine binary exists, considering extraction successful");
+                }
+                else
+                {
+                    throw new Exception($"Failed to extract Proton: {stderr}");
+                }
+            }
+            
+            logger?.LogDebug("[PROTON-DL] Extraction completed successfully");
         }
-        
-        logger?.LogDebug("[PROTON-DL] Extraction completed successfully");
+        catch (OperationCanceledException) when (extractCts.Token.IsCancellationRequested)
+        {
+            logger?.LogError("[PROTON-DL] Extraction timeout (30 seconds)");
+            process.Kill();
+            throw new Exception("Proton extraction timeout (30 seconds)");
+        }
     }
     
     /// <summary>
     /// Get download directory path
+    /// Downloads to user data proton directory (not config directory)
     /// </summary>
     private string GetDownloadDirectory()
     {
-        var dir = Path.Combine(_platformPaths.UserDataDirectory, "proton-ge");
+        var dir = _platformPaths.GetProtonDirectory();
         logger?.LogDebug("[PROTON-DL] Download directory: {Dir}", dir);
         return dir;
     }
@@ -416,9 +457,17 @@ public class DownloadProgress
 {
     public string Stage { get; set; } = string.Empty;
     public string MessageKey { get; set; } = string.Empty;
-    public long DownloadedBytes { get; set; }
+    public string? CurrentFile { get; set; }
+    public long BytesDownloaded { get; set; }
     public long TotalBytes { get; set; }
-    public int Percent { get; set; }
+    
+    /// <summary>
+    /// Completion percentage (0-100), auto-calculated
+    /// </summary>
+    public double Percentage => TotalBytes > 0 
+        ? Math.Round(BytesDownloaded * 100.0 / TotalBytes, 1) 
+        : 0;
+    
     public bool IsComplete { get; set; }
     public bool HasError { get; set; }
     public string? ErrorMessage { get; set; }

@@ -74,12 +74,34 @@ public record ProcessResult(
 
 /// <summary>
 /// Environment initialization progress (unified across all platforms)
+/// Follows DalamudUpdateProgress pattern for consistency
 /// </summary>
 public class EnvironmentInitProgress
 {
     public string Stage { get; set; } = string.Empty;
     public string MessageKey { get; set; } = string.Empty;
-    public int Percent { get; set; }
+    public string? CurrentFile { get; set; }
+    
+    /// <summary>Downloaded bytes (for download progress)</summary>
+    public long BytesDownloaded { get; set; }
+    
+    /// <summary>Total bytes (for download progress)</summary>
+    public long TotalBytes { get; set; }
+    
+    /// <summary>Completed items (for multi-item progress)</summary>
+    public int CompletedItems { get; set; }
+    
+    /// <summary>Total items (for multi-item progress)</summary>
+    public int TotalItems { get; set; }
+    
+    /// <summary>
+    /// Completion percentage (0-100), auto-calculated
+    /// Priority: BytesDownloaded/TotalBytes > CompletedItems/TotalItems
+    /// </summary>
+    public double Percentage => TotalBytes > 0
+        ? Math.Round(BytesDownloaded * 100.0 / TotalBytes, 1)
+        : (TotalItems > 0 ? Math.Round(CompletedItems * 100.0 / TotalItems, 1) : 0);
+    
     public bool IsComplete { get; set; }
     public bool HasError { get; set; }
     public string? ErrorMessageKey { get; set; }
