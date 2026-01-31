@@ -16,7 +16,6 @@ shared/resources/bin/
 # Frontend
 frontend/node_modules/
 frontend/dist/
-frontend/resources/
 
 # Documentation (開發文件不上傳)
 docs/
