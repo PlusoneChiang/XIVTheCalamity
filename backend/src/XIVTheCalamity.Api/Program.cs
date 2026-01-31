@@ -48,17 +48,25 @@ try
     // Register ConfigService
     builder.Services.AddSingleton<ConfigService>();
 
-    // Register Wine services (macOS/Linux only)
-    if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) || RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+    // 平台相關服務註冊 - 使用 IEnvironmentService 介面
+    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
     {
+        // Windows: 使用空實作
+        builder.Services.AddSingleton<XIVTheCalamity.Platform.IEnvironmentService, XIVTheCalamity.Platform.Windows.WindowsEnvironmentService>();
+    }
+    else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+    {
+        // macOS: 使用 Wine
+        builder.Services.AddSingleton<XIVTheCalamity.Platform.IEnvironmentService, XIVTheCalamity.Platform.MacOS.Wine.WineEnvironmentService>();
         builder.Services.AddSingleton<WinePrefixService>();
         builder.Services.AddSingleton<WineConfigService>();
-    }
-    
-    // Register macOS Audio Router service
-    if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-    {
         builder.Services.AddSingleton<XIVTheCalamity.Platform.MacOS.Audio.AudioRouterService>();
+    }
+    else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+    {
+        // Linux: 使用 Proton
+        builder.Services.AddSingleton<XIVTheCalamity.Platform.IEnvironmentService, XIVTheCalamity.Platform.Linux.Proton.ProtonEnvironmentService>();
+        builder.Services.AddSingleton<XIVTheCalamity.Platform.Linux.Proton.ProtonDownloadService>();
     }
 
     // Configure HttpClient for TcAuthService

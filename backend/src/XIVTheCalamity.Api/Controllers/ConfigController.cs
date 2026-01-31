@@ -3,7 +3,7 @@ using XIVTheCalamity.Api.Extensions;
 using XIVTheCalamity.Api.Models;
 using XIVTheCalamity.Core.Models;
 using XIVTheCalamity.Core.Services;
-using XIVTheCalamity.Platform.MacOS.Wine;
+using XIVTheCalamity.Platform;
 
 namespace XIVTheCalamity.Api.Controllers;
 
@@ -15,7 +15,7 @@ namespace XIVTheCalamity.Api.Controllers;
 public class ConfigController(
     ILogger<ConfigController> logger,
     ConfigService configService,
-    WinePrefixService winePrefixService) : ControllerBase
+    IEnvironmentService environmentService) : ControllerBase
 {
     /// <summary>
     /// Get current configuration
@@ -91,7 +91,6 @@ public class ConfigController(
             currentConfig.Wine.MaxFramerate = partialConfig.Wine.MaxFramerate;
             currentConfig.Wine.AudioRouting = partialConfig.Wine.AudioRouting;
             currentConfig.Wine.EsyncEnabled = partialConfig.Wine.EsyncEnabled;
-            currentConfig.Wine.FsyncEnabled = partialConfig.Wine.FsyncEnabled;
             currentConfig.Wine.Msync = partialConfig.Wine.Msync;
             currentConfig.Wine.WineDebug = partialConfig.Wine.WineDebug;
             currentConfig.Wine.LeftOptionIsAlt = partialConfig.Wine.LeftOptionIsAlt;
@@ -114,15 +113,15 @@ public class ConfigController(
             
             await configService.SaveConfigAsync(currentConfig);
             
-            // Apply Wine settings to registry and DLLs
+            // Apply platform-specific configuration
             try
             {
-                logger.LogInformation("Applying Wine settings to prefix");
-                await winePrefixService.ApplyGraphicsSettingsAsync(currentConfig.Wine);
+                logger.LogInformation("Applying platform configuration");
+                await environmentService.ApplyConfigAsync();
             }
-            catch (Exception wineEx)
+            catch (Exception envEx)
             {
-                logger.LogWarning(wineEx, "Failed to apply Wine settings, but config was saved");
+                logger.LogWarning(envEx, "Failed to apply platform configuration, but config was saved");
             }
             
             return this.SuccessResult(currentConfig);

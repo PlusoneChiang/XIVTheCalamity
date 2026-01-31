@@ -4,7 +4,7 @@ using XIVTheCalamity.Api.Extensions;
 using XIVTheCalamity.Api.Models;
 using XIVTheCalamity.Dalamud.Services;
 using XIVTheCalamity.Game.Launcher;
-using XIVTheCalamity.Platform.MacOS.Wine;
+using XIVTheCalamity.Platform;
 using XIVTheCalamity.Core.Services;
 
 namespace XIVTheCalamity.Api.Controllers;
@@ -21,7 +21,7 @@ public class GameController : ControllerBase
     private readonly ConfigService _configService;
     private readonly DalamudInjectorService _dalamudInjector;
     private readonly DalamudPathService _dalamudPathService;
-    private readonly IServiceProvider _serviceProvider;
+    private readonly IEnvironmentService _environmentService;
     
     public GameController(
         ILogger<GameController> logger,
@@ -29,14 +29,14 @@ public class GameController : ControllerBase
         ConfigService configService,
         DalamudInjectorService dalamudInjector,
         DalamudPathService dalamudPathService,
-        IServiceProvider serviceProvider)
+        IEnvironmentService environmentService)
     {
         _logger = logger;
         _gameLaunchService = gameLaunchService;
         _configService = configService;
         _dalamudInjector = dalamudInjector;
         _dalamudPathService = dalamudPathService;
-        _serviceProvider = serviceProvider;
+        _environmentService = environmentService;
     }
     
     /// <summary>
@@ -74,17 +74,19 @@ public class GameController : ControllerBase
             {
                 _logger.LogInformation("[GAME] Fake launch successful, PID: {Pid}", result.ProcessId);
                 
-                // Start audio router if enabled (macOS only)
-                if (config.Wine.AudioRouting && RuntimeInformation.IsOSPlatform(OSPlatform.OSX) && result.ProcessId.HasValue)
+                // Start audio router if enabled (via environment service)
+                if (config.Wine?.AudioRouting == true && result.ProcessId.HasValue)
                 {
-                    StartAudioRouter(result.ProcessId.Value, config.Wine.EsyncEnabled, config.Wine.Msync);
+                    _environmentService.StartAudioRouter(result.ProcessId.Value, 
+                        config.Wine?.EsyncEnabled ?? false, 
+                        config.Wine?.Msync ?? false);
                 }
                 
                 // Inject Dalamud if enabled
                 if (config.Dalamud.Enabled)
                 {
                     _logger.LogInformation("[GAME] Dalamud enabled, starting injection...");
-                    _ = InjectDalamudAsync(config.Wine, config.Dalamud, cancellationToken);
+                    _ = InjectDalamudAsync(config.Dalamud, cancellationToken);
                 }
                 
                 _logger.LogInformation("[GAME] Waiting for game exit...");
@@ -126,18 +128,22 @@ public class GameController : ControllerBase
     /// Inject Dalamud (runs in background)
     /// </summary>
     private async Task InjectDalamudAsync(
-        XIVTheCalamity.Core.Models.WineConfig wineConfig,
         XIVTheCalamity.Core.Models.DalamudConfig dalamudConfig,
         CancellationToken cancellationToken)
     {
         try
         {
-            // Get Wine path and environment variables
-            var winePathService = WinePathService.Instance;
-            var winePath = winePathService.WineExecutable;
+            // Get emulator path and environment from platform service
+            var emulatorDir = _environmentService.GetEmulatorDirectory();
+            var winePath = Path.Combine(emulatorDir, "files", "bin", "wine");
             
-            var wineConfigService = new WineConfigService(null);
-            var environment = wineConfigService.GetFullEnvironment(wineConfig);
+            if (string.IsNullOrEmpty(emulatorDir) || !System.IO.File.Exists(winePath))
+            {
+                _logger.LogWarning("[GAME] Wine/Proton not available, cannot inject Dalamud");
+                return;
+            }
+            
+            var environment = _environmentService.GetEnvironment();
             
             var options = new DalamudInjectionOptions
             {
@@ -204,17 +210,19 @@ public class GameController : ControllerBase
             {
                 _logger.LogInformation("[GAME] Launch successful, PID: {Pid}", result.ProcessId);
                 
-                // Start audio router if enabled (macOS only)
-                if (config.Wine.AudioRouting && RuntimeInformation.IsOSPlatform(OSPlatform.OSX) && result.ProcessId.HasValue)
+                // Start audio router if enabled (via environment service)
+                if (config.Wine?.AudioRouting == true && result.ProcessId.HasValue)
                 {
-                    StartAudioRouter(result.ProcessId.Value, config.Wine.EsyncEnabled, config.Wine.Msync);
+                    _environmentService.StartAudioRouter(result.ProcessId.Value, 
+                        config.Wine?.EsyncEnabled ?? false, 
+                        config.Wine?.Msync ?? false);
                 }
                 
                 // Inject Dalamud if enabled
                 if (config.Dalamud.Enabled)
                 {
                     _logger.LogInformation("[GAME] Dalamud enabled, starting injection...");
-                    _ = InjectDalamudAsync(config.Wine, config.Dalamud, cancellationToken);
+                    _ = InjectDalamudAsync(config.Dalamud, cancellationToken);
                 }
                 
                 return this.SuccessResult(new { processId = result.ProcessId });
@@ -263,39 +271,23 @@ public class GameController : ControllerBase
     /// <param name="gamePid">Game process ID</param>
     /// <param name="esync">Enable Esync</param>
     /// <param name="msync">Enable Msync</param>
-    private void StartAudioRouter(int gamePid, bool esync, bool msync)
-    {
-        try
-        {
-            var audioRouter = _serviceProvider.GetService<XIVTheCalamity.Platform.MacOS.Audio.AudioRouterService>();
-            if (audioRouter == null)
-            {
-                _logger.LogWarning("[GAME] AudioRouterService not available");
-                return;
-            }
-            
-            var winePathService = WinePathService.Instance;
-            var winePath = winePathService.WineExecutable;
-            var winePrefix = winePathService.WinePrefix;
-            
-            _logger.LogInformation("[GAME] Starting audio router for game PID: {Pid}, Esync: {Esync}, Msync: {Msync}", gamePid, esync, msync);
-            _logger.LogInformation("[GAME] Audio router params - WinePath: {WinePath}, WinePrefix: {WinePrefix}", winePath, winePrefix);
-            
-            var result = audioRouter.StartRouter(gamePid, winePrefix, winePath, esync, msync);
-            if (result)
-            {
-                _logger.LogInformation("[GAME] Audio router started successfully");
-            }
-            else
-            {
-                _logger.LogWarning("[GAME] Audio router failed to start");
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "[GAME] Failed to start audio router");
-        }
-    }
+//             _logger.LogInformation("[GAME] Audio router params - WinePath: {WinePath}, WinePrefix: {WinePrefix}", winePath, winePrefix);
+//             
+//             var result = audioRouter.StartRouter(gamePid, winePrefix, winePath, esync, msync);
+//             if (result)
+//             {
+//                 _logger.LogInformation("[GAME] Audio router started successfully");
+//             }
+//             else
+//             {
+//                 _logger.LogWarning("[GAME] Audio router failed to start");
+//             }
+//         }
+//         catch (Exception ex)
+//         {
+//             _logger.LogWarning(ex, "[GAME] Failed to start audio router");
+//         }
+//     }
 }
 
 public class LaunchRequest

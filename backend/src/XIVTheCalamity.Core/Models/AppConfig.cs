@@ -6,7 +6,8 @@ namespace XIVTheCalamity.Core.Models;
 public class AppConfig
 {
     public GameConfig Game { get; set; } = new();
-    public WineConfig Wine { get; set; } = new();
+    public WineConfig? Wine { get; set; }
+    public ProtonConfig? Proton { get; set; }
     public DalamudConfig Dalamud { get; set; } = new();
     public LauncherConfig Launcher { get; set; } = new();
 }

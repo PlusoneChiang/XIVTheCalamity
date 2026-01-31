@@ -144,28 +144,12 @@ public class ConfigService
     /// </summary>
     private AppConfig CreateDefaultConfig()
     {
-        return new AppConfig
+        var config = new AppConfig
         {
             Game = new GameConfig
             {
                 GamePath = "",
                 Region = "TraditionalChinese"
-            },
-            Wine = new WineConfig
-            {
-                DxmtEnabled = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) && 
-                             Environment.OSVersion.Version.Major >= 14, // macOS 14.0+
-                MetalFxSpatialEnabled = false,
-                MetalFxSpatialFactor = 2.0,
-                Metal3PerformanceOverlay = false,
-                HudScale = 1.0,
-                NativeResolution = false,
-                MaxFramerate = 60,
-                AudioRouting = false,
-                EsyncEnabled = true,
-                FsyncEnabled = false,
-                Msync = true,
-                WineDebug = ""
             },
             Dalamud = new DalamudConfig
             {
@@ -182,6 +166,39 @@ public class ConfigService
                 DevelopmentMode = false
             }
         };
+
+        // Platform-specific defaults
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            config.Wine = new WineConfig
+            {
+                DxmtEnabled = Environment.OSVersion.Version.Major >= 14, // macOS 14.0+
+                MetalFxSpatialEnabled = false,
+                MetalFxSpatialFactor = 2.0,
+                Metal3PerformanceOverlay = false,
+                HudScale = 1.0,
+                NativeResolution = false,
+                MaxFramerate = 60,
+                AudioRouting = false,
+                EsyncEnabled = true,
+                Msync = true,
+                WineDebug = ""
+            };
+        }
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            config.Proton = new ProtonConfig
+            {
+                DxvkHudEnabled = false,
+                FsyncEnabled = true,
+                EsyncEnabled = true,
+                GameModeEnabled = false,
+                MaxFramerate = 60,
+                WineDebug = ""
+            };
+        }
+
+        return config;
     }
 
     /// <summary>
@@ -201,16 +218,20 @@ public class ConfigService
             throw new ArgumentException("Region must be 'TraditionalChinese'");
         }
 
-        // Validate metalFxSpatialFactor
-        if (config.Wine.MetalFxSpatialFactor < 1.0 || config.Wine.MetalFxSpatialFactor > 4.0)
+        // Validate Wine config (macOS only)
+        if (config.Wine != null)
         {
-            throw new ArgumentException("MetalFxSpatialFactor must be between 1.0 and 4.0");
-        }
+            // Validate metalFxSpatialFactor
+            if (config.Wine.MetalFxSpatialFactor < 1.0 || config.Wine.MetalFxSpatialFactor > 4.0)
+            {
+                throw new ArgumentException("MetalFxSpatialFactor must be between 1.0 and 4.0");
+            }
 
-        // Validate maxFramerate
-        if (config.Wine.MaxFramerate < 30 || config.Wine.MaxFramerate > 240)
-        {
-            throw new ArgumentException("MaxFramerate must be between 30 and 240");
+            // Validate maxFramerate
+            if (config.Wine.MaxFramerate < 30 || config.Wine.MaxFramerate > 240)
+            {
+                throw new ArgumentException("MaxFramerate must be between 30 and 240");
+            }
         }
 
         // Validate injectDelay (milliseconds)

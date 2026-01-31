@@ -1,10 +1,24 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
 const http = require('http');
 const log = require('electron-log');
 const { spawn } = require('child_process');
+
+// Set application name FIRST to ensure correct case in directory names
+// Must be called before any app.getPath() calls
+app.setName('XIVTheCalamity');
+
+// Platform detection
+const isMacOS = process.platform === 'darwin';
+const isLinux = process.platform === 'linux';
+const isWindows = process.platform === 'win32';
+
+// Hide menu on Linux/Windows (macOS keeps native menu bar)
+if (!isMacOS) {
+  Menu.setApplicationMenu(null);
+}
 
 // Load version info
 let versionInfo = { version: '0.1.0', appName: 'XIV The Calamity', description: 'Final Fantasy XIV Cross-Platform Launcher' };
@@ -64,7 +78,7 @@ log.info('Log file:', logPath);
 let settingsWindowInstance = null;
 
 // Track if debug/development mode is enabled (read from config on startup)
-let isDebugModeEnabled = false;
+let isDebugModeEnabled = false; // Will be loaded from config
 
 /**
  * Safe logging functions that won't throw EPIPE
@@ -87,9 +101,10 @@ function safeError(...args) {
 
 /**
  * Configure Electron paths before app is ready
- * Separation:
- * - Electron system files -> ~/Library/Caches/XIVTheCalamity
- * - User config/credentials -> ~/Library/Application Support/XIVTheCalamity
+ * Uses Electron's default appData paths:
+ * - macOS: ~/Library/Application Support
+ * - Linux: ~/.config
+ * - Windows: %APPDATA%
  */
 const os = require('os');
 
@@ -97,7 +112,7 @@ const os = require('os');
 const electronCacheDir = path.join(app.getPath('cache'), 'XIVTheCalamity');
 app.setPath('userData', electronCacheDir);
 
-// User config files go to Application Support
+// User config files go to Application Support (or .config on Linux)
 const userConfigDir = path.join(app.getPath('appData'), 'XIVTheCalamity');
 
 // Ensure user config directory exists
@@ -120,6 +135,7 @@ function createWindow() {
     backgroundColor: '#00000000',
     vibrancy: 'dark',
     title: 'XIV The Calamity',
+    autoHideMenuBar: !isMacOS, // Hide menu bar on Linux/Windows
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -142,8 +158,11 @@ function createWindow() {
     }
   });
   
-  // Disable DevTools if not in debug mode
-  if (!isDebugModeEnabled) {
+  // DevTools control
+  if (isDebugModeEnabled) {
+    // Open DevTools automatically in debug mode
+    mainWindow.webContents.openDevTools();
+  } else {
     // Close DevTools immediately if opened
     mainWindow.webContents.on('devtools-opened', () => {
       mainWindow.webContents.closeDevTools();
@@ -183,6 +202,7 @@ function createSettingsWindow() {
     backgroundColor: '#00000000',
     vibrancy: 'dark',
     title: 'Settings - XIV The Calamity',
+    autoHideMenuBar: !isMacOS, // Hide menu bar on Linux/Windows
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,

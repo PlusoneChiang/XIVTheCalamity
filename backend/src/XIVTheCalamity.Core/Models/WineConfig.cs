@@ -53,11 +53,6 @@ public class WineConfig
     public bool EsyncEnabled { get; set; } = true;
     
     /// <summary>
-    /// Enable Fsync synchronization (Linux only)
-    /// </summary>
-    public bool FsyncEnabled { get; set; } = false;
-    
-    /// <summary>
     /// Enable Msync synchronization
     /// </summary>
     public bool Msync { get; set; } = true;

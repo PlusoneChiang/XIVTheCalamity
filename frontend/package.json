@@ -16,7 +16,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "build": {
-    "appId": "com.xivthecalamity.launcher",
+    "appId": "com.XIVTheCalamity.launcher",
     "productName": "XIVTheCalamity",
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "directories": {
@@ -30,25 +30,8 @@
     ],
     "extraResources": [
       {
-        "from": "../shared/resources",
-        "to": "resources",
-        "filter": [
-          "**/*"
-        ]
-      },
-      {
-        "from": "../wine",
-        "to": "wine",
-        "filter": [
-          "**/*"
-        ]
-      },
-      {
-        "from": "../Release/temp-backend",
-        "to": "backend",
-        "filter": [
-          "**/*"
-        ]
+        "from": "../Release/temp-backend-linux/XIVTheCalamity.Api",
+        "to": "backend/XIVTheCalamity.Api"
       }
     ],
     "afterPack": "./electron-builder-afterpack.js",

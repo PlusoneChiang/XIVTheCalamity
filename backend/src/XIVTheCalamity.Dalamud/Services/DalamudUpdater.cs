@@ -33,7 +33,10 @@ public class DalamudUpdater
     {
         _logger = logger;
         _pathService = pathService;
-        _httpClient = new HttpClient();
+        _httpClient = new HttpClient
+        {
+            Timeout = Timeout.InfiniteTimeSpan  // Use CancellationToken for timeout control instead
+        };
         _httpClient.DefaultRequestHeaders.Add("User-Agent", "XIVTheCalamity/1.0");
     }
     
@@ -321,6 +324,7 @@ public class DalamudUpdater
         
         // 並行下載 (最多 5 個)
         var semaphore = new SemaphoreSlim(5);
+        var downloadedCount = 0;
         var tasks = filesToDownload.Select(async asset =>
         {
             await semaphore.WaitAsync(ct);
@@ -328,6 +332,9 @@ public class DalamudUpdater
             {
                 var localPath = Path.Combine(assetDir, asset.FileName);
                 Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
+                
+                _logger.LogDebug("開始下載 Asset: {FileName} ({Index}/{Total})", 
+                    asset.FileName, Interlocked.Increment(ref downloadedCount), filesToDownload.Count);
                 
                 // 使用 jsDelivr CDN 加速
                 var url = ConvertToJsDelivr(asset.Url);
@@ -341,9 +348,16 @@ public class DalamudUpdater
                     throw new Exception($"Asset 驗證失敗: {asset.FileName}");
                 }
                 
+                _logger.LogDebug("完成下載 Asset: {FileName}", asset.FileName);
+                
                 _currentProgress.IncrementCompleted();
                 _currentProgress.CurrentFile = asset.FileName;
                 OnProgress?.Invoke(_currentProgress);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "下載 Asset 失敗: {FileName}", asset.FileName);
+                throw;
             }
             finally
             {
@@ -351,7 +365,9 @@ public class DalamudUpdater
             }
         });
         
+        _logger.LogInformation("開始並行下載 {Count} 個 Asset 檔案...", filesToDownload.Count);
         await Task.WhenAll(tasks);
+        _logger.LogInformation("所有 Asset 檔案下載完成");
         
         // 保存版本
         await File.WriteAllTextAsync(_pathService.AssetsVersionFile, manifest.Version.ToString(), ct);
@@ -388,11 +404,17 @@ public class DalamudUpdater
     /// <summary>下載檔案 (不追蹤 bytes 進度，用於並行下載小檔案)</summary>
     private async Task DownloadFileSimpleAsync(string url, string targetPath, CancellationToken ct)
     {
-        using var response = await _httpClient.GetAsync(url, ct);
+        // Use per-request timeout of 2 minutes for large files
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromMinutes(2));
+        
+        using var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cts.Token);
         response.EnsureSuccessStatusCode();
         
+        await using var contentStream = await response.Content.ReadAsStreamAsync(cts.Token);
         await using var fileStream = new FileStream(targetPath, FileMode.Create, FileAccess.Write, FileShare.None);
-        await response.Content.CopyToAsync(fileStream, ct);
+        
+        await contentStream.CopyToAsync(fileStream, cts.Token);
     }
     
     private async Task ExtractSevenZipAsync(string archivePath, string targetDir, CancellationToken ct)

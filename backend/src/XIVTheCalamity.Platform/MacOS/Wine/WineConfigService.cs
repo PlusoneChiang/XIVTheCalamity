@@ -201,12 +201,6 @@ public class WineConfigService
             env["WINEESYNC"] = "1";
         }
         
-        // Fsync (Linux only)
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && config.FsyncEnabled)
-        {
-            env["WINEFSYNC"] = "1";
-        }
-        
         // Msync
         if (config.Msync)
         {

@@ -35,6 +35,15 @@ const translations = {
     'game.running': '遊戲執行中',
     'game.stopped': '遊戲已停止',
     
+    // Progress (Environment Initialization)
+    'progress.checking_proton': '檢查 Proton 狀態...',
+    'progress.downloading': '下載 Proton 中... ({percent}%)',
+    'progress.extracting': '解壓縮 Proton 中...',
+    'progress.proton_ready': 'Proton 已就緒',
+    'progress.initializing_prefix': '初始化 Wine Prefix...',
+    'progress.prefix_initialized': 'Wine Prefix 已就緒',
+    'progress.complete': '環境初始化完成',
+    
     // Update
     'update.checking': '檢查更新中...',
     'update.available': '有可用的更新',
@@ -295,6 +304,8 @@ const translations = {
     
     // API Error codes - Environment
     'error.env_init_failed': '環境初始化失敗',
+    'error.download_failed': 'Proton 下載失敗',
+    'error.initialization_failed': '環境初始化失敗',
     
     // API Error codes - System
     'error.internal_error': '系統內部錯誤',
@@ -332,6 +343,15 @@ const translations = {
     'game.launching': 'Launching game...',
     'game.running': 'Game is running',
     'game.stopped': 'Game stopped',
+    
+    // Progress (Environment Initialization)
+    'progress.checking_proton': 'Checking Proton status...',
+    'progress.downloading': 'Downloading Proton... ({percent}%)',
+    'progress.extracting': 'Extracting Proton...',
+    'progress.proton_ready': 'Proton is ready',
+    'progress.initializing_prefix': 'Initializing Wine Prefix...',
+    'progress.prefix_initialized': 'Wine Prefix is ready',
+    'progress.complete': 'Environment initialization complete',
     
     // Update
     'update.checking': 'Checking for updates...',
@@ -593,6 +613,8 @@ const translations = {
     
     // API Error codes - Environment
     'error.env_init_failed': 'Environment initialization failed',
+    'error.download_failed': 'Proton download failed',
+    'error.initialization_failed': 'Environment initialization failed',
     
     // API Error codes - System
     'error.internal_error': 'Internal server error',
