@@ -11,6 +11,7 @@ namespace XIVTheCalamity.Platform.Linux.Wine;
 /// </summary>
 public class WineXIVEnvironmentService(
     WineXIVDownloadService downloadService,
+    ConfigService configService,
     ILogger<WineXIVEnvironmentService>? logger = null
 ) : IEnvironmentService
 {
@@ -245,6 +246,10 @@ public class WineXIVEnvironmentService(
     
     public Dictionary<string, string> GetEnvironment()
     {
+        // Load current config (synchronously - GetEnvironment must be sync)
+        var config = configService.LoadConfigAsync().GetAwaiter().GetResult();
+        var wineXIVConfig = config.WineXIV ?? new WineXIVConfig();
+        
         var wineLibPath = Path.Combine(WineRoot, "lib64", "wine");
         var wineDllPath = Path.Combine(wineLibPath, "x86_64-windows");
         
@@ -261,22 +266,30 @@ public class WineXIVEnvironmentService(
             // Different from XIVLauncher.Core to ensure DXGI fallback works
             ["WINEDLLOVERRIDES"] = "mshtml=;d3d11,dxgi,d3d10core,d3d9=n,b",
             
-            // Wine synchronization (matches XIVLauncher.Core)
-            ["WINEESYNC"] = "1",
-            ["WINEFSYNC"] = "1",
+            // Wine synchronization - configured from WineXIVConfig
+            ["WINEESYNC"] = wineXIVConfig.EsyncEnabled ? "1" : "0",
+            ["WINEFSYNC"] = wineXIVConfig.FsyncEnabled ? "1" : "0",
             
-            // DXVK configuration (matches XIVLauncher.Core)
-            ["DXVK_HUD"] = "0",
-            ["DXVK_ASYNC"] = "0",
+            // DXVK configuration - configured from WineXIVConfig
+            ["DXVK_HUD"] = wineXIVConfig.DxvkHudEnabled ? "fps,frametime,memory" : "0",
+            ["DXVK_ASYNC"] = "0",  // Always disabled for stability
             
-            // Wine debug (disabled by default)
-            ["WINEDEBUG"] = "-all",
+            // Wine debug - configured from WineXIVConfig
+            ["WINEDEBUG"] = string.IsNullOrEmpty(wineXIVConfig.WineDebug) ? "-all" : wineXIVConfig.WineDebug,
             
             // XIVLauncher marker
             ["XL_WINEONLINUX"] = "true",
         };
         
-        logger?.LogDebug("[WINE-XIV] Generated environment");
+        // GameMode support (Linux only)
+        if (wineXIVConfig.GameModeEnabled)
+        {
+            env["LD_PRELOAD"] = "/usr/lib/libgamemodeauto.so.0";
+            logger?.LogDebug("[WINE-XIV] GameMode enabled");
+        }
+        
+        logger?.LogDebug("[WINE-XIV] Generated environment with config: Esync={Esync}, Fsync={Fsync}, DXVK HUD={DxvkHud}, GameMode={GameMode}", 
+            wineXIVConfig.EsyncEnabled, wineXIVConfig.FsyncEnabled, wineXIVConfig.DxvkHudEnabled, wineXIVConfig.GameModeEnabled);
         
         return env;
     }
