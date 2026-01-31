@@ -1,0 +1,48 @@
+# Build outputs
+Release/
+/wine/
+
+# Backend bin/obj
+backend/src/**/bin/
+backend/src/**/obj/
+
+# XTCAudioRouter (Swift)
+XTCAudioRouter/.build/
+XTCAudioRouter/Package.resolved
+
+# Built binaries in shared resources (copied during build)
+shared/resources/bin/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/resources/
+
+# Documentation (開發文件不上傳)
+docs/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+._*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# User data
+*.user
+*.suo
+
+# Temporary files
+*.tmp
+*~
+
+# Temporary files and test scripts
+temp/
+RefProjects/

@@ -1,0 +1,102 @@
+{
+  "fill" : {
+    "linear-gradient" : [
+      "extended-gray:1.00000,1.00000",
+      "extended-gray:0.75000,1.00000"
+    ],
+    "orientation" : {
+      "start" : {
+        "x" : 0.5,
+        "y" : 0
+      },
+      "stop" : {
+        "x" : 0.5,
+        "y" : 0.7
+      }
+    }
+  },
+  "groups" : [
+    {
+      "blur-material" : 0.3,
+      "layers" : [
+
+      ],
+      "lighting" : "individual",
+      "position" : {
+        "scale" : 1,
+        "translation-in-points" : [
+          28.219251321741016,
+          -14.301128093495024
+        ]
+      },
+      "shadow" : {
+        "kind" : "layer-color",
+        "opacity" : 1
+      },
+      "specular" : true,
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.8
+      }
+    },
+    {
+      "blur-material" : 1,
+      "layers" : [
+        {
+          "fill" : "automatic",
+          "glass" : false,
+          "hidden-specializations" : [
+            {
+              "appearance" : "light",
+              "value" : false
+            }
+          ],
+          "image-name" : "The Calamity (Bahamut).png",
+          "name" : "The Calamity (Bahamut)",
+          "opacity-specializations" : [
+            {
+              "value" : 1
+            },
+            {
+              "appearance" : "light",
+              "value" : 1
+            }
+          ],
+          "position" : {
+            "scale" : 1.19,
+            "translation-in-points" : [
+              13.3900000000001,
+              -36.27531249999993
+            ]
+          }
+        },
+        {
+          "fill" : "automatic",
+          "glass" : false,
+          "hidden" : false,
+          "image-name" : "The Calamity (Moon).png",
+          "name" : "The Calamity (Moon)",
+          "position" : {
+            "scale" : 1.19,
+            "translation-in-points" : [
+              15.470000000000027,
+              -16.065000000000055
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 1
+      },
+      "specular" : false,
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.2
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "squares" : "shared"
+  }
+}

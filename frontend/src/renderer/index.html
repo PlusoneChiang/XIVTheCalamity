@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XIV The Calamity - FF14 Launcher</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1 data-i18n="app.title">XIV The Calamity</h1>
+      <p class="subtitle" data-i18n="app.subtitle">Final Fantasy XIV 跨平台啟動器</p>
+      
+      <!-- Language Switcher -->
+      <div class="language-switcher">
+        <button id="lang-zh-tw" class="lang-btn active">繁中</button>
+        <button id="lang-en-us" class="lang-btn">EN</button>
+      </div>
+      
+      <!-- Progress Card -->
+      <div id="progress-card" class="progress-card" style="display: none;">
+        <div class="progress-bar">
+          <div id="progress-bar-fill" class="progress-bar-fill"></div>
+        </div>
+        <p id="progress-message" class="progress-message"></p>
+      </div>
+      
+      <!-- Status Message -->
+      <div id="status-message" class="status-message" style="display: none;"></div>
+    </header>
+    
+    <main>
+      <div class="welcome">
+        <h2 data-i18n="message.welcome">歡迎來到艾歐澤亞</h2>
+        <p>Your adventure awaits...</p>
+      </div>
+      
+      <div class="actions">
+        <button id="launch-btn" class="btn-primary" data-i18n="button.launch">啟動遊戲</button>
+        <button class="btn-secondary" data-i18n="button.settings">設定</button>
+      </div>
+    </main>
+  </div>
+  
+  <script type="module" src="renderer.js"></script>
+</body>
+</html>

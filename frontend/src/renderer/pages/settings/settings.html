@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings - XIV The Calamity</title>
+  <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+  <!-- Draggable Title Bar -->
+  <div class="title-bar"></div>
+  
+  <div class="settings-container">
+    <!-- Tab Navigation -->
+    <nav class="tab-navigation">
+      <button class="tab-button active" data-tab="general" data-i18n="settings.tab.general">一般</button>
+      <button class="tab-button" data-tab="wine" data-i18n="settings.tab.wine">Wine</button>
+      <button class="tab-button" data-tab="dalamud" data-i18n="settings.tab.dalamud">Dalamud</button>
+      <button class="tab-button" data-tab="about" data-i18n="settings.tab.about">關於</button>
+    </nav>
+
+    <!-- Tab Content Container -->
+    <div class="tab-content-container">
+      <!-- General Tab -->
+      <div id="tab-general" class="tab-content active">
+        <div class="settings-section">
+          <h2 data-i18n="settings.general.basic">基本設定</h2>
+          <div class="form-group">
+            <div>
+              <label for="language" data-i18n="settings.general.language">語言</label>
+              <select id="language">
+                <option value="zh-TW">繁體中文</option>
+                <option value="en-US">English</option>
+              </select>
+              <p class="help-text" data-i18n="settings.general.language_help">選擇介面語言</p>
+            </div>
+            <div class="checkbox-group">
+              <label>
+                <input type="checkbox" id="debugLogging">
+                <span data-i18n="settings.general.debug">Debug 記錄</span>
+              </label>
+              <button id="openLogPathButton" class="btn btn-secondary btn-sm" data-i18n="settings.general.open_log">開啟</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h2 data-i18n="settings.general.game">遊戲設定</h2>
+          <div class="form-group">
+            <div class="full-width">
+              <label for="gamePath" data-i18n="settings.general.game_path">遊戲路徑</label>
+              <div class="input-with-button">
+                <input type="text" id="gamePath" placeholder="/path/to/game">
+                <button id="browseGamePathButton" class="btn btn-secondary" data-i18n="settings.general.browse">瀏覽</button>
+              </div>
+              <p class="help-text" data-i18n="settings.general.game_path_help">指定遊戲安裝目錄</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Wine Tab -->
+      <div id="tab-wine" class="tab-content">
+        <div class="settings-section">
+          <h2 data-i18n="settings.wine.graphics">圖形設定</h2>
+          <div class="form-group">
+            <div class="platform-darwin">
+              <label>
+                <input type="checkbox" id="dxmtEnabled">
+                <span data-i18n="settings.wine.dxmt">啟用 DXMT</span>
+              </label>
+              <p class="help-text" data-i18n="settings.wine.dxmt_help">macOS Metal 轉譯層</p>
+            </div>
+            <div class="platform-darwin">
+              <label>
+                <input type="checkbox" id="metalFxEnabled">
+                <span data-i18n="settings.wine.metalfx">啟用 MetalFX</span>
+              </label>
+              <p class="help-text" data-i18n="settings.wine.metalfx_help">需要 DXMT</p>
+            </div>
+            <div class="platform-darwin">
+              <label for="metalFxFactor" data-i18n="settings.wine.metalfx_factor">MetalFX 倍率</label>
+              <div class="slider-group">
+                <input type="range" id="metalFxFactor" min="1" max="4" step="1" value="2">
+                <span id="metalFxFactorValue">2.0x</span>
+              </div>
+              <p class="help-text" data-i18n="settings.wine.metalfx_factor_help">超解析倍率 (1x-4x)</p>
+            </div>
+            <div>
+              <label>
+                <input type="checkbox" id="hudEnabled">
+                <span data-i18n="settings.wine.hud">HUD 顯示</span>
+              </label>
+              <p class="help-text" data-i18n="settings.wine.hud_help">顯示效能監控</p>
+            </div>
+            <div>
+              <label for="hudScale" data-i18n="settings.wine.hud_scale">HUD 大小</label>
+              <div class="slider-group">
+                <input type="range" id="hudScale" min="0.5" max="2.0" step="0.5" value="1.0">
+                <span id="hudScaleValue">1.0x</span>
+              </div>
+            </div>
+            <div class="platform-darwin">
+              <label>
+                <input type="checkbox" id="nativeResolution">
+                <span data-i18n="settings.wine.native_resolution">原生解析度</span>
+              </label>
+              <p class="help-text" data-i18n="settings.wine.native_resolution_help">使用 Retina 原生解析度（畫質較高但效能需求較高）</p>
+            </div>
+            <div>
+              <label for="maxFramerate" data-i18n="settings.wine.max_framerate">最高幀率</label>
+              <input type="number" id="maxFramerate" min="30" max="240" step="10" value="60">
+              <p class="help-text" data-i18n="settings.wine.max_framerate_help">限制最高 FPS (30-240)</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h2 data-i18n="settings.wine.audio">音訊設定</h2>
+          <div class="form-group">
+            <div>
+              <label>
+                <input type="checkbox" id="audioRouting">
+                <span data-i18n="settings.wine.audio_routing">音訊路由</span>
+              </label>
+              <p class="help-text" data-i18n="settings.wine.audio_routing_help">改善音訊相容性</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h2 data-i18n="settings.wine.advanced">進階設定</h2>
+          <div class="form-group">
+            <div>
+              <label>
+                <input type="checkbox" id="esyncEnabled">
+                <span data-i18n="settings.wine.esync">Esync</span>
+              </label>
+              <p class="help-text" data-i18n="settings.wine.esync_help">事件同步機制</p>
+            </div>
+            <div class="platform-linux">
+              <label>
+                <input type="checkbox" id="fsyncEnabled">
+                <span data-i18n="settings.wine.fsync">Fsync</span>
+              </label>
+              <p class="help-text" data-i18n="settings.wine.fsync_help">快速同步機制 (Linux)</p>
+            </div>
+            <div>
+              <label>
+                <input type="checkbox" id="msyncEnabled">
+                <span data-i18n="settings.wine.msync">Msync</span>
+              </label>
+              <p class="help-text" data-i18n="settings.wine.msync_help">macOS 同步機制</p>
+            </div>
+            <div class="full-width">
+              <label for="wineDebug" data-i18n="settings.wine.wine_debug">Wine Debug 參數</label>
+              <input type="text" id="wineDebug" placeholder="-all,+module">
+              <p class="help-text" data-i18n="settings.wine.wine_debug_help">Wine 除錯參數 (留空停用)</p>
+            </div>
+          </div>
+          <div class="button-group">
+            <button id="openWineCfgButton" class="btn btn-secondary btn-sm" data-i18n="settings.wine.open_winecfg">Winecfg</button>
+            <button id="openRegeditButton" class="btn btn-secondary btn-sm" data-i18n="settings.wine.open_regedit">登錄編輯器</button>
+            <button id="openCmdButton" class="btn btn-secondary btn-sm" data-i18n="settings.wine.open_cmd">命令列</button>
+          </div>
+        </div>
+
+        <div class="settings-section platform-darwin">
+          <h2 data-i18n="settings.wine.keyboard_mapping">按鍵映射</h2>
+          <div class="form-group">
+            <div>
+              <label for="leftOptionMapping" data-i18n="settings.wine.left_option">左側 Option 鍵</label>
+              <select id="leftOptionMapping">
+                <option value="true" data-i18n="settings.wine.key_as_alt">映射為 Alt</option>
+                <option value="false" data-i18n="settings.wine.key_as_option">保持 Option</option>
+              </select>
+            </div>
+            <div>
+              <label for="rightOptionMapping" data-i18n="settings.wine.right_option">右側 Option 鍵</label>
+              <select id="rightOptionMapping">
+                <option value="true" data-i18n="settings.wine.key_as_alt">映射為 Alt</option>
+                <option value="false" data-i18n="settings.wine.key_as_option">保持 Option</option>
+              </select>
+            </div>
+            <div>
+              <label for="leftCommandMapping" data-i18n="settings.wine.left_command">左側 Command 鍵</label>
+              <select id="leftCommandMapping">
+                <option value="true" data-i18n="settings.wine.key_as_ctrl">映射為 Ctrl</option>
+                <option value="false" data-i18n="settings.wine.key_as_alt_key">映射為 Alt</option>
+              </select>
+            </div>
+            <div>
+              <label for="rightCommandMapping" data-i18n="settings.wine.right_command">右側 Command 鍵</label>
+              <select id="rightCommandMapping">
+                <option value="true" data-i18n="settings.wine.key_as_ctrl">映射為 Ctrl</option>
+                <option value="false" data-i18n="settings.wine.key_as_alt_key">映射為 Alt</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dalamud Tab -->
+      <div id="tab-dalamud" class="tab-content">
+        <div class="settings-section">
+          <h2 data-i18n="settings.tab.dalamud">Dalamud</h2>
+          <div class="form-group">
+            <div>
+              <label>
+                <input type="checkbox" id="dalamudEnabled">
+                <span data-i18n="settings.dalamud.enable">啟用 Dalamud</span>
+              </label>
+              <p class="help-text" data-i18n="settings.dalamud.enable_help">載入遊戲插件框架</p>
+            </div>
+            <div>
+              <label data-i18n="settings.dalamud.version">Dalamud 版本</label>
+              <div class="readonly-field" id="dalamudVersion">-</div>
+            </div>
+            <div>
+              <label for="injectDelay" data-i18n="settings.dalamud.inject_delay">注入延遲（毫秒）</label>
+              <input type="number" id="injectDelay" value="5000" min="0" max="30000" step="100">
+              <p class="help-text" data-i18n="settings.dalamud.inject_delay_help">遊戲啟動後等待時間</p>
+            </div>
+            <div>
+              <label>
+                <input type="checkbox" id="safeMode">
+                <span data-i18n="settings.dalamud.safe_mode">安全模式</span>
+              </label>
+              <p class="help-text" data-i18n="settings.dalamud.safe_mode_help">停用第三方插件</p>
+            </div>
+            <div class="full-width">
+              <label for="pluginRepoUrl" data-i18n="settings.dalamud.plugin_repo">插件倉庫 URL</label>
+              <input type="text" id="pluginRepoUrl" placeholder="https://">
+              <p class="help-text" data-i18n="settings.dalamud.plugin_repo_help">自訂插件來源</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Test Launch Section -->
+        <div class="settings-section">
+          <h2 data-i18n="settings.dalamud.test_section">測試功能</h2>
+          <div class="form-group">
+            <div class="full-width">
+              <button id="testLaunchButton" class="btn btn-secondary" data-i18n="settings.dalamud.test_launch">測試啟動遊戲</button>
+              <p class="help-text" data-i18n="settings.dalamud.test_launch_help">不需登入即可測試遊戲啟動，無法連線至伺服器</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- About Tab -->
+      <div id="tab-about" class="tab-content">
+        <div class="about-container">
+          <div class="app-logo">
+            <img src="../../assets/app-icon-full.png" alt="XIV The Calamity" class="app-icon-image">
+            <h1>XIV The Calamity</h1>
+          </div>
+
+          <div class="about-section">
+            <h2 data-i18n="settings.about.app_info">應用程式資訊</h2>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="info-label" data-i18n="settings.about.version">版本</span>
+                <span class="info-value" id="appVersion">1.0.0</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="about-section">
+            <h2 data-i18n="settings.about.links">連結</h2>
+            <div class="links-container">
+              <button id="githubLink" class="link-button" data-i18n="settings.about.github">GitHub 儲存庫</button>
+              <button id="showLicenseButton" class="link-button" data-i18n="settings.about.show_license">顯示授權條款</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="settings-footer">
+      <button id="cancelButton" class="btn btn-secondary" data-i18n="button.cancel">取消</button>
+      <button id="applyButton" class="btn btn-secondary" data-i18n="button.apply">套用</button>
+      <button id="saveButton" class="btn btn-primary" data-i18n="button.save">儲存</button>
+    </div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+    <div class="loading-content">
+      <div class="loading-spinner"></div>
+      <p class="loading-text" data-i18n="settings.wine.launching_tool">正在啟動 Wine 工具...</p>
+    </div>
+  </div>
+
+  <!-- Game Running Overlay -->
+  <div id="gameRunningOverlay" class="loading-overlay" style="display: none;">
+    <div class="loading-content">
+      <div class="loading-spinner"></div>
+      <p class="loading-text" id="gameRunningText" data-i18n="settings.dalamud.game_running">遊戲執行中...</p>
+    </div>
+  </div>
+
+  <!-- Exit Code Dialog -->
+  <div id="exitCodeDialog" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <h2 data-i18n="settings.dalamud.game_exited">遊戲已結束</h2>
+      <p id="exitCodeMessage"></p>
+      <div class="modal-buttons">
+        <button id="exitCodeOkButton" class="btn btn-primary" data-i18n="button.ok">確定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Directory Setup Dialog -->
+  <div id="gameSetupDialog" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <h2 data-i18n="settings.game_setup.title">遊戲目錄設定</h2>
+      <p data-i18n="settings.game_setup.description">請選擇您的遊戲安裝方式</p>
+      <div class="modal-buttons">
+        <button id="existingGameButton" class="btn btn-primary" data-i18n="settings.game_setup.existing">我已有遊戲</button>
+        <button id="installGameButton" class="btn btn-secondary" data-i18n="settings.game_setup.install">安裝新遊戲</button>
+        <button id="cancelSetupButton" class="btn btn-secondary" data-i18n="button.cancel">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="settings.js"></script>
+</body>
+</html>

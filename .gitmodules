@@ -1,0 +1,3 @@
+[submodule "wine-builder/winecx"]
+	path = wine-builder/winecx
+	url = https://github.com/PlusoneChiang/winecx.git

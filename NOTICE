@@ -1,0 +1,55 @@
+XIV The Calamity - Final Fantasy XIV Cross-Platform Launcher
+Copyright (C) 2026 XIV The Calamity Contributors
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+See LICENSE file for full license text.
+
+================================================================================
+THIRD-PARTY COMPONENTS
+================================================================================
+
+This project contains code derived from:
+
+• XIV on Mac
+  Copyright (C) 2022-2025 marzent and Contributors
+  License: GNU General Public License v3.0
+  Source: https://github.com/marzent/XIV-on-Mac
+  
+  Derived components:
+  - Wine registry direct file manipulation
+  - Wine prefix initialization (wineboot + wineserver)
+  - Font and locale configuration strategies
+
+• Wine (bundled)
+  License: GNU Lesser General Public License v2.1
+  Source: https://www.winehq.org/
+  Fork: https://github.com/marzent/winecx (modified)
+
+• GStreamer (bundled)
+  License: GNU Lesser General Public License v2.0+
+  Source: https://gstreamer.freedesktop.org/
+
+• Noto Sans TC Font (bundled)
+  Copyright (C) Google LLC
+  License: SIL Open Font License 1.1
+
+• Electron (framework)
+  License: MIT License
+
+• .NET (framework)
+  License: MIT License
+
+================================================================================
+TRADEMARK NOTICE
+================================================================================
+
+"FINAL FANTASY" and "FINAL FANTASY XIV" are registered trademarks of
+Square Enix Holdings Co., Ltd.
+
+This project is not affiliated with, endorsed by, or sponsored by
+Square Enix Holdings Co., Ltd.
+

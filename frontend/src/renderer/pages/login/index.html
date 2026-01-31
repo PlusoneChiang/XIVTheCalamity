@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="app.title">XIV The Calamity</title>
+    
+    <!-- reCAPTCHA Enterprise -->
+    <script src="https://www.google.com/recaptcha/enterprise.js?render=6Ld6VmorAAAAANQdQeqkaOeScR42qHC7Hyalq00r" async defer></script>
+    
+    <style>
+        /* CSS will be inlined here by main process */
+    </style>
+</head>
+<body>
+    <!-- Draggable Title Bar -->
+    <div class="title-bar">
+        <!-- Settings Button -->
+        <button id="settingsBtn" class="test-progress-btn" title="Settings" data-i18n-attr="title:button.settings" data-i18n="button.settings">設定</button>
+    </div>
+    
+    <!-- Title Bar Info Card -->
+    <div class="title-bar-card">
+        <div class="progress-bar-bg" id="progressBarBg">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <span id="titleBarText">XIV The Calamity</span>
+    </div>
+    
+    <div class="container">
+        <!-- News Section (Left 60%) -->
+        <div class="news-section">
+            <iframe 
+                id="newsFrame" 
+                src="https://user-cdn.ffxiv.com.tw/news/251115/launcher_left.html"
+                frameborder="0"
+                allowtransparency="true">
+            </iframe>
+        </div>
+        
+        <!-- Login Section (Right 40%) -->
+        <div class="login-section">
+            <!-- State 1: Login Form (Idle) -->
+            <div id="loginForm" class="login-container">
+                <form id="loginFormElement" class="form">
+                    <div class="form-group">
+                        <label for="email" data-i18n="login.email">帳號 (Email)</label>
+                        <div class="input-with-button">
+                            <input 
+                                type="email" 
+                                id="email" 
+                                name="email" 
+                                required
+                                autocomplete="email"
+                                placeholder="user@example.com">
+                            <button type="button" class="input-addon-btn" id="accountDropdownBtn" title="選擇已保存的帳號">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M4 6l4 4 4-4"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="dropdown-menu" id="accountDropdown" style="display: none;">
+                            <!-- Account list will be populated here -->
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password" data-i18n="login.password">密碼</label>
+                        <div class="input-with-button">
+                            <input 
+                                type="password" 
+                                id="password" 
+                                name="password" 
+                                required
+                                autocomplete="current-password">
+                            <button type="button" class="input-addon-btn" id="passwordToggleBtn" title="按住顯示密碼">
+                                <!-- Eye with slash icon (default: password hidden) -->
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="eye-slash-icon">
+                                    <path d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7.028 7.028 0 0 0-2.79.588l.77.771A5.944 5.944 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.134 13.134 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755-.165.165-.337.328-.517.486l.708.709z"/>
+                                    <path d="M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829l.822.822zm-2.943 1.299l.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829z"/>
+                                    <path d="M3.35 5.47c-.18.16-.353.322-.518.487A13.134 13.134 0 0 0 1.172 8l.195.288c.335.48.83 1.12 1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7.029 7.029 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884l-12-12 .708-.708 12 12-.708.708z"/>
+                                </svg>
+                                <!-- Eye icon (shown when holding: password visible) -->
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="eye-icon" style="display: none;">
+                                    <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/>
+                                    <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="otp" data-i18n="login.otp">OTP 驗證碼</label>
+                        <div class="input-with-button">
+                            <input 
+                                type="text" 
+                                id="otp" 
+                                name="otp" 
+                                required
+                                maxlength="6"
+                                pattern="\d{6}"
+                                inputmode="numeric"
+                                placeholder="000000"
+                                data-i18n-placeholder="login.otp.placeholder">
+                            <div class="otp-timer hidden" id="otpTimer">
+                                <svg viewBox="0 0 36 36" class="circular-timer">
+                                    <circle class="timer-bg" cx="18" cy="18" r="16"/>
+                                    <circle class="timer-progress" cx="18" cy="18" r="16"/>
+                                    <text x="18" y="18" class="timer-text">30</text>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- OTP Secret Input (collapsible) -->
+                    <div class="form-group otp-secret-group" id="otpSecretGroup" style="display: none;">
+                        <label for="otpSecret">OTP 金鑰 (Base32)</label>
+                        <input 
+                            type="text" 
+                            id="otpSecret" 
+                            name="otpSecret" 
+                            placeholder="JBSWY3DPEHPK3PXP"
+                            pattern="[A-Za-z2-7\s]+"
+                            title="請輸入 Base32 格式的 OTP 金鑰">
+                        <small class="help-text">請輸入您的 OTP 金鑰以啟用自動填入功能</small>
+                        <button type="button" id="confirmOTPSecretBtn" class="btn btn-secondary btn-small">
+                            確認
+                        </button>
+                    </div>
+                    
+                    <div class="form-group checkbox-group">
+                        <label>
+                            <input type="checkbox" id="rememberPassword" name="rememberPassword">
+                            <span data-i18n="login.rememberPassword">記住帳號密碼</span>
+                        </label>
+                        <label>
+                            <input type="checkbox" id="autoFillOTP" name="autoFillOTP">
+                            <span data-i18n="login.autoFillOTP">自動填入 OTP</span>
+                        </label>
+                    </div>
+                    
+                    <div class="error-message" id="errorMessage"></div>
+                    
+                    <button type="button" id="loginButton" class="btn btn-primary">
+                        <span data-i18n="login.button">登入遊戲</span>
+                    </button>
+                </form>
+            </div>
+            
+            <!-- State 2: Loading -->
+            <div id="loadingView" class="loading-container" style="display: none;">
+                <div class="loading-spinner"></div>
+                <p class="loading-text" data-i18n="login.loading">登入中...</p>
+            </div>
+            
+            <!-- State 3: Success -->
+            <div id="successView" class="success-container" style="display: none;">
+                <div class="success-icon">✓</div>
+                <h2 class="success-title" data-i18n="login.success">登入成功！</h2>
+                <p class="session-info" id="sessionInfo"></p>
+                
+                <div class="button-group">
+                    <button id="launchButton" class="btn btn-primary btn-large">
+                        <span data-i18n="button.launch">🎮 啟動遊戲</span>
+                    </button>
+                    <button id="reloginButton" class="btn btn-secondary">
+                        <span data-i18n="button.relogin">🔄 重新登入</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Game Directory Setup Dialog -->
+    <div id="gameSetupDialog" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h2 data-i18n="login.game_setup.title">遊戲目錄設定</h2>
+            <p data-i18n="login.game_setup.description">首次使用需要設定遊戲目錄，請選擇您的情況</p>
+            <div class="modal-buttons">
+                <button id="existingGameButton" class="btn btn-primary" data-i18n="login.game_setup.existing">我已有遊戲</button>
+                <button id="installGameButton" class="btn btn-secondary" data-i18n="login.game_setup.install">安裝新遊戲</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        /* JavaScript will be inlined here by main process */
+    </script>
+</body>
+</html>

@@ -1,0 +1,87 @@
+{
+  "name": "xivthecalamity",
+  "version": "0.1.0",
+  "description": "Final Fantasy XIV Cross-Platform Launcher",
+  "main": "src/main/index.js",
+  "scripts": {
+    "start": "electron .",
+    "prebuild": "node ../scripts/sync-version.js",
+    "build": "npm run build:cli && npm run build:backend && electron-builder",
+    "build:cli": "node -e \"if(process.platform==='darwin'){require('child_process').execSync('cd ../XTCAudioRouter && ./build.sh release',{stdio:'inherit'})}else{console.log('Skipping XTCAudioRouter (macOS only)')}\"",
+    "build:backend": "cd ../backend && dotnet publish src/XIVTheCalamity.Api/XIVTheCalamity.Api.csproj -c Release -r osx-arm64 --self-contained false -o ../Release/temp-backend",
+    "build:dev": "npm run build:cli && npm run build:backend && electron-builder --dir",
+    "build:prod": "npm run build:cli && npm run build:backend && electron-builder --dir",
+    "pack": "npm run build:cli && npm run build:backend && electron-builder --dir",
+    "dist": "npm run build:cli && npm run build:backend && electron-builder",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "build": {
+    "appId": "com.xivthecalamity.launcher",
+    "productName": "XIVTheCalamity",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "../Release",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "resources/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../shared/resources",
+        "to": "resources",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../wine",
+        "to": "wine",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../Release/temp-backend",
+        "to": "backend",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "afterPack": "./electron-builder-afterpack.js",
+    "mac": {
+      "category": "public.app-category.games",
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "build/XIVTC.icon",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "identity": null
+    }
+  },
+  "keywords": [
+    "ff14",
+    "ffxiv",
+    "launcher",
+    "electron"
+  ],
+  "author": "XIV The Calamity Contributors",
+  "license": "GPL-3.0-or-later",
+  "devDependencies": {
+    "electron": "^40.0.0",
+    "electron-builder": "^26.4.0"
+  },
+  "dependencies": {
+    "axios": "^1.13.4",
+    "electron-log": "^5.4.3"
+  }
+}
