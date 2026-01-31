@@ -71,6 +71,39 @@ public class ConfigService
             }
             #pragma warning restore CS0618
             
+            // Ensure platform-specific config exists with defaults
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) && config.Wine == null)
+            {
+                config.Wine = new WineConfig
+                {
+                    DxmtEnabled = Environment.OSVersion.Version.Major >= 14,
+                    MetalFxSpatialEnabled = false,
+                    MetalFxSpatialFactor = 2.0,
+                    Metal3PerformanceOverlay = false,
+                    HudScale = 1.0,
+                    NativeResolution = false,
+                    MaxFramerate = 60,
+                    AudioRouting = false,
+                    EsyncEnabled = true,
+                    Msync = true,
+                    WineDebug = ""
+                };
+                Console.WriteLine("[Config] Initialized Wine config with defaults");
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && config.Proton == null)
+            {
+                config.Proton = new ProtonConfig
+                {
+                    DxvkHudEnabled = false,
+                    FsyncEnabled = true,
+                    EsyncEnabled = true,
+                    GameModeEnabled = true,
+                    MaxFramerate = 60,
+                    WineDebug = ""
+                };
+                Console.WriteLine("[Config] Initialized Proton config with defaults");
+            }
+            
             Console.WriteLine("[Config] Config loaded successfully");
             return config;
         }
@@ -192,7 +225,7 @@ public class ConfigService
                 DxvkHudEnabled = false,
                 FsyncEnabled = true,
                 EsyncEnabled = true,
-                GameModeEnabled = false,
+                GameModeEnabled = true,  // Default enabled
                 MaxFramerate = 60,
                 WineDebug = ""
             };

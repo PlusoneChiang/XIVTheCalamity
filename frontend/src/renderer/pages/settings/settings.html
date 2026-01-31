@@ -14,7 +14,8 @@
     <!-- Tab Navigation -->
     <nav class="tab-navigation">
       <button class="tab-button active" data-tab="general" data-i18n="settings.tab.general">一般</button>
-      <button class="tab-button" data-tab="wine" data-i18n="settings.tab.wine">Wine</button>
+      <button class="tab-button platform-darwin" data-tab="wine" data-i18n="settings.tab.wine">Wine</button>
+      <button class="tab-button platform-linux" data-tab="proton" data-i18n="settings.tab.proton">Proton</button>
       <button class="tab-button" data-tab="dalamud" data-i18n="settings.tab.dalamud">Dalamud</button>
       <button class="tab-button" data-tab="about" data-i18n="settings.tab.about">關於</button>
     </nav>
@@ -195,6 +196,65 @@
                 <option value="true" data-i18n="settings.wine.key_as_ctrl">映射為 Ctrl</option>
                 <option value="false" data-i18n="settings.wine.key_as_alt_key">映射為 Alt</option>
               </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Proton Tab (Linux Only) -->
+      <div id="tab-proton" class="tab-content">
+        <div class="settings-section">
+          <h2 data-i18n="settings.proton.graphics">圖形設定</h2>
+          <div class="form-group">
+            <div>
+              <label>
+                <input type="checkbox" id="protonDxvkHudEnabled">
+                <span data-i18n="settings.proton.dxvk_hud">DXVK HUD 顯示</span>
+              </label>
+              <p class="help-text" data-i18n="settings.proton.dxvk_hud_help">顯示 DXVK 效能監控</p>
+            </div>
+            <div>
+              <label for="protonMaxFramerate" data-i18n="settings.proton.max_framerate">最高幀率</label>
+              <input type="number" id="protonMaxFramerate" min="30" max="240" step="10" value="60">
+              <p class="help-text" data-i18n="settings.proton.max_framerate_help">限制最高 FPS (30-240)</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h2 data-i18n="settings.proton.performance">效能設定</h2>
+          <div class="form-group">
+            <div>
+              <label>
+                <input type="checkbox" id="protonGameModeEnabled">
+                <span data-i18n="settings.proton.gamemode">啟用 GameMode</span>
+              </label>
+              <p class="help-text" data-i18n="settings.proton.gamemode_help">Feral GameMode 效能優化</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h2 data-i18n="settings.proton.advanced">進階設定</h2>
+          <div class="form-group">
+            <div>
+              <label>
+                <input type="checkbox" id="protonEsyncEnabled">
+                <span data-i18n="settings.proton.esync">Esync</span>
+              </label>
+              <p class="help-text" data-i18n="settings.proton.esync_help">事件同步機制</p>
+            </div>
+            <div>
+              <label>
+                <input type="checkbox" id="protonFsyncEnabled">
+                <span data-i18n="settings.proton.fsync">Fsync</span>
+              </label>
+              <p class="help-text" data-i18n="settings.proton.fsync_help">快速同步機制 (需要 Linux 5.16+)</p>
+            </div>
+            <div>
+              <label for="protonWineDebug" data-i18n="settings.proton.wine_debug">Wine Debug</label>
+              <input type="text" id="protonWineDebug" placeholder="-all,+module">
+              <p class="help-text" data-i18n="settings.proton.wine_debug_help">Wine 除錯旗標 (進階使用者)</p>
             </div>
           </div>
         </div>

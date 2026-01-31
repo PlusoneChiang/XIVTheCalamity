@@ -25,6 +25,7 @@ async function init() {
   // Initialize each tab
   initGeneralTab();
   initWineTab();
+  initProtonTab();
   initDalamudTab();
   initAboutTab();
   
@@ -190,6 +191,14 @@ function collectFormData() {
       rightOptionIsAlt: document.getElementById('rightOptionMapping').value === 'true',
       leftCommandIsCtrl: document.getElementById('leftCommandMapping').value === 'true',
       rightCommandIsCtrl: document.getElementById('rightCommandMapping').value === 'true'
+    },
+    proton: {
+      dxvkHudEnabled: document.getElementById('protonDxvkHudEnabled')?.checked || false,
+      maxFramerate: parseInt(document.getElementById('protonMaxFramerate')?.value || 60),
+      gameModeEnabled: document.getElementById('protonGameModeEnabled')?.checked !== false,
+      esyncEnabled: document.getElementById('protonEsyncEnabled')?.checked !== false,
+      fsyncEnabled: document.getElementById('protonFsyncEnabled')?.checked !== false,
+      wineDebug: document.getElementById('protonWineDebug')?.value || ''
     },
     dalamud: {
       enabled: document.getElementById('dalamudEnabled').checked,
@@ -517,6 +526,31 @@ async function openWineTool(tool) {
     hideLoadingOverlay();
     showError(i18n.t('settings.wine.tool_failed', { tool }));
   }
+}
+
+/**
+ * Initialize Proton Tab (Linux)
+ */
+function initProtonTab() {
+  if (!currentConfig?.proton) {
+    console.warn('[Settings] Proton config not found');
+    return;
+  }
+  
+  const config = currentConfig.proton;
+  console.log('[Settings] Loading Proton settings:', config);
+  
+  // Graphics
+  document.getElementById('protonDxvkHudEnabled').checked = config.dxvkHudEnabled || false;
+  document.getElementById('protonMaxFramerate').value = config.maxFramerate || 60;
+  
+  // Performance
+  document.getElementById('protonGameModeEnabled').checked = config.gameModeEnabled !== false; // default true
+  
+  // Advanced
+  document.getElementById('protonEsyncEnabled').checked = config.esyncEnabled !== false; // default true
+  document.getElementById('protonFsyncEnabled').checked = config.fsyncEnabled !== false; // default true
+  document.getElementById('protonWineDebug').value = config.wineDebug || '';
 }
 
 /**
