@@ -1,6 +1,8 @@
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using XIVTheCalamity.Core.Models;
+using XIVTheCalamity.Core.Models.Progress;
 using XIVTheCalamity.Core.Services;
 using XIVTheCalamity.Platform.MacOS.Audio;
 
@@ -19,19 +21,23 @@ public class WineEnvironmentService(
     private readonly WinePathService _paths = WinePathService.Instance;
     private readonly WinePrefixService _prefixService = new();
 
-    public async Task InitializeAsync(IProgress<EnvironmentInitProgress>? progress = null, CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<EnvironmentProgressEvent> InitializeAsync(
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         logger?.LogInformation("[WINE-ENV] Starting Wine environment initialization");
         
-        // Use WinePrefixService with detailed progress reporting
-        var wineProgress = new Progress<WineInitProgress>(p =>
+        yield return new EnvironmentProgressEvent
         {
-            logger?.LogDebug("[WINE-ENV] Wine progress: Stage={Stage}, MessageKey={MessageKey}", 
-                p.Stage, p.MessageKey);
-            
-            // Convert WineInitProgress to EnvironmentInitProgress
-            // Map Wine stages to percent (rough estimation)
-            var percent = p.Stage switch
+            Stage = "checking",
+            MessageKey = "progress.checking_wine",
+            Percentage = 10
+        };
+        
+        // Delegate to WinePrefixService and convert progress events
+        await foreach (var wineProgress in _prefixService.InitializePrefixAsyncEnumerable(cancellationToken))
+        {
+            // Convert WineInitProgress to EnvironmentProgressEvent
+            var percent = wineProgress.Stage switch
             {
                 WineInitStage.Checking => 10,
                 WineInitStage.CreatingPrefix => 30,
@@ -42,21 +48,24 @@ public class WineEnvironmentService(
                 _ => 0
             };
             
-            progress?.Report(new EnvironmentInitProgress
+            yield return new EnvironmentProgressEvent
             {
-                Stage = p.Stage.ToString().ToLower(),
-                MessageKey = p.MessageKey,
+                Stage = wineProgress.Stage.ToString().ToLower(),
+                MessageKey = wineProgress.MessageKey,
                 CompletedItems = percent,
                 TotalItems = 100,
-                IsComplete = p.IsComplete,
-                HasError = p.HasError,
-                ErrorMessageKey = p.ErrorMessageKey,
-                ErrorMessage = p.ErrorParams?.ContainsKey("message") == true ? p.ErrorParams["message"].ToString() : null,
-                ExtraData = p.ErrorParams
-            });
-        });
+                IsComplete = wineProgress.IsComplete,
+                HasError = wineProgress.HasError,
+                ErrorMessageKey = wineProgress.ErrorMessageKey,
+                ExtraData = wineProgress.ErrorParams
+            };
+            
+            if (wineProgress.HasError && !string.IsNullOrEmpty(wineProgress.ErrorParams?["message"]?.ToString()))
+            {
+                logger?.LogError("[WINE-ENV] Error: {Error}", wineProgress.ErrorParams["message"]);
+            }
+        }
         
-        await _prefixService.InitializePrefixAsync(wineProgress, cancellationToken);
         logger?.LogInformation("[WINE-ENV] Wine environment initialization complete");
     }
 

@@ -1,6 +1,8 @@
-namespace XIVTheCalamity.Platform.Windows;
-
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
+using XIVTheCalamity.Core.Models.Progress;
+
+namespace XIVTheCalamity.Platform.Windows;
 
 /// <summary>
 /// Windows environment service (native execution, no emulation needed)
@@ -10,20 +12,21 @@ public class WindowsEnvironmentService(
     ILogger<WindowsEnvironmentService>? logger = null
 ) : IEnvironmentService
 {
-    public Task InitializeAsync(IProgress<EnvironmentInitProgress>? progress = null, CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<EnvironmentProgressEvent> InitializeAsync(
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         logger?.LogInformation("[WIN-ENV] Windows native execution, no initialization needed");
         
-        progress?.Report(new EnvironmentInitProgress
+        yield return new EnvironmentProgressEvent
         {
             Stage = "complete",
             MessageKey = "progress.skip_windows",
             CompletedItems = 100,
             TotalItems = 100,
             IsComplete = true
-        });
+        };
         
-        return Task.CompletedTask;
+        await Task.CompletedTask;
     }
 
     public Task EnsurePrefixAsync(CancellationToken cancellationToken = default)

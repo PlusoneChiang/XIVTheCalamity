@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
@@ -196,6 +197,148 @@ public class WinePrefixService
     /// <summary>
     /// Initialize Wine Prefix (Fast mode - following XoM pattern)
     /// Only performs essential synchronous initialization, other steps run in background
+    /// </summary>
+    /// <summary>
+    /// Initialize Wine Prefix with progress reporting using IAsyncEnumerable
+    /// NEW: Returns async enumerable for SSE-friendly progress reporting
+    /// </summary>
+    public async IAsyncEnumerable<WineInitProgress> InitializePrefixAsyncEnumerable(
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        _logger?.LogInformation("[WINE-INIT] ========== Wine Prefix Initialization Started ==========");
+
+        // Check if already fully initialized
+        if (IsFullyInitialized())
+        {
+            _logger?.LogInformation("[WINE-INIT] Wine Prefix already fully initialized, skipping");
+            yield return new WineInitProgress
+            {
+                Stage = WineInitStage.Complete,
+                MessageKey = "progress.already_initialized",
+                IsComplete = true
+            };
+            _logger?.LogInformation("[WINE-INIT] ========== Completed (Already Initialized) ==========");
+            yield break;
+        }
+        
+        _logger?.LogInformation("[WINE-INIT] Not fully initialized, proceeding with initialization");
+
+        // Collect all progress events first to avoid yield in try-catch
+        var events = new List<WineInitProgress>();
+        WineInitProgress? finalEvent = null;
+        
+        try
+        {
+            // 1. Check Prefix
+            events.Add(new WineInitProgress
+            {
+                Stage = WineInitStage.Checking,
+                MessageKey = "progress.checking"
+            });
+            _logger?.LogDebug("[WINE-INIT] Stage 1: Checking Wine Prefix at {Path}", _paths.WinePrefix);
+
+            // 2. Create Prefix
+            if (!Directory.Exists(_paths.PrefixDriveC))
+            {
+                events.Add(new WineInitProgress
+                {
+                    Stage = WineInitStage.CreatingPrefix,
+                    MessageKey = "progress.creating_prefix"
+                });
+                _logger?.LogInformation("[WINE-INIT] Stage 2: Creating Wine Prefix");
+                await EnsurePrefixAsync(cancellationToken);
+            }
+
+            // 3. Install fonts
+            var fontPath = Path.Combine(_paths.PrefixFonts, _paths.FontFile);
+            if (!File.Exists(fontPath))
+            {
+                events.Add(new WineInitProgress
+                {
+                    Stage = WineInitStage.InstallingFonts,
+                    MessageKey = "progress.installing_fonts"
+                });
+                _logger?.LogInformation("[WINE-INIT] Stage 3: Installing fonts");
+                await InstallFontIfNeededAsync(cancellationToken);
+            }
+
+            // 4. Set locale
+            events.Add(new WineInitProgress
+            {
+                Stage = WineInitStage.SettingLocale,
+                MessageKey = "progress.setting_locale"
+            });
+            _logger?.LogInformation("[WINE-INIT] Stage 4: Setting locale to zh-TW");
+            await SetLocaleToZhTWAsync(cancellationToken);
+
+            // 5. Configure MediaFoundation
+            events.Add(new WineInitProgress
+            {
+                Stage = WineInitStage.ConfiguringMedia,
+                MessageKey = "progress.configuring_media"
+            });
+            _logger?.LogInformation("[WINE-INIT] Stage 5: Configuring MediaFoundation");
+            await ConfigureMediaFoundationAsync(cancellationToken);
+
+            // 6. Install graphics backend
+            events.Add(new WineInitProgress
+            {
+                Stage = WineInitStage.ConfiguringMedia,
+                MessageKey = "progress.installing_graphics"
+            });
+            _logger?.LogInformation("[WINE-INIT] Stage 6: Installing graphics backend");
+            
+            var defaultConfig = new WineConfig
+            {
+                DxmtEnabled = true,
+                NativeResolution = false,
+                LeftOptionIsAlt = true,
+                RightOptionIsAlt = true,
+                LeftCommandIsCtrl = false,
+                RightCommandIsCtrl = false
+            };
+            await ApplyGraphicsSettingsAsync(defaultConfig, cancellationToken);
+
+            // 7. Complete
+            finalEvent = new WineInitProgress
+            {
+                Stage = WineInitStage.Complete,
+                MessageKey = "progress.complete",
+                IsComplete = true
+            };
+
+            _logger?.LogInformation("[WINE-INIT] ========== Completed Successfully ==========");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "[WINE-INIT] ========== FAILED ==========");
+
+            finalEvent = new WineInitProgress
+            {
+                HasError = true,
+                ErrorMessageKey = "error.init_failed",
+                ErrorParams = new Dictionary<string, object>
+                {
+                    { "message", ex.Message }
+                }
+            };
+        }
+        
+        // Yield all collected events
+        foreach (var evt in events)
+        {
+            yield return evt;
+        }
+        
+        if (finalEvent != null)
+        {
+            yield return finalEvent;
+        }
+    }
+
+    /// <summary>
+    /// Initialize Wine Prefix with progress reporting
+    /// LEGACY: Kept for backward compatibility, will be removed in Phase 6
     /// </summary>
     public async Task InitializePrefixAsync(
         IProgress<WineInitProgress>? progress = null,

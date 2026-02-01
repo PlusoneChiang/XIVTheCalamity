@@ -1,6 +1,8 @@
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using XIVTheCalamity.Core.Models;
+using XIVTheCalamity.Core.Models.Progress;
 using XIVTheCalamity.Core.Services;
 
 namespace XIVTheCalamity.Platform.Linux.Wine;
@@ -24,14 +26,19 @@ public class WineXIVEnvironmentService(
     private string WineServer => Path.Combine(WineBin, "wineserver");
     private string WinePrefix => _platformPaths.GetWinePrefixPath();
     
-    public async Task InitializeAsync(IProgress<EnvironmentInitProgress>? progress = null, CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<EnvironmentProgressEvent> InitializeAsync(
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         logger?.LogInformation("[WINE-XIV] Starting Wine-XIV environment initialization");
+        
+        // Collect events to avoid yield in try-catch
+        var events = new List<EnvironmentProgressEvent>();
+        EnvironmentProgressEvent? finalEvent = null;
         
         try
         {
             // Step 1: Check if Wine is installed (5%)
-            progress?.Report(new EnvironmentInitProgress
+            events.Add(new EnvironmentProgressEvent
             {
                 Stage = "check_wine",
                 MessageKey = "progress.checking_wine",
@@ -47,7 +54,7 @@ public class WineXIVEnvironmentService(
             {
                 logger?.LogInformation("[WINE-XIV] Wine not found, starting download");
                 
-                progress?.Report(new EnvironmentInitProgress
+                events.Add(new EnvironmentProgressEvent
                 {
                     Stage = "download_wine",
                     MessageKey = "progress.downloading_wine",
@@ -55,47 +62,12 @@ public class WineXIVEnvironmentService(
                     TotalItems = 100
                 });
                 
+                // Note: Wine download still uses old Progress<T> pattern
+                // Will be refactored in Phase 4
                 var downloadProgress = new Progress<DownloadProgress>(p =>
                 {
                     logger?.LogDebug("[WINE-XIV] Download progress: Stage={Stage}, Percent={Percent:F1}%", 
                         p.Stage, p.Percentage);
-                    
-                    if (p.HasError)
-                    {
-                        progress?.Report(new EnvironmentInitProgress
-                        {
-                            Stage = "download_error",
-                            MessageKey = p.MessageKey,
-                            HasError = true,
-                            ErrorMessage = p.ErrorMessage
-                        });
-                    }
-                    else if (p.IsComplete)
-                    {
-                        progress?.Report(new EnvironmentInitProgress
-                        {
-                            Stage = "wine_downloaded",
-                            MessageKey = "progress.wine_downloaded",
-                            CompletedItems = 50,
-                            TotalItems = 100
-                        });
-                    }
-                    else
-                    {
-                        // Map download progress to overall progress (10-50%)
-                        var overallPercent = 10 + (int)(p.Percentage * 40.0 / 100.0);
-                        
-                        progress?.Report(new EnvironmentInitProgress
-                        {
-                            Stage = p.Stage,
-                            MessageKey = p.MessageKey,
-                            CurrentFile = p.CurrentFile,
-                            BytesDownloaded = p.BytesDownloaded,
-                            TotalBytes = p.TotalBytes,
-                            CompletedItems = overallPercent,
-                            TotalItems = 100
-                        });
-                    }
                 });
                 
                 var success = await downloadService.DownloadAsync(downloadProgress, cancellationToken);
@@ -103,10 +75,18 @@ public class WineXIVEnvironmentService(
                 {
                     throw new Exception("Failed to download Wine-XIV");
                 }
+                
+                events.Add(new EnvironmentProgressEvent
+                {
+                    Stage = "wine_downloaded",
+                    MessageKey = "progress.wine_downloaded",
+                    CompletedItems = 50,
+                    TotalItems = 100
+                });
             }
             
             // Step 3: Initialize Wine prefix (50-80%)
-            progress?.Report(new EnvironmentInitProgress
+            events.Add(new EnvironmentProgressEvent
             {
                 Stage = "init_prefix",
                 MessageKey = "progress.init_wine_prefix",
@@ -117,7 +97,7 @@ public class WineXIVEnvironmentService(
             await EnsurePrefixAsync(cancellationToken);
             
             // Step 4: Install required DLLs (80-100%)
-            progress?.Report(new EnvironmentInitProgress
+            events.Add(new EnvironmentProgressEvent
             {
                 Stage = "install_dlls",
                 MessageKey = "progress.installing_dlls",
@@ -128,14 +108,14 @@ public class WineXIVEnvironmentService(
             await InstallRequiredDllsAsync();
             
             // Complete
-            progress?.Report(new EnvironmentInitProgress
+            finalEvent = new EnvironmentProgressEvent
             {
                 Stage = "complete",
                 MessageKey = "progress.environment_ready",
                 CompletedItems = 100,
                 TotalItems = 100,
                 IsComplete = true
-            });
+            };
             
             logger?.LogInformation("[WINE-XIV] Wine-XIV environment initialization complete");
         }
@@ -143,15 +123,24 @@ public class WineXIVEnvironmentService(
         {
             logger?.LogError(ex, "[WINE-XIV] Initialization failed");
             
-            progress?.Report(new EnvironmentInitProgress
+            finalEvent = new EnvironmentProgressEvent
             {
                 Stage = "error",
                 MessageKey = "error.wine_init_failed",
                 HasError = true,
                 ErrorMessage = ex.Message
-            });
-            
-            throw;
+            };
+        }
+        
+        // Yield all collected events
+        foreach (var evt in events)
+        {
+            yield return evt;
+        }
+        
+        if (finalEvent != null)
+        {
+            yield return finalEvent;
         }
     }
     
