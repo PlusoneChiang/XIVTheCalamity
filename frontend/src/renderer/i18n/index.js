@@ -234,6 +234,8 @@ const translations = {
     'login.downloading_short': '下載',
     'login.installing_short': '安裝',
     'login.remaining_short': '剩',
+    'login.installing_patches': '安裝更新檔中',
+    'login.cleaning_up': '清理暫存檔案中',
     
     // Dalamud update
     'login.dalamud_checking': '檢查 Dalamud 更新...',

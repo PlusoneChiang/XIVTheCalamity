@@ -31,117 +31,105 @@ public class WineXIVEnvironmentService(
     {
         logger?.LogInformation("[WINE-XIV] Starting Wine-XIV environment initialization");
         
-        // Collect events to avoid yield in try-catch
-        var events = new List<EnvironmentProgressEvent>();
-        EnvironmentProgressEvent? finalEvent = null;
-        
-        try
+        // Step 1: Check if Wine is installed (5%)
+        yield return new EnvironmentProgressEvent
         {
-            // Step 1: Check if Wine is installed (5%)
-            events.Add(new EnvironmentProgressEvent
+            Stage = "check_wine",
+            MessageKey = "progress.checking_wine",
+            CompletedItems = 5,
+            TotalItems = 100
+        };
+        
+        var wineStatus = await downloadService.GetStatusAsync();
+        logger?.LogInformation("[WINE-XIV] Wine status: Installed={IsInstalled}", wineStatus.IsInstalled);
+        
+        // Step 2: Download Wine if not installed (10-70%)
+        if (!wineStatus.IsInstalled)
+        {
+            logger?.LogInformation("[WINE-XIV] Wine not found, starting download");
+            
+            yield return new EnvironmentProgressEvent
             {
-                Stage = "check_wine",
-                MessageKey = "progress.checking_wine",
-                CompletedItems = 5,
+                Stage = "download_wine",
+                MessageKey = "progress.downloading_wine",
+                CompletedItems = 10,
                 TotalItems = 100
-            });
+            };
             
-            var wineStatus = await downloadService.GetStatusAsync();
-            logger?.LogInformation("[WINE-XIV] Wine status: Installed={IsInstalled}", wineStatus.IsInstalled);
+            // Forward all download progress events
+            var downloadFailed = false;
+            string? downloadError = null;
             
-            // Step 2: Download Wine if not installed (10-50%)
-            if (!wineStatus.IsInstalled)
+            await foreach (var downloadProgress in downloadService.DownloadAsync(cancellationToken))
             {
-                logger?.LogInformation("[WINE-XIV] Wine not found, starting download");
+                // Convert Wine download progress to environment progress
+                // Map 10-70% range to download progress
+                var mappedPercentage = 10 + (int)(downloadProgress.Percentage * 0.6);
                 
-                events.Add(new EnvironmentProgressEvent
+                yield return new EnvironmentProgressEvent
                 {
-                    Stage = "download_wine",
-                    MessageKey = "progress.downloading_wine",
-                    CompletedItems = 10,
+                    Stage = downloadProgress.Stage,
+                    MessageKey = downloadProgress.MessageKey,
+                    CompletedItems = mappedPercentage,
                     TotalItems = 100
-                });
+                };
                 
-                // Note: Wine download still uses old Progress<T> pattern
-                // Will be refactored in Phase 4
-                var downloadProgress = new Progress<DownloadProgress>(p =>
+                if (downloadProgress.HasError)
                 {
-                    logger?.LogDebug("[WINE-XIV] Download progress: Stage={Stage}, Percent={Percent:F1}%", 
-                        p.Stage, p.Percentage);
-                });
-                
-                var success = await downloadService.DownloadAsync(downloadProgress, cancellationToken);
-                if (!success)
-                {
-                    throw new Exception("Failed to download Wine-XIV");
+                    downloadFailed = true;
+                    downloadError = downloadProgress.ErrorMessage;
+                    break;
                 }
-                
-                events.Add(new EnvironmentProgressEvent
-                {
-                    Stage = "wine_downloaded",
-                    MessageKey = "progress.wine_downloaded",
-                    CompletedItems = 50,
-                    TotalItems = 100
-                });
             }
             
-            // Step 3: Initialize Wine prefix (50-80%)
-            events.Add(new EnvironmentProgressEvent
+            if (downloadFailed)
             {
-                Stage = "init_prefix",
-                MessageKey = "progress.init_wine_prefix",
-                CompletedItems = 50,
-                TotalItems = 100
-            });
+                yield return new EnvironmentProgressEvent
+                {
+                    Stage = "error",
+                    MessageKey = "error.wine_download_failed",
+                    HasError = true,
+                    ErrorMessage = downloadError ?? "Wine download failed"
+                };
+                yield break;
+            }
             
-            await EnsurePrefixAsync(cancellationToken);
-            
-            // Step 4: Install required DLLs (80-100%)
-            events.Add(new EnvironmentProgressEvent
-            {
-                Stage = "install_dlls",
-                MessageKey = "progress.installing_dlls",
-                CompletedItems = 80,
-                TotalItems = 100
-            });
-            
-            await InstallRequiredDllsAsync();
-            
-            // Complete
-            finalEvent = new EnvironmentProgressEvent
-            {
-                Stage = "complete",
-                MessageKey = "progress.environment_ready",
-                CompletedItems = 100,
-                TotalItems = 100,
-                IsComplete = true
-            };
-            
-            logger?.LogInformation("[WINE-XIV] Wine-XIV environment initialization complete");
-        }
-        catch (Exception ex)
-        {
-            logger?.LogError(ex, "[WINE-XIV] Initialization failed");
-            
-            finalEvent = new EnvironmentProgressEvent
-            {
-                Stage = "error",
-                MessageKey = "error.wine_init_failed",
-                HasError = true,
-                ErrorMessage = ex.Message
-            };
+            logger?.LogInformation("[WINE-XIV] Wine downloaded successfully");
         }
         
-        // Yield all collected events
-        foreach (var evt in events)
+        // Step 3: Initialize Wine prefix (70-85%)
+        yield return new EnvironmentProgressEvent
         {
-            yield return evt;
-        }
+            Stage = "init_prefix",
+            MessageKey = "progress.init_wine_prefix",
+            CompletedItems = 70,
+            TotalItems = 100
+        };
         
-        if (finalEvent != null)
+        await EnsurePrefixAsync(cancellationToken);
+        
+        // Step 4: Install required DLLs (85-100%)
+        yield return new EnvironmentProgressEvent
         {
-            yield return finalEvent;
-        }
+            Stage = "install_dlls",
+            MessageKey = "progress.installing_dlls",
+            CompletedItems = 85,
+            TotalItems = 100
+        };
+        
+        await InstallRequiredDllsAsync();
+        
+        // Complete
+        yield return new EnvironmentProgressEvent
+        {
+            Stage = "complete",
+            MessageKey = "progress.environment_ready",
+            CompletedItems = 100,
+            TotalItems = 100,
+            IsComplete = true
+        };
+        
+        logger?.LogInformation("[WINE-XIV] Wine-XIV environment initialization complete");
     }
     
     public async Task EnsurePrefixAsync(CancellationToken cancellationToken = default)

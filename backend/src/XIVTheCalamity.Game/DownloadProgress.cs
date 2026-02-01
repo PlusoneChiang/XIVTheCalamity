@@ -100,10 +100,6 @@ public class DownloadProgress
     /// Whether all downloads and installs are completed
     /// </summary>
     public bool IsCompleted => InstalledPatches >= TotalPatches && TotalPatches > 0;
-    
-    // Legacy property for backward compatibility
-    [Obsolete("Use DownloadingCount instead")]
-    public int DownloadingPatches { get => DownloadingCount; set => DownloadingCount = value; }
 }
 
 /// <summary>

@@ -110,32 +110,8 @@ export async function startUpdate() {
     // Show update progress in title bar
     showTitleBarProgress(0, 'login.checking_updates');
     
-    // 開啟 SSE 監聽進度
-    startProgressMonitoring();
-    
-    // 發起更新請求
-    window.electronAPI.backend.call('/api/update/check', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: { gamePath: gamePath }
-    }).then(async response => {
-      try {
-        const data = await handleApiResponse(response);
-        handleUpdateCheckComplete(data);
-      } catch (error) {
-        console.error('[UPDATE] Update check error:', getErrorMessage(error, i18n));
-        stopProgressMonitoring();
-        hideTitleBarProgress();
-        isUpdateChecking = false;
-        triggerOnUpdateComplete();
-      }
-    }).catch(error => {
-      console.error('[UPDATE] Update check error:', error);
-      stopProgressMonitoring();
-      hideTitleBarProgress();
-      isUpdateChecking = false;
-      triggerOnUpdateComplete();
-    });
+    // 使用新的 SSE endpoint 進行更新（單一連接）
+    startUpdateWithSSE(gamePath);
     
   } catch (error) {
     console.error('[UPDATE] Update check error:', error);
@@ -146,10 +122,199 @@ export async function startUpdate() {
 }
 
 /**
- * 處理更新檢查完成
+ * 使用 SSE endpoint 進行更新
+ */
+function startUpdateWithSSE(gamePath) {
+  if (progressEventSource) {
+    console.log('[UPDATE] Closing existing EventSource');
+    stopProgressMonitoring();
+  }
+  
+  console.log('[UPDATE] Starting update via SSE endpoint');
+  
+  // 編碼路徑參數
+  const encodedPath = encodeURIComponent(gamePath);
+  const url = `http://localhost:5050/api/update/install?gamePath=${encodedPath}`;
+  console.log('[UPDATE] SSE URL:', url);
+  
+  progressEventSource = new EventSource(url);
+  console.log('[UPDATE] EventSource created, readyState:', progressEventSource.readyState);
+  
+  // 處理進度事件
+  progressEventSource.addEventListener('progress', (event) => {
+    console.log('[UPDATE] Progress event received, raw data:', event.data);
+    try {
+      const progress = JSON.parse(event.data);
+      handleProgressEvent(progress);
+    } catch (error) {
+      console.error('[UPDATE] Failed to parse progress:', error);
+    }
+  });
+  
+  // 處理完成事件
+  progressEventSource.addEventListener('complete', (event) => {
+    console.log('[UPDATE] Complete event received');
+    try {
+      const data = JSON.parse(event.data);
+      console.log('[UPDATE] Update complete:', data);
+      
+      showTitleBarProgress(100, 'login.update_complete');
+      setTimeout(() => {
+        stopProgressMonitoring();
+        hideTitleBarProgress();
+        isUpdateChecking = false;
+        triggerOnUpdateComplete();
+      }, 2000);
+    } catch (error) {
+      console.error('[UPDATE] Failed to parse complete event:', error);
+    }
+  });
+  
+  // 處理取消事件
+  progressEventSource.addEventListener('cancelled', (event) => {
+    console.log('[UPDATE] Cancelled event received');
+    try {
+      const data = event.data ? JSON.parse(event.data) : {};
+      console.log('[UPDATE] Update cancelled:', data);
+      
+      stopProgressMonitoring();
+      hideTitleBarProgress();
+      isUpdateChecking = false;
+      triggerOnUpdateComplete();
+    } catch (error) {
+      console.error('[UPDATE] Failed to parse cancelled event:', error);
+    }
+  });
+  
+  // 處理錯誤事件
+  progressEventSource.addEventListener('error', (event) => {
+    console.error('[UPDATE] Error event triggered, readyState:', progressEventSource?.readyState);
+    console.error('[UPDATE] Error event object:', event);
+    
+    try {
+      if (event.data) {
+        const errorData = JSON.parse(event.data);
+        console.error('[UPDATE] Update error:', errorData);
+        
+        // 顯示錯誤訊息
+        if (errorData.message) {
+          console.error('[UPDATE] Error message:', errorData.message);
+        }
+      } else {
+        console.error('[UPDATE] SSE connection error (no data)');
+      }
+    } catch (parseError) {
+      console.error('[UPDATE] SSE error event (parse failed):', parseError);
+    }
+    
+    // 檢查連接狀態
+    if (progressEventSource?.readyState === 2) {
+      console.log('[UPDATE] SSE connection closed, stopping monitoring');
+      stopProgressMonitoring();
+      hideTitleBarProgress();
+      isUpdateChecking = false;
+      triggerOnUpdateComplete();
+    }
+  });
+  
+  progressEventSource.addEventListener('open', () => {
+    console.log('[UPDATE] SSE connection opened successfully');
+  });
+}
+
+/**
+ * 處理進度事件
+ */
+function handleProgressEvent(progress) {
+  console.log('[UPDATE] Progress event received:', JSON.stringify(progress, null, 2));
+  
+  // 安全取得數值
+  const installedPatches = typeof progress.installedPatches === 'number' ? progress.installedPatches : 0;
+  const totalPatches = typeof progress.totalPatches === 'number' ? progress.totalPatches : 1;
+  const downloadingCount = typeof progress.downloadingCount === 'number' ? progress.downloadingCount : 0;
+  const installingCount = typeof progress.installingCount === 'number' ? progress.installingCount : 0;
+  const downloadSpeed = typeof progress.downloadSpeedBytesPerSec === 'number' ? progress.downloadSpeedBytesPerSec : 0;
+  const totalBytesDownloaded = typeof progress.totalBytesDownloaded === 'number' ? progress.totalBytesDownloaded : 0;
+  const totalBytes = typeof progress.totalBytes === 'number' && progress.totalBytes > 0 ? progress.totalBytes : 1;
+  const phase = progress.phase || 'downloading';
+  
+  // 計算百分比
+  let percentage = 0;
+  if (progress.percentage > 0) {
+    percentage = progress.percentage;
+  } else if (totalBytes > 0) {
+    percentage = (totalBytesDownloaded * 100 / totalBytes);
+  }
+  
+  // 格式化大小 (自動選擇 MB 或 GB)
+  const formatSize = (bytes) => {
+    if (bytes >= 1024 * 1024 * 1024) {
+      return (bytes / 1024 / 1024 / 1024).toFixed(1) + ' GB';
+    }
+    return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+  };
+  
+  // 格式化速度
+  const speedMBps = (downloadSpeed / 1024 / 1024).toFixed(0);
+  
+  // 解析剩餘時間
+  let timeRemaining = '00:00:00';
+  if (progress.estimatedTimeRemaining) {
+    // 如果是 TimeSpan 字符串格式 (e.g., "01:23:45")
+    if (typeof progress.estimatedTimeRemaining === 'string') {
+      const timeMatch = progress.estimatedTimeRemaining.match(/^(\d+):(\d+):(\d+)/);
+      if (timeMatch) {
+        const hours = timeMatch[1].padStart(2, '0');
+        const minutes = timeMatch[2].padStart(2, '0');
+        const seconds = timeMatch[3].padStart(2, '0');
+        timeRemaining = `${hours}:${minutes}:${seconds}`;
+      }
+    }
+  }
+  
+  // 根據階段顯示不同的訊息
+  let message = '';
+  
+  if (phase === 'downloading') {
+    // 下載階段：顯示完整資訊
+    const downloadedSize = formatSize(totalBytesDownloaded);
+    const totalSize = formatSize(totalBytes);
+    const percentText = Math.round(percentage) + '%';
+    
+    message = `${i18n.t('login.game_updating')} - ` +
+      `${i18n.t('login.patch_progress')} ${installedPatches}/${totalPatches} | ` +
+      `${i18n.t('login.threads')} ${downloadingCount} | ` +
+      `${speedMBps} MB/s | ` +
+      `${i18n.t('login.remaining')} ${timeRemaining} | ` +
+      `${downloadedSize}/${totalSize} - ${percentText}`;
+  } else if (phase === 'installing') {
+    // 安裝階段
+    const percentText = Math.round(percentage) + '%';
+    const installingFileName = progress.installingFileName || '';
+    
+    message = `${i18n.t('login.installing_patches')} - ` +
+      `${installedPatches}/${totalPatches} - ${percentText}` +
+      (installingFileName ? ` - ${installingFileName}` : '');
+  } else if (phase === 'cleanup') {
+    // 清理階段
+    message = i18n.t('login.cleaning_up');
+  } else if (phase === 'checking') {
+    // 檢查階段
+    message = i18n.t('login.checking_updates');
+  } else {
+    // 預設
+    message = i18n.t('login.game_updating');
+  }
+  
+  showTitleBarProgress(percentage, message);
+}
+
+/**
+ * 處理更新檢查完成（舊方法，保留用於向後兼容）
+ * 注意：新的 SSE endpoint 不再使用這個方法
  */
 function handleUpdateCheckComplete(result) {
-  console.log('[UPDATE] Update check API returned');
+  console.log('[UPDATE] Update check API returned (legacy)');
   
   if (updateCheckCancelled) {
     console.log('[UPDATE] Update check was cancelled');
@@ -213,109 +378,8 @@ export async function cancelUpdate() {
   
   stopProgressMonitoring();
   
-  try {
-    await window.electronAPI.backend.call('/api/update/cancel', {
-      method: 'POST'
-    });
-    console.log('[UPDATE] Update cancelled');
-  } catch (error) {
-    console.error('[UPDATE] Failed to cancel update:', error);
-  }
-  
   isUpdateChecking = false;
   hideTitleBarProgress();
-}
-
-/**
- * 開始監聽下載進度
- */
-function startProgressMonitoring() {
-  if (progressEventSource) {
-    stopProgressMonitoring();
-  }
-  
-  console.log('[UPDATE] Starting progress monitoring via SSE');
-  progressEventSource = new EventSource('http://localhost:5050/api/update/progress-stream');
-  
-  progressEventSource.addEventListener('progress', (event) => {
-    try {
-      const progress = JSON.parse(event.data);
-      
-      // 安全取得數值
-      const installedPatches = typeof progress.installedPatches === 'number' ? progress.installedPatches : 0;
-      const totalPatches = typeof progress.totalPatches === 'number' ? progress.totalPatches : 1;
-      const downloadingCount = typeof progress.downloadingCount === 'number' ? progress.downloadingCount : 0;
-      const installingCount = typeof progress.installingCount === 'number' ? progress.installingCount : 0;
-      const downloadSpeed = typeof progress.downloadSpeedBytesPerSecond === 'number' ? progress.downloadSpeedBytesPerSecond : 0;
-      const totalBytesDownloaded = typeof progress.totalBytesDownloaded === 'number' ? progress.totalBytesDownloaded : 0;
-      const totalBytes = typeof progress.totalBytes === 'number' && progress.totalBytes > 0 ? progress.totalBytes : 1;
-      
-      // 計算百分比（基於下載的位元組數，而非檔案數）
-      const percentage = totalBytes > 0 ? (totalBytesDownloaded * 100 / totalBytes) : 0;
-      
-      // 格式化大小 (自動選擇 MB 或 GB)
-      const formatSize = (bytes) => {
-        if (bytes >= 1024 * 1024 * 1024) {
-          return (bytes / 1024 / 1024 / 1024).toFixed(1) + ' GB';
-        }
-        return (bytes / 1024 / 1024).toFixed(1) + ' MB';
-      };
-      
-      // 格式化速度
-      const speedMBps = (downloadSpeed / 1024 / 1024).toFixed(0);
-      
-      // 解析剩餘時間（強制顯示為 hh:mm:ss 格式）
-      let timeRemaining = '00:00:00';
-      if (progress.estimatedTimeRemaining && typeof progress.estimatedTimeRemaining === 'string') {
-        const timeMatch = progress.estimatedTimeRemaining.match(/^(\d+):(\d+):(\d+)/);
-        if (timeMatch) {
-          const hours = timeMatch[1].padStart(2, '0');
-          const minutes = timeMatch[2].padStart(2, '0');
-          const seconds = timeMatch[3].padStart(2, '0');
-          timeRemaining = `${hours}:${minutes}:${seconds}`;
-        }
-      }
-      
-      // 組合新格式的進度訊息
-      // 遊戲更新中 - 更新檔 15/91 | 線程 4 | 60 MB/s | 剩餘 01:12:30 | 14.8/85.5 GB - 17%
-      const downloadedSize = formatSize(totalBytesDownloaded);
-      const totalSize = formatSize(totalBytes);
-      const percentText = Math.round(percentage) + '%';
-      
-      const message = `${i18n.t('login.game_updating')} - ` +
-        `${i18n.t('login.patch_progress')} ${installedPatches}/${totalPatches} | ` +
-        `${i18n.t('login.threads')} ${downloadingCount} | ` +
-        `${speedMBps} MB/s | ` +
-        `${i18n.t('login.remaining')} ${timeRemaining} | ` +
-        `${downloadedSize}/${totalSize} - ${percentText}`;
-      
-      showTitleBarProgress(percentage, message);
-      
-      // 下載完成
-      if (progress.isCompleted) {
-        console.log('[UPDATE] Download completed!');
-        showTitleBarProgress(100, 'login.update_complete');
-        setTimeout(() => {
-          stopProgressMonitoring();
-          hideTitleBarProgress();
-        }, 2000);
-      }
-    } catch (error) {
-      console.error('[UPDATE] Failed to parse progress:', error);
-    }
-  });
-  
-  progressEventSource.addEventListener('error', (error) => {
-    console.error('[UPDATE] SSE error:', error);
-    if (progressEventSource?.readyState === 2) {
-      console.log('[UPDATE] SSE connection closed, stopping monitoring');
-      stopProgressMonitoring();
-    }
-  });
-  
-  progressEventSource.addEventListener('open', () => {
-    console.log('[UPDATE] SSE connection opened');
-  });
 }
 
 /**

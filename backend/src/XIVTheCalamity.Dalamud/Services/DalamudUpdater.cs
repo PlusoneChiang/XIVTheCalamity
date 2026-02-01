@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -25,9 +26,6 @@ public class DalamudUpdater
     private const string DesktopRuntimeUrl = "https://dotnetcli.azureedge.net/dotnet/WindowsDesktop/{0}/windowsdesktop-runtime-{0}-win-x64.zip";
     
     private CancellationTokenSource? _cts;
-    private DalamudUpdateProgress _currentProgress = new();
-    
-    public event Action<DalamudUpdateProgress>? OnProgress;
     
     public DalamudUpdater(ILogger<DalamudUpdater> logger, DalamudPathService pathService)
     {
@@ -133,78 +131,73 @@ public class DalamudUpdater
         }
     }
     
-    /// <summary>Execute complete update</summary>
-    public async Task<bool> UpdateAsync(CancellationToken cancellationToken = default)
+    /// <summary>Execute complete update and stream progress</summary>
+    public async IAsyncEnumerable<DalamudUpdateProgress> UpdateAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _currentProgress = new DalamudUpdateProgress();
+        var currentProgress = new DalamudUpdateProgress();
         
-        try
+        _pathService.EnsureDirectoriesExist();
+        
+        // 1. Check version
+        currentProgress = ReportProgress(currentProgress, DalamudUpdateStage.CheckingVersion, "Checking version...");
+        yield return currentProgress;
+        
+        var versionInfo = await GetRemoteVersionAsync();
+        if (versionInfo == null)
         {
-            _pathService.EnsureDirectoriesExist();
-            
-            // 1. Check version
-            ReportProgress(DalamudUpdateStage.CheckingVersion, "Checking version...");
-            var versionInfo = await GetRemoteVersionAsync();
-            if (versionInfo == null)
+            currentProgress = ReportProgress(currentProgress, DalamudUpdateStage.Failed, "Failed to retrieve version");
+            currentProgress.HasError = true;
+            currentProgress.ErrorMessage = "Failed to retrieve remote version information";
+            yield return currentProgress;
+            yield break;
+        }
+        
+        var localVersion = _pathService.GetLocalVersion();
+        var needsUpdate = localVersion != versionInfo.AssemblyVersion;
+        
+        _logger.LogInformation("Dalamud version check: Local={LocalVersion}, Remote={RemoteVersion}, NeedsUpdate={NeedsUpdate}",
+            localVersion ?? "Not installed", versionInfo.AssemblyVersion, needsUpdate);
+        
+        // 2. Download Dalamud (if needed)
+        if (needsUpdate)
+        {
+            await foreach (var progress in DownloadDalamudAsync(versionInfo, _cts.Token))
             {
-                throw new Exception("Failed to retrieve remote version information");
+                yield return progress;
+                currentProgress = progress;
             }
-            
-            var localVersion = _pathService.GetLocalVersion();
-            var needsUpdate = localVersion != versionInfo.AssemblyVersion;
-            
-            _logger.LogInformation("Dalamud version check: Local={LocalVersion}, Remote={RemoteVersion}, NeedsUpdate={NeedsUpdate}",
-                localVersion ?? "Not installed", versionInfo.AssemblyVersion, needsUpdate);
-            
-            // 2. Download Dalamud (if needed)
-            if (needsUpdate)
+        }
+        
+        // 3. Download Runtime (if needed)
+        if (versionInfo.RuntimeRequired)
+        {
+            var localRuntime = _pathService.GetLocalRuntimeVersion();
+            if (localRuntime != versionInfo.RuntimeVersion)
             {
-                await DownloadDalamudAsync(versionInfo, _cts.Token);
-            }
-            
-            // 3. Download Runtime (if needed)
-            if (versionInfo.RuntimeRequired)
-            {
-                var localRuntime = _pathService.GetLocalRuntimeVersion();
-                if (localRuntime != versionInfo.RuntimeVersion)
+                await foreach (var progress in DownloadRuntimeAsync(versionInfo.RuntimeVersion, _cts.Token))
                 {
-                    await DownloadRuntimeAsync(versionInfo.RuntimeVersion, _cts.Token);
-                }
-                else
-                {
-                    _logger.LogInformation("Runtime 已是最新版本: {Version}", localRuntime);
+                    yield return progress;
+                    currentProgress = progress;
                 }
             }
-            
-            // 4. 下載 Assets (如需要)
-            await DownloadAssetsAsync(_cts.Token);
-            
-            // 完成
-            ReportProgress(DalamudUpdateStage.Complete, "更新完成");
-            _currentProgress.IsComplete = true;
-            OnProgress?.Invoke(_currentProgress);
-            
-            return true;
+            else
+            {
+                _logger.LogInformation("Runtime 已是最新版本: {Version}", localRuntime);
+            }
         }
-        catch (OperationCanceledException)
+        
+        // 4. 下載 Assets (如需要)
+        await foreach (var progress in DownloadAssetsAsync(_cts.Token))
         {
-            _logger.LogInformation("Dalamud 更新已取消");
-            ReportProgress(DalamudUpdateStage.Failed, "更新已取消");
-            _currentProgress.HasError = true;
-            _currentProgress.ErrorMessage = "更新已取消";
-            OnProgress?.Invoke(_currentProgress);
-            return false;
+            yield return progress;
+            currentProgress = progress;
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Dalamud 更新失敗");
-            ReportProgress(DalamudUpdateStage.Failed, ex.Message);
-            _currentProgress.HasError = true;
-            _currentProgress.ErrorMessage = ex.Message;
-            OnProgress?.Invoke(_currentProgress);
-            return false;
-        }
+        
+        // 完成
+        currentProgress = ReportProgress(currentProgress, DalamudUpdateStage.Complete, "更新完成");
+        currentProgress.IsComplete = true;
+        yield return currentProgress;
     }
     
     /// <summary>取消更新</summary>
@@ -213,14 +206,16 @@ public class DalamudUpdater
         _cts?.Cancel();
     }
     
-    /// <summary>取得當前進度</summary>
-    public DalamudUpdateProgress GetProgress() => _currentProgress;
-    
     #region Private Methods
     
-    private async Task DownloadDalamudAsync(DalamudVersionInfo versionInfo, CancellationToken ct)
+    private async IAsyncEnumerable<DalamudUpdateProgress> DownloadDalamudAsync(DalamudVersionInfo versionInfo, [EnumeratorCancellation] CancellationToken ct)
     {
-        ReportProgress(DalamudUpdateStage.DownloadingDalamud, "下載 Dalamud...");
+        var progress = new DalamudUpdateProgress
+        {
+            Stage = DalamudUpdateStage.DownloadingDalamud,
+            CurrentFile = "下載 Dalamud..."
+        };
+        yield return progress;
         
         var tempFile = Path.Combine(Path.GetTempPath(), $"dalamud_{versionInfo.AssemblyVersion}.7z");
         var targetDir = _pathService.GetHooksVersionPath(versionInfo.AssemblyVersion);
@@ -229,10 +224,16 @@ public class DalamudUpdater
         {
             // 下載
             _logger.LogInformation("下載 Dalamud 從: {Url}", versionInfo.DownloadUrl);
-            await DownloadFileWithProgressAsync(versionInfo.DownloadUrl, tempFile, ct);
+            await foreach (var downloadProgress in DownloadFileWithProgressAsync(versionInfo.DownloadUrl, tempFile, ct))
+            {
+                downloadProgress.Stage = DalamudUpdateStage.DownloadingDalamud;
+                yield return downloadProgress;
+                progress = downloadProgress;
+            }
             
             // 解壓
-            ReportProgress(DalamudUpdateStage.ExtractingDalamud, "解壓 Dalamud...");
+            progress = ReportProgress(progress, DalamudUpdateStage.ExtractingDalamud, "解壓 Dalamud...");
+            yield return progress;
             await ExtractSevenZipAsync(tempFile, targetDir, ct);
             
             // 保存版本資訊
@@ -251,13 +252,16 @@ public class DalamudUpdater
         }
     }
     
-    private async Task DownloadRuntimeAsync(string version, CancellationToken ct)
+    private async IAsyncEnumerable<DalamudUpdateProgress> DownloadRuntimeAsync(string version, [EnumeratorCancellation] CancellationToken ct)
     {
-        ReportProgress(DalamudUpdateStage.DownloadingRuntime, $"下載 .NET Runtime {version}...");
-        
-        // 設定總共需要下載 2 個檔案
-        _currentProgress.TotalItems = 2;
-        _currentProgress.CompletedItems = 0;
+        var progress = new DalamudUpdateProgress
+        {
+            Stage = DalamudUpdateStage.DownloadingRuntime,
+            CurrentFile = $"下載 .NET Runtime {version}...",
+            TotalItems = 2,
+            CompletedItems = 0
+        };
+        yield return progress;
         
         var tempDir = Path.Combine(Path.GetTempPath(), $"dotnet_runtime_{version}");
         Directory.CreateDirectory(tempDir);
@@ -268,22 +272,43 @@ public class DalamudUpdater
             var dotnetUrl = string.Format(DotnetRuntimeUrl, version);
             var dotnetFile = Path.Combine(tempDir, "dotnet-runtime.zip");
             _logger.LogInformation("下載 .NET Runtime 從: {Url}", dotnetUrl);
-            _currentProgress.CurrentFile = "dotnet-runtime.zip";
-            await DownloadFileWithProgressAsync(dotnetUrl, dotnetFile, ct);
-            _currentProgress.CompletedItems = 1;
-            OnProgress?.Invoke(_currentProgress);
+            progress.CurrentFile = "dotnet-runtime.zip";
+            
+            await foreach (var downloadProgress in DownloadFileWithProgressAsync(dotnetUrl, dotnetFile, ct))
+            {
+                downloadProgress.Stage = DalamudUpdateStage.DownloadingRuntime;
+                downloadProgress.TotalItems = 2;
+                downloadProgress.CompletedItems = 0;
+                downloadProgress.CurrentFile = "dotnet-runtime.zip";
+                yield return downloadProgress;
+                progress = downloadProgress;
+            }
+            
+            progress.CompletedItems = 1;
+            yield return progress;
             
             // 下載 windowsdesktop-runtime (2/2)
             var desktopUrl = string.Format(DesktopRuntimeUrl, version);
             var desktopFile = Path.Combine(tempDir, "windowsdesktop-runtime.zip");
             _logger.LogInformation("下載 Windows Desktop Runtime 從: {Url}", desktopUrl);
-            _currentProgress.CurrentFile = "windowsdesktop-runtime.zip";
-            await DownloadFileWithProgressAsync(desktopUrl, desktopFile, ct);
-            _currentProgress.CompletedItems = 2;
-            OnProgress?.Invoke(_currentProgress);
+            progress.CurrentFile = "windowsdesktop-runtime.zip";
+            
+            await foreach (var downloadProgress in DownloadFileWithProgressAsync(desktopUrl, desktopFile, ct))
+            {
+                downloadProgress.Stage = DalamudUpdateStage.DownloadingRuntime;
+                downloadProgress.TotalItems = 2;
+                downloadProgress.CompletedItems = 1;
+                downloadProgress.CurrentFile = "windowsdesktop-runtime.zip";
+                yield return downloadProgress;
+                progress = downloadProgress;
+            }
+            
+            progress.CompletedItems = 2;
+            yield return progress;
             
             // 解壓
-            ReportProgress(DalamudUpdateStage.ExtractingRuntime, "解壓 Runtime...");
+            progress = ReportProgress(progress, DalamudUpdateStage.ExtractingRuntime, "解壓 Runtime...");
+            yield return progress;
             await ExtractZipAsync(dotnetFile, _pathService.RuntimePath, ct);
             await ExtractZipAsync(desktopFile, _pathService.RuntimePath, ct);
             
@@ -299,9 +324,14 @@ public class DalamudUpdater
         }
     }
     
-    private async Task DownloadAssetsAsync(CancellationToken ct)
+    private async IAsyncEnumerable<DalamudUpdateProgress> DownloadAssetsAsync([EnumeratorCancellation] CancellationToken ct)
     {
-        ReportProgress(DalamudUpdateStage.DownloadingAssets, "檢查 Assets...");
+        var progress = new DalamudUpdateProgress
+        {
+            Stage = DalamudUpdateStage.DownloadingAssets,
+            CurrentFile = "檢查 Assets..."
+        };
+        yield return progress;
         
         var manifest = await GetAssetManifestAsync();
         if (manifest == null)
@@ -346,101 +376,121 @@ public class DalamudUpdater
                 await File.WriteAllTextAsync(_pathService.AssetsVersionFile, manifest.Version.ToString(), ct);
                 _logger.LogInformation("更新 Assets 版本文件: v{Version}", manifest.Version);
             }
-            return;
+            yield break;
         }
         
         _logger.LogInformation("需要下載 {Count}/{Total} 個 Asset 檔案", 
             filesToDownload.Count, manifest.Assets.Count);
         
-        _currentProgress.TotalItems = filesToDownload.Count;
-        _currentProgress.CompletedItems = 0;
-        ReportProgress(DalamudUpdateStage.DownloadingAssets, $"下載 Assets (0/{filesToDownload.Count})", resetProgress: false);
-        OnProgress?.Invoke(_currentProgress);
+        progress.TotalItems = filesToDownload.Count;
+        progress.CompletedItems = 0;
+        progress.CurrentFile = $"下載 Assets (0/{filesToDownload.Count})";
+        yield return progress;
         
-        // 並行下載 (最多 5 個)
+        // 並行下載 (最多 5 個) - 使用 Channel 報告進度
+        var progressChannel = System.Threading.Channels.Channel.CreateUnbounded<DalamudUpdateProgress>();
         var semaphore = new SemaphoreSlim(5);
         var downloadedCount = 0;
-        var tasks = filesToDownload.Select(async asset =>
+        var completedCount = 0;
+        
+        var downloadTask = Task.Run(async () =>
         {
-            await semaphore.WaitAsync(ct);
-            try
+            var tasks = filesToDownload.Select(async asset =>
             {
-                var localPath = Path.Combine(assetDir, asset.FileName);
-                Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
-                
-                _logger.LogDebug("開始下載 Asset: {FileName} ({Index}/{Total})", 
-                    asset.FileName, Interlocked.Increment(ref downloadedCount), filesToDownload.Count);
-                
-                // 刪除已存在的不完整檔案
-                if (File.Exists(localPath))
-                {
-                    _logger.LogDebug("刪除舊檔案: {FileName}", asset.FileName);
-                    File.Delete(localPath);
-                }
-                
-                // 使用 jsDelivr CDN 加速
-                var url = ConvertToJsDelivr(asset.Url);
-                if (url != asset.Url)
-                {
-                    _logger.LogDebug("使用 CDN 加速: {OriginalUrl} → {CdnUrl}", asset.Url, url);
-                }
-                
+                await semaphore.WaitAsync(ct);
                 try
                 {
-                    await DownloadFileSimpleAsync(url, localPath, ct);
+                    var localPath = Path.Combine(assetDir, asset.FileName);
+                    Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
+                    
+                    _logger.LogDebug("開始下載 Asset: {FileName} ({Index}/{Total})", 
+                        asset.FileName, Interlocked.Increment(ref downloadedCount), filesToDownload.Count);
+                    
+                    // 刪除已存在的不完整檔案
+                    if (File.Exists(localPath))
+                    {
+                        _logger.LogDebug("刪除舊檔案: {FileName}", asset.FileName);
+                        File.Delete(localPath);
+                    }
+                    
+                    // 使用 jsDelivr CDN 加速
+                    var url = ConvertToJsDelivr(asset.Url);
+                    if (url != asset.Url)
+                    {
+                        _logger.LogDebug("使用 CDN 加速: {OriginalUrl} → {CdnUrl}", asset.Url, url);
+                    }
+                    
+                    try
+                    {
+                        await DownloadFileSimpleAsync(url, localPath, ct);
+                    }
+                    catch (Exception ex)
+                    {
+                        // 下載失敗，刪除可能部分寫入的檔案
+                        if (File.Exists(localPath))
+                        {
+                            _logger.LogWarning("下載失敗，刪除不完整檔案: {FileName}", asset.FileName);
+                            try
+                            {
+                                File.Delete(localPath);
+                            }
+                            catch (Exception deleteEx)
+                            {
+                                _logger.LogError(deleteEx, "無法刪除不完整檔案: {FileName}", asset.FileName);
+                            }
+                        }
+                        throw new Exception($"下載失敗: {asset.FileName}", ex);
+                    }
+                    
+                    // 驗證
+                    if (!await VerifyFileHashAsync(localPath, asset.Hash))
+                    {
+                        _logger.LogWarning("Asset Hash驗證失敗: {FileName}", asset.FileName);
+                        File.Delete(localPath);
+                        throw new Exception($"Asset Hash驗證失敗: {asset.FileName}");
+                    }
+                    
+                    _logger.LogDebug("完成下載 Asset: {FileName}", asset.FileName);
+                    
+                    var completed = Interlocked.Increment(ref completedCount);
+                    
+                    // 每 5 個檔案或最後一個檔案才報告進度
+                    if (completed % 5 == 0 || completed == filesToDownload.Count)
+                    {
+                        _logger.LogInformation("Asset 下載進度: {Completed}/{Total}", completed, filesToDownload.Count);
+                        await progressChannel.Writer.WriteAsync(new DalamudUpdateProgress
+                        {
+                            Stage = DalamudUpdateStage.DownloadingAssets,
+                            CurrentFile = asset.FileName,
+                            TotalItems = filesToDownload.Count,
+                            CompletedItems = completed
+                        }, ct);
+                    }
                 }
                 catch (Exception ex)
                 {
-                    // 下載失敗，刪除可能部分寫入的檔案
-                    if (File.Exists(localPath))
-                    {
-                        _logger.LogWarning("下載失敗，刪除不完整檔案: {FileName}", asset.FileName);
-                        try
-                        {
-                            File.Delete(localPath);
-                        }
-                        catch (Exception deleteEx)
-                        {
-                            _logger.LogError(deleteEx, "無法刪除不完整檔案: {FileName}", asset.FileName);
-                        }
-                    }
-                    throw new Exception($"下載失敗: {asset.FileName}", ex);
+                    _logger.LogError(ex, "下載 Asset 失敗: {FileName}", asset.FileName);
+                    throw;
                 }
-                
-                // 驗證
-                if (!await VerifyFileHashAsync(localPath, asset.Hash))
+                finally
                 {
-                    _logger.LogWarning("Asset Hash驗證失敗: {FileName}", asset.FileName);
-                    File.Delete(localPath);
-                    throw new Exception($"Asset Hash驗證失敗: {asset.FileName}");
+                    semaphore.Release();
                 }
-                
-                _logger.LogDebug("完成下載 Asset: {FileName}", asset.FileName);
-                
-                var completed = _currentProgress.IncrementCompleted();
-                _currentProgress.CurrentFile = asset.FileName;
-                
-                // 每 5 個檔案或最後一個檔案才報告進度，避免阻塞
-                if (completed % 5 == 0 || completed == filesToDownload.Count)
-                {
-                    _logger.LogInformation("Asset 下載進度: {Completed}/{Total}", completed, filesToDownload.Count);
-                    OnProgress?.Invoke(_currentProgress);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "下載 Asset 失敗: {FileName}", asset.FileName);
-                throw;
-            }
-            finally
-            {
-                semaphore.Release();
-            }
-        });
+            });
+            
+            _logger.LogInformation("開始並行下載 {Count} 個 Asset 檔案...", filesToDownload.Count);
+            await Task.WhenAll(tasks);
+            _logger.LogInformation("所有 Asset 檔案下載完成");
+            progressChannel.Writer.Complete();
+        }, ct);
         
-        _logger.LogInformation("開始並行下載 {Count} 個 Asset 檔案...", filesToDownload.Count);
-        await Task.WhenAll(tasks);
-        _logger.LogInformation("所有 Asset 檔案下載完成");
+        // Stream progress from channel
+        await foreach (var downloadProgress in progressChannel.Reader.ReadAllAsync(ct))
+        {
+            yield return downloadProgress;
+        }
+        
+        await downloadTask; // Ensure download completes
         
         // 驗證所有檔案完整性（包含子目錄）
         _logger.LogInformation("驗證 Assets 完整性（包含子目錄）...");
@@ -503,26 +553,41 @@ public class DalamudUpdater
     }
     
     /// <summary>下載檔案並追蹤進度 (用於單一大檔案下載)</summary>
-    private async Task DownloadFileWithProgressAsync(string url, string targetPath, CancellationToken ct)
+    private async IAsyncEnumerable<DalamudUpdateProgress> DownloadFileWithProgressAsync(string url, string targetPath, [EnumeratorCancellation] CancellationToken ct)
     {
         using var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
         response.EnsureSuccessStatusCode();
         
         var totalBytes = response.Content.Headers.ContentLength ?? 0;
-        _currentProgress.TotalBytes = totalBytes;
-        _currentProgress.BytesDownloaded = 0;
+        var progress = new DalamudUpdateProgress
+        {
+            TotalBytes = totalBytes,
+            BytesDownloaded = 0
+        };
         
         await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
         await using var fileStream = new FileStream(targetPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
         
         var buffer = new byte[81920];
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var lastYield = stopwatch.ElapsedMilliseconds;
         int bytesRead;
+        
         while ((bytesRead = await contentStream.ReadAsync(buffer, ct)) > 0)
         {
             await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
-            _currentProgress.BytesDownloaded += bytesRead;
-            OnProgress?.Invoke(_currentProgress);
+            progress.BytesDownloaded += bytesRead;
+            
+            // Yield progress every 500ms
+            if (stopwatch.ElapsedMilliseconds - lastYield >= 500)
+            {
+                yield return progress;
+                lastYield = stopwatch.ElapsedMilliseconds;
+            }
         }
+        
+        // Final progress
+        yield return progress;
     }
     
     /// <summary>下載檔案 (不追蹤 bytes 進度，用於並行下載小檔案)</summary>
@@ -693,21 +758,17 @@ public class DalamudUpdater
         return url;
     }
     
-    private void ReportProgress(DalamudUpdateStage stage, string? currentFile = null, bool resetProgress = true)
+    private static DalamudUpdateProgress ReportProgress(DalamudUpdateProgress current, DalamudUpdateStage stage, string? currentFile = null)
     {
-        _currentProgress.Stage = stage;
-        _currentProgress.CurrentFile = currentFile;
-        
-        // 切換階段時重置進度數值
-        if (resetProgress)
+        return new DalamudUpdateProgress
         {
-            _currentProgress.TotalBytes = 0;
-            _currentProgress.BytesDownloaded = 0;
-            _currentProgress.TotalItems = 0;
-            _currentProgress.CompletedItems = 0;
-        }
-        
-        OnProgress?.Invoke(_currentProgress);
+            Stage = stage,
+            CurrentFile = currentFile,
+            TotalBytes = 0,
+            BytesDownloaded = 0,
+            TotalItems = 0,
+            CompletedItems = 0
+        };
     }
     
     #endregion

@@ -34,11 +34,8 @@ html {
     margin: 0;
     font-size: 11px;
     font-weight: 500;
-    background: linear-gradient(180deg, 
-        rgba(200, 200, 200, 0.2) 0%,   /* 加深背景 */
-        rgba(20, 20, 20, 0.3) 50%, 
-        rgba(0, 0, 0, 0.25) 100%);
-    color: rgba(255, 255, 255, 0.9);  /* 文字更明顯 */
+    background: rgba(30, 30, 30, 0.35);  /* 接近登入卡片的颜色 */
+    color: rgba(255, 255, 255, 0.85);
     border: 1px solid rgba(255, 255, 255, 0.25);
     border-radius: 15px;
     cursor: pointer;
@@ -46,9 +43,8 @@ html {
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     box-shadow: 
-        0 4px 16px rgba(0, 0, 0, 0.4),
-        inset 0 1px 1px rgba(255, 255, 255, 0.3),
-        inset 0 -1px 1px rgba(0, 0, 0, 0.2);
+        0 4px 16px rgba(0, 0, 0, 0.3),
+        inset 0 1px 1px rgba(255, 255, 255, 0.15);
     z-index: 3;
     display: flex;
     align-items: center;
@@ -58,27 +54,68 @@ html {
 }
 
 .test-progress-btn:hover:not(:disabled) {
-    background: linear-gradient(180deg, 
-        rgba(255, 255, 255, 0.3) 0%, 
-        rgba(30, 30, 30, 0.35) 50%, 
-        rgba(0, 0, 0, 0.25) 100%);
-    color: rgba(255, 255, 255, 1);
+    background: rgba(40, 40, 40, 0.5);  /* hover 时稍微亮一点 */
+    color: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.35);
     box-shadow: 
-        0 6px 16px rgba(0, 0, 0, 0.4),
-        inset 0 1px 1px rgba(255, 255, 255, 0.4),
-        inset 0 -1px 1px rgba(0, 0, 0, 0.2);
+        0 6px 16px rgba(0, 0, 0, 0.35),
+        inset 0 1px 1px rgba(255, 255, 255, 0.2);
     transform: scale(1.05);
 }
 
 .test-progress-btn:disabled {
-    background: linear-gradient(180deg, 
-        rgba(100, 100, 100, 0.1) 0%, 
-        rgba(20, 20, 20, 0.15) 50%, 
-        rgba(0, 0, 0, 0.2) 100%);
+    background: rgba(30, 30, 30, 0.2);
     color: rgba(255, 255, 255, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.15);
     cursor: not-allowed;
     opacity: 0.5;
     border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Close Button (Linux only) */
+.close-btn {
+    position: absolute;
+    top: 6px;
+    left: 10px;
+    -webkit-app-region: no-drag;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    margin: 0;
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 28px;
+    background: rgba(220, 38, 38, 0.3);  /* 红色透明背景 */
+    color: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(220, 38, 38, 0.5);
+    border-radius: 15px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 
+        0 4px 16px rgba(0, 0, 0, 0.3),
+        inset 0 1px 1px rgba(255, 255, 255, 0.15);
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+}
+
+.close-btn:hover {
+    background: rgba(239, 68, 68, 0.5);  /* hover 时更亮的红色 */
+    color: rgba(255, 255, 255, 1);
+    border: 1px solid rgba(239, 68, 68, 0.7);
+    box-shadow: 
+        0 6px 16px rgba(220, 38, 38, 0.4),
+        inset 0 1px 1px rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+}
+
+.close-btn:active {
+    background: rgba(185, 28, 28, 0.6);
+    transform: scale(0.95);
 }
 
 /* Title Bar Info Card */

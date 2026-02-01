@@ -62,15 +62,6 @@ public class ConfigService
                 return CreateDefaultConfig();
             }
             
-            // Migrate deprecated VerboseLogging to DevelopmentMode
-            #pragma warning disable CS0618
-            if (config.Launcher.VerboseLogging && !config.Launcher.DevelopmentMode)
-            {
-                config.Launcher.DevelopmentMode = true;
-                Console.WriteLine("[Config] Migrated VerboseLogging to DevelopmentMode");
-            }
-            #pragma warning restore CS0618
-            
             // Ensure platform-specific config exists with defaults
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) && config.Wine == null)
             {

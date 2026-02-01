@@ -15,6 +15,12 @@ const isMacOS = process.platform === 'darwin';
 const isLinux = process.platform === 'linux';
 const isWindows = process.platform === 'win32';
 
+// Linux-specific: Add --no-sandbox flag for AppImage compatibility
+if (isLinux) {
+  app.commandLine.appendSwitch('no-sandbox');
+  console.log('[Main] Linux detected: Added --no-sandbox flag for AppImage compatibility');
+}
+
 // Hide menu on Linux/Windows (macOS keeps native menu bar)
 if (!isMacOS) {
   Menu.setApplicationMenu(null);
@@ -843,6 +849,16 @@ ipcMain.handle('app:validate-game-directory', async (event, dirPath) => {
   } catch (error) {
     safeError('[IPC] Failed to validate directory:', error);
     return { valid: false, error: error.message };
+  }
+});
+
+/**
+ * 關閉主視窗（Linux專用）
+ */
+ipcMain.handle('window:close', async () => {
+  console.log('[IPC] Close window requested');
+  if (mainWindow) {
+    mainWindow.close();
   }
 });
 

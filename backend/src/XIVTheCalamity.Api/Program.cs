@@ -83,6 +83,7 @@ try
     builder.Services.AddSingleton<GameVersionService>();
     builder.Services.AddSingleton<PatchListParser>();
     builder.Services.AddSingleton<PatchInstallService>();
+    builder.Services.AddSingleton<PatchDownloadManager>();  // Added: New download manager
     builder.Services.AddSingleton<UpdateManager>();
     
     // Register Game Launch service

@@ -80,6 +80,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return process.platform; // 'darwin', 'win32', 'linux'
   },
   
+  closeWindow: async () => {
+    return await ipcRenderer.invoke('window:close');
+  },
+  
   // Directory operations
   selectDirectory: async (options) => {
     return await ipcRenderer.invoke('app:select-directory', options);

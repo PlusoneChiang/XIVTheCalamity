@@ -1,114 +1,199 @@
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Http;
+using XIVTheCalamity.Core.Models.Progress;
 using XIVTheCalamity.Game.Models;
 
 namespace XIVTheCalamity.Game.Services;
 
 /// <summary>
-/// Patch download manager (multi-threaded)
+/// Patch download manager using IAsyncEnumerable for progress reporting
+/// Supports multi-threaded concurrent downloads with Channel-based progress aggregation
 /// </summary>
 public class PatchDownloadManager
 {
-    private readonly ILogger _logger;
+    private readonly ILogger<PatchDownloadManager> _logger;
     private readonly HttpClient _httpClient;
-    private readonly SemaphoreSlim _downloadSemaphore;
     private readonly int _maxConcurrent;
 
-    private DownloadProgress _currentProgress = new();
-    private readonly object _progressLock = new();
-    private Stopwatch _speedStopwatch = new();
-    private long _lastBytesDownloaded = 0;
-    
-    // Track download progress per patch (filename -> bytes downloaded)
-    private readonly Dictionary<string, long> _patchProgress = new();
-
     public PatchDownloadManager(
-        ILogger logger, 
-        IHttpClientFactory httpClientFactory,
-        int maxConcurrent = 3)
+        ILogger<PatchDownloadManager> logger, 
+        IHttpClientFactory httpClientFactory)
     {
         _logger = logger;
         _httpClient = httpClientFactory.CreateClient();
         _httpClient.Timeout = TimeSpan.FromMinutes(10);
-        _maxConcurrent = maxConcurrent;
-        _downloadSemaphore = new SemaphoreSlim(maxConcurrent, maxConcurrent);
+        _maxConcurrent = 3; // Default to 3 concurrent downloads
     }
 
     /// <summary>
-    /// Download all patches (multi-threaded)
+    /// Download all patches with progress reporting via IAsyncEnumerable
+    /// Uses Channel to aggregate progress from multiple download threads
     /// </summary>
-    public async Task DownloadAllPatchesAsync(
+    public async IAsyncEnumerable<PatchProgressEvent> DownloadAllPatchesAsync(
         List<PatchInfo> patches,
         string downloadPath,
-        IProgress<DownloadProgress>? progress = null,
-        CancellationToken cancellationToken = default)
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         if (!Directory.Exists(downloadPath))
         {
             Directory.CreateDirectory(downloadPath);
         }
 
-        // Initialize progress
-        lock (_progressLock)
-        {
-            _currentProgress = new DownloadProgress
-            {
-                TotalPatches = patches.Count,
-                CompletedPatches = 0,
-                DownloadingPatches = 0,
-                TotalBytes = patches.Sum(p => p.Size),
-                TotalBytesDownloaded = 0,
-                DownloadSpeedBytesPerSecond = 0
-            };
-        }
-
-        _speedStopwatch = Stopwatch.StartNew();
-
         _logger.LogInformation("Starting download of {Count} patches ({Concurrent} concurrent threads)", 
             patches.Count, _maxConcurrent);
 
-        // Create download tasks
-        var downloadTasks = patches.Select(patch =>
-            DownloadPatchAsync(patch, downloadPath, progress, cancellationToken)
-        );
-
-        // Wait for all tasks to complete
-        await Task.WhenAll(downloadTasks);
-
+        // Create channel for progress aggregation
+        var progressChannel = Channel.CreateUnbounded<PatchProgressUpdate>();
+        
+        // Shared progress state (thread-safe via channel)
+        var totalBytes = patches.Sum(p => p.Size);
+        var patchProgress = new Dictionary<string, long>(); // filename -> bytes downloaded
+        var completedPatches = 0;
+        var downloadingCount = 0;
+        var speedStopwatch = Stopwatch.StartNew();
+        var lastTotalBytes = 0L;
+        var lastSpeedUpdate = speedStopwatch.Elapsed;
+        var lastYieldUpdate = speedStopwatch.Elapsed;
+        
+        // Initialize progress tracking
+        foreach (var patch in patches)
+        {
+            patchProgress[patch.FileName] = 0;
+        }
+        
+        // Start download tasks
+        var downloadTask = Task.Run(async () =>
+        {
+            using var semaphore = new SemaphoreSlim(_maxConcurrent, _maxConcurrent);
+            var downloadTasks = patches.Select(patch =>
+                DownloadPatchWithProgressAsync(patch, downloadPath, progressChannel.Writer, semaphore, cancellationToken)
+            );
+            
+            await Task.WhenAll(downloadTasks);
+            progressChannel.Writer.Complete();
+        }, cancellationToken);
+        
+        // Yield initial progress
+        yield return new PatchProgressEvent
+        {
+            Stage = "download_started",
+            MessageKey = "progress.download_started",
+            Phase = "downloading",
+            TotalPatches = patches.Count,
+            CompletedPatches = 0,
+            DownloadingCount = 0,
+            TotalBytes = totalBytes,
+            TotalBytesDownloaded = 0,
+            Percentage = 0
+        };
+        
+        // Read progress updates from channel and aggregate
+        await foreach (var update in progressChannel.Reader.ReadAllAsync(cancellationToken))
+        {
+            // Update shared state based on update type
+            switch (update.Type)
+            {
+                case ProgressUpdateType.DownloadStarted:
+                    downloadingCount++;
+                    break;
+                    
+                case ProgressUpdateType.DownloadProgress:
+                    if (update.FileName != null)
+                    {
+                        patchProgress[update.FileName] = update.BytesDownloaded;
+                    }
+                    break;
+                    
+                case ProgressUpdateType.DownloadCompleted:
+                    downloadingCount--;
+                    completedPatches++;
+                    if (update.FileName != null)
+                    {
+                        patchProgress[update.FileName] = update.TotalBytes;
+                    }
+                    break;
+            }
+            
+            // Calculate aggregated progress
+            var totalDownloaded = patchProgress.Values.Sum();
+            
+            // Calculate speed (every second)
+            var downloadSpeed = 0.0;
+            var elapsed = speedStopwatch.Elapsed;
+            if ((elapsed - lastSpeedUpdate).TotalMilliseconds >= 1000)
+            {
+                var timeDiff = (elapsed - lastSpeedUpdate).TotalSeconds;
+                var bytesDiff = totalDownloaded - lastTotalBytes;
+                downloadSpeed = timeDiff > 0 ? bytesDiff / timeDiff : 0;
+                
+                lastSpeedUpdate = elapsed;
+                lastTotalBytes = totalDownloaded;
+            }
+            
+            // Yield progress event (throttle to avoid too many events)
+            var shouldYield = update.Type == ProgressUpdateType.DownloadCompleted || 
+                              (elapsed - lastYieldUpdate).TotalMilliseconds >= 500;
+            
+            if (shouldYield)
+            {
+                yield return new PatchProgressEvent
+                {
+                    Stage = "downloading",
+                    MessageKey = "progress.downloading_patches",
+                    Phase = "downloading",
+                    TotalPatches = patches.Count,
+                    CompletedPatches = completedPatches,
+                    DownloadingCount = downloadingCount,
+                    CurrentFileName = update.FileName,
+                    CurrentFileDownloaded = update.BytesDownloaded,
+                    CurrentFileSize = update.TotalBytes,
+                    TotalBytes = totalBytes,
+                    TotalBytesDownloaded = totalDownloaded,
+                    DownloadSpeedBytesPerSec = downloadSpeed
+                };
+                
+                lastYieldUpdate = elapsed;
+            }
+        }
+        
+        // Wait for all downloads to complete
+        await downloadTask;
+        
         _logger.LogInformation("All patches downloaded");
+        
+        // Yield completion
+        yield return new PatchProgressEvent
+        {
+            Stage = "download_complete",
+            MessageKey = "progress.download_complete",
+            Phase = "downloading",
+            TotalPatches = patches.Count,
+            CompletedPatches = completedPatches,
+            DownloadingCount = 0,
+            TotalBytes = totalBytes,
+            TotalBytesDownloaded = totalBytes,
+            IsComplete = true,
+            Percentage = 100
+        };
     }
 
     /// <summary>
-    /// Download a single patch
+    /// Download a single patch and report progress to channel
     /// </summary>
-    private async Task DownloadPatchAsync(
+    private async Task DownloadPatchWithProgressAsync(
         PatchInfo patch,
         string downloadPath,
-        IProgress<DownloadProgress>? progress,
+        ChannelWriter<PatchProgressUpdate> progressWriter,
+        SemaphoreSlim semaphore,
         CancellationToken cancellationToken)
     {
-        // Limit concurrency
-        await _downloadSemaphore.WaitAsync(cancellationToken);
-
+        await semaphore.WaitAsync(cancellationToken);
+        
         try
         {
-            // Initialize progress tracking for this patch
-            lock (_progressLock)
-            {
-                _patchProgress[patch.FileName] = 0;
-            }
-            
-            // Update progress: start downloading
-            lock (_progressLock)
-            {
-                _currentProgress.DownloadingPatches++;
-                _currentProgress.CurrentFileName = patch.FileName;
-                _currentProgress.CurrentFileSize = patch.Size;
-                _currentProgress.CurrentFileDownloaded = 0;
-            }
-            progress?.Report(_currentProgress);
-
             var filePath = Path.Combine(downloadPath, patch.Repository.ToString(), patch.FileName);
             patch.LocalPath = filePath;
 
@@ -127,25 +212,40 @@ public class PatchDownloadManager
                 {
                     _logger.LogInformation("Patch already exists, skipping: {File}", patch.FileName);
                     
-                    // Mark as completed
-                    lock (_progressLock)
+                    await progressWriter.WriteAsync(new PatchProgressUpdate
                     {
-                        _patchProgress[patch.FileName] = patch.Size;
-                    }
+                        Type = ProgressUpdateType.DownloadCompleted,
+                        FileName = patch.FileName,
+                        TotalBytes = patch.Size
+                    }, cancellationToken);
                     
-                    OnPatchCompleted(progress);
                     return;
                 }
             }
 
-            // Download file
             _logger.LogInformation("Starting download: {File} ({Size} MB)", 
                 patch.FileName, patch.Size / 1024.0 / 1024.0);
 
-            await DownloadFileAsync(patch, filePath, progress, cancellationToken);
+            // Report download started
+            await progressWriter.WriteAsync(new PatchProgressUpdate
+            {
+                Type = ProgressUpdateType.DownloadStarted,
+                FileName = patch.FileName,
+                TotalBytes = patch.Size
+            }, cancellationToken);
+
+            // Download file with progress
+            await DownloadFileAsync(patch, filePath, progressWriter, cancellationToken);
 
             _logger.LogInformation("Download complete: {File}", patch.FileName);
-            OnPatchCompleted(progress);
+            
+            // Report download completed
+            await progressWriter.WriteAsync(new PatchProgressUpdate
+            {
+                Type = ProgressUpdateType.DownloadCompleted,
+                FileName = patch.FileName,
+                TotalBytes = patch.Size
+            }, cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -159,21 +259,17 @@ public class PatchDownloadManager
         }
         finally
         {
-            lock (_progressLock)
-            {
-                _currentProgress.DownloadingPatches--;
-            }
-            _downloadSemaphore.Release();
+            semaphore.Release();
         }
     }
 
     /// <summary>
-    /// Download file (streaming)
+    /// Download file with streaming and progress reporting
     /// </summary>
     private async Task DownloadFileAsync(
         PatchInfo patch,
         string filePath,
-        IProgress<DownloadProgress>? progress,
+        ChannelWriter<PatchProgressUpdate> progressWriter,
         CancellationToken cancellationToken)
     {
         using var response = await _httpClient.GetAsync(
@@ -194,102 +290,56 @@ public class PatchDownloadManager
         var buffer = new byte[81920];
         long totalBytesRead = 0;
         int bytesRead;
+        var progressStopwatch = Stopwatch.StartNew();
 
         while ((bytesRead = await contentStream.ReadAsync(buffer, cancellationToken)) > 0)
         {
             await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken);
             totalBytesRead += bytesRead;
 
-            // Update progress (every 100KB)
-            if (totalBytesRead % (100 * 1024) == 0 || totalBytesRead == patch.Size)
+            // Report progress every 200ms (more frequent than outer throttle)
+            if (progressStopwatch.ElapsedMilliseconds >= 200)
             {
-                lock (_progressLock)
+                await progressWriter.WriteAsync(new PatchProgressUpdate
                 {
-                    // Update current file progress
-                    _currentProgress.CurrentFileDownloaded = totalBytesRead;
-                    
-                    // Update this patch's progress
-                    _patchProgress[patch.FileName] = totalBytesRead;
-                    
-                    // Calculate total downloaded: cumulative progress of all patches
-                    _currentProgress.TotalBytesDownloaded = _patchProgress.Values.Sum();
-                    
-                    _logger.LogDebug(
-                        "[DOWNLOAD-PROGRESS] File: {FileName}, FileProgress: {FileProgress}/{FileSize}, " +
-                        "TotalPatches: {TotalPatches}, PatchProgressCount: {ProgressCount}, " +
-                        "TotalBytesDownloaded: {TotalDownloaded}/{TotalBytes}",
-                        patch.FileName, totalBytesRead, patch.Size,
-                        _currentProgress.TotalPatches, _patchProgress.Count,
-                        _currentProgress.TotalBytesDownloaded, _currentProgress.TotalBytes);
-                    
-                    UpdateSpeed();
-                }
-                progress?.Report(_currentProgress);
+                    Type = ProgressUpdateType.DownloadProgress,
+                    FileName = patch.FileName,
+                    BytesDownloaded = totalBytesRead,
+                    TotalBytes = patch.Size
+                }, cancellationToken);
+                
+                progressStopwatch.Restart();
             }
         }
-    }
-
-    /// <summary>
-    /// Patch download completed
-    /// </summary>
-    private void OnPatchCompleted(IProgress<DownloadProgress>? progress)
-    {
-        lock (_progressLock)
-        {
-            _currentProgress.CompletedPatches++;
-            _currentProgress.CurrentFileDownloaded = 0;
-            _currentProgress.CurrentFileSize = 0;
-            _currentProgress.CurrentFileName = null;
-            
-            _logger.LogDebug(
-                "[DOWNLOAD-COMPLETE] Completed: {Completed}/{Total}, TotalBytesDownloaded: {TotalDownloaded}/{TotalBytes}",
-                _currentProgress.CompletedPatches, _currentProgress.TotalPatches,
-                _currentProgress.TotalBytesDownloaded, _currentProgress.TotalBytes);
-        }
-        progress?.Report(_currentProgress);
-    }
-
-    /// <summary>
-    /// Update download speed and ETA
-    /// </summary>
-    private void UpdateSpeed()
-    {
-        var elapsed = _speedStopwatch.Elapsed.TotalSeconds;
-        if (elapsed < 1) return;
-
-        var currentTotalBytes = _currentProgress.TotalBytesDownloaded;
-        var bytesDownloaded = currentTotalBytes - _lastBytesDownloaded;
         
-        _currentProgress.DownloadSpeedBytesPerSecond = bytesDownloaded / elapsed;
-        
-        // Calculate ETA (based on total remaining)
-        var remainingBytes = _currentProgress.TotalBytes - currentTotalBytes;
-        if (_currentProgress.DownloadSpeedBytesPerSecond > 0)
+        // Final progress update
+        await progressWriter.WriteAsync(new PatchProgressUpdate
         {
-            var remainingSeconds = remainingBytes / _currentProgress.DownloadSpeedBytesPerSecond;
-            _currentProgress.EstimatedTimeRemaining = TimeSpan.FromSeconds(remainingSeconds);
-        }
-
-        _lastBytesDownloaded = currentTotalBytes;
-        _speedStopwatch.Restart();
+            Type = ProgressUpdateType.DownloadProgress,
+            FileName = patch.FileName,
+            BytesDownloaded = totalBytesRead,
+            TotalBytes = patch.Size
+        }, cancellationToken);
     }
+}
 
-    /// <summary>
-    /// Get current progress
-    /// </summary>
-    public DownloadProgress GetCurrentProgress()
-    {
-        lock (_progressLock)
-        {
-            return _currentProgress;
-        }
-    }
+/// <summary>
+/// Internal progress update message for channel communication
+/// </summary>
+internal class PatchProgressUpdate
+{
+    public ProgressUpdateType Type { get; set; }
+    public string? FileName { get; set; }
+    public long BytesDownloaded { get; set; }
+    public long TotalBytes { get; set; }
+}
 
-    /// <summary>
-    /// Cancel all downloads
-    /// </summary>
-    public void CancelAll()
-    {
-        _logger.LogWarning("Cancelling all downloads");
-    }
+/// <summary>
+/// Type of progress update
+/// </summary>
+internal enum ProgressUpdateType
+{
+    DownloadStarted,
+    DownloadProgress,
+    DownloadCompleted
 }

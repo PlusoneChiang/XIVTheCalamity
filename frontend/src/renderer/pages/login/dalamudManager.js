@@ -147,7 +147,7 @@ function startDalamudUpdateWithSSE() {
       
       try {
         const progress = JSON.parse(event.data);
-        console.log('[DALAMUD] Progress:', progress);
+        console.log('[DALAMUD] Progress event:', progress);
         
         // 取得階段訊息
         const stageMessage = getDalamudStageMessage(progress.stage);
@@ -175,31 +175,26 @@ function startDalamudUpdateWithSSE() {
         }
         
         showTitleBarProgress(percentage, message);
+      } catch (err) {
+        console.error('[DALAMUD] Failed to parse progress:', err);
+      }
+    });
+    
+    dalamudEventSource.addEventListener('complete', (event) => {
+      try {
+        const progress = JSON.parse(event.data);
+        console.log('[DALAMUD] Complete event:', progress);
         
-        // 檢查完成
-        if (progress.isComplete) {
-          console.log('[DALAMUD] Update complete!');
-          showTitleBarProgress(100, 'login.dalamud_complete');
-          setTimeout(() => {
-            closeDalamudSSE();
-            hideTitleBarProgress();
-            isDalamudChecking = false;
-            triggerOnDalamudComplete();
-            resolve(true);
-          }, 1500);
-        }
-        
-        // 檢查錯誤
-        if (progress.hasError) {
-          console.error('[DALAMUD] Update error:', progress.errorMessage);
+        showTitleBarProgress(100, 'login.dalamud_complete');
+        setTimeout(() => {
           closeDalamudSSE();
           hideTitleBarProgress();
           isDalamudChecking = false;
-          triggerOnDalamudComplete(); // 即使錯誤也觸發，讓 UI 能回到正常狀態
-          resolve(false);
-        }
+          triggerOnDalamudComplete();
+          resolve(true);
+        }, 1500);
       } catch (err) {
-        console.error('[DALAMUD] Failed to parse progress:', err);
+        console.error('[DALAMUD] Failed to parse complete event:', err);
       }
     });
     

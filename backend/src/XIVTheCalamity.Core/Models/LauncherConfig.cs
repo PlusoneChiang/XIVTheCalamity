@@ -24,10 +24,4 @@ public class LauncherConfig
     /// Detect non-zero exit codes and report errors
     /// </summary>
     public bool NonZeroExitError { get; set; } = true;
-    
-    /// <summary>
-    /// Verbose logging mode (deprecated, use DevelopmentMode)
-    /// </summary>
-    [Obsolete("Use DevelopmentMode instead")]
-    public bool VerboseLogging { get; set; } = false;
 }

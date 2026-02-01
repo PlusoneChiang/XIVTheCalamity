@@ -61,6 +61,16 @@ function init() {
     console.log('[Login] Settings button disabled until Wine initialization completes');
   }
   
+  // Close button (Linux only)
+  const closeBtn = document.getElementById('closeBtn');
+  if (platform === 'linux') {
+    closeBtn.style.display = 'flex';  // Show close button on Linux
+    closeBtn.addEventListener('click', () => {
+      console.log('[Login] Close button clicked');
+      window.electronAPI.closeWindow();
+    });
+  }
+  
   // 監聽設定變更事件
   if (window.electronAPI.events) {
     window.electronAPI.events.on('config-changed', (data) => {

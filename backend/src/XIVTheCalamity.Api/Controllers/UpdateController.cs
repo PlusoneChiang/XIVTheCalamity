@@ -8,7 +8,7 @@ namespace XIVTheCalamity.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class UpdateController : ControllerBase
+public class UpdateController : SseControllerBase
 {
     private readonly ILogger<UpdateController> _logger;
     private readonly UpdateManager _updateManager;
@@ -48,10 +48,10 @@ public class UpdateController : ControllerBase
     }
 
     /// <summary>
-    /// Check and install updates (using official API, no login required)
+    /// Check for updates only (no installation)
     /// </summary>
-    [HttpPost("check")]
-    public async Task<IActionResult> CheckAndInstallUpdates([FromBody] CheckUpdateRequest request)
+    [HttpPost("check-only")]
+    public async Task<IActionResult> CheckUpdates([FromBody] CheckUpdateRequest request, CancellationToken cancellationToken)
     {
         try
         {
@@ -60,15 +60,8 @@ public class UpdateController : ControllerBase
                 return this.BadRequestError("VALIDATION_FAILED", "Invalid game path");
             }
 
-            var result = await _updateManager.CheckAndInstallUpdatesAsync(
-                request.GamePath,
-                progress: null); // SSE progress push
-
+            var result = await _updateManager.CheckUpdatesAsync(request.GamePath, cancellationToken);
             return this.SuccessResult(result);
-        }
-        catch (OperationCanceledException)
-        {
-            return this.SuccessResult(new { cancelled = true, message = "Update check cancelled by user" });
         }
         catch (Exception ex)
         {
@@ -78,108 +71,34 @@ public class UpdateController : ControllerBase
     }
 
     /// <summary>
-    /// Cancel download
+    /// Check and install updates with SSE progress streaming
+    /// Uses IAsyncEnumerable for progress reporting
     /// </summary>
-    [HttpPost("cancel")]
-    public IActionResult CancelDownload()
+    [HttpGet("install")]
+    public async Task InstallUpdates([FromQuery] string gamePath, CancellationToken cancellationToken)
     {
-        try
+        _logger.LogInformation("[UPDATE-SSE] Install endpoint called, gamePath: {GamePath}", gamePath);
+        
+        SetupSseResponse();
+        _logger.LogInformation("[UPDATE-SSE] Headers set, starting SSE stream");
+
+        if (string.IsNullOrEmpty(gamePath) || !Directory.Exists(gamePath))
         {
-            _updateManager.OnUserClickLogin();
-            return this.SuccessResult(new { message = "Download cancelled" });
+            _logger.LogWarning("[UPDATE-SSE] Invalid game path: {GamePath}", gamePath);
+            await SendSseEventAsync("error", new { 
+                message = "Invalid game path",
+                code = "VALIDATION_FAILED"
+            }, cancellationToken);
+            return;
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to cancel download");
-            return this.InternalError("Failed to cancel download", ex.Message);
-        }
-    }
 
-    /// <summary>
-    /// Get current download progress
-    /// </summary>
-    [HttpGet("progress")]
-    public IActionResult GetProgress()
-    {
-        try
-        {
-            var progress = _updateManager.GetCurrentProgress();
-            if (progress == null)
-            {
-                return this.SuccessResult(new { isDownloading = false });
-            }
-
-            return this.SuccessResult(new
-            {
-                isDownloading = _updateManager.IsDownloading,
-                progress = progress
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to get progress");
-            return this.InternalError("Failed to get progress", ex.Message);
-        }
-    }
-
-    /// <summary>
-    /// SSE progress push
-    /// </summary>
-    [HttpGet("progress-stream")]
-    public async Task GetProgressStream(CancellationToken cancellationToken)
-    {
-        Response.Headers.Append("Content-Type", "text/event-stream");
-        Response.Headers.Append("Cache-Control", "no-cache");
-        Response.Headers.Append("Connection", "keep-alive");
-
-        try
-        {
-            while (!cancellationToken.IsCancellationRequested)
-            {
-                var progress = _updateManager.GetCurrentProgress();
-                if (progress != null)
-                {
-                    // Use camelCase serialization options
-                    var options = new System.Text.Json.JsonSerializerOptions
-                    {
-                        PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
-                    };
-                    var json = System.Text.Json.JsonSerializer.Serialize(progress, options);
-                    _logger.LogInformation("[SSE] Sending progress: {Json}", json);
-                    await Response.WriteAsync($"event: progress\n", cancellationToken);
-                    await Response.WriteAsync($"data: {json}\n\n", cancellationToken);
-                    await Response.Body.FlushAsync(cancellationToken);
-                }
-
-                await Task.Delay(1000, cancellationToken); // Update every second
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // Client disconnected
-        }
-    }
-
-    // Keep old endpoints for backward compatibility (deprecated)
-    
-    /// <summary>
-    /// [Deprecated] Background update: Please use POST /api/update/check
-    /// </summary>
-    [HttpPost("check-background")]
-    public async Task<IActionResult> CheckUpdatePlanA([FromBody] CheckUpdateRequest request)
-    {
-        _logger.LogWarning("check-background is deprecated, use check instead");
-        return await CheckAndInstallUpdates(request);
-    }
-
-    /// <summary>
-    /// [Deprecated] Update after login: Please use POST /api/update/check (SessionId no longer required)
-    /// </summary>
-    [HttpPost("check-login")]
-    public async Task<IActionResult> CheckUpdatePlanB([FromBody] CheckUpdatePlanBRequest request)
-    {
-        _logger.LogWarning("check-login is deprecated, use check instead (sessionId is no longer required)");
-        return await CheckAndInstallUpdates(new CheckUpdateRequest { GamePath = request.GamePath });
+        _logger.LogInformation("[UPDATE-SSE] Starting CheckAndInstallUpdatesAsync");
+        await StreamProgressEventsAsync(
+            _updateManager.CheckAndInstallUpdatesAsync(gamePath, cancellationToken),
+            cancellationToken,
+            onError: ex => _logger.LogError(ex, "[UPDATE-SSE] Update installation failed")
+        );
+        _logger.LogInformation("[UPDATE-SSE] Stream completed");
     }
 }
 
@@ -189,13 +108,4 @@ public class UpdateController : ControllerBase
 public class CheckUpdateRequest
 {
     public string GamePath { get; set; } = string.Empty;
-}
-
-/// <summary>
-/// [Deprecated] Update after login check update request
-/// </summary>
-public class CheckUpdatePlanBRequest
-{
-    public string GamePath { get; set; } = string.Empty;
-    public string SessionId { get; set; } = string.Empty;
 }
