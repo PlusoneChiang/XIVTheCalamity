@@ -1,6 +1,6 @@
 {
   "name": "xivthecalamity",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Final Fantasy XIV Cross-Platform Launcher",
   "main": "src/main/index.js",
   "scripts": {
@@ -47,17 +47,23 @@
         {
           "from": "../Release/temp-backend",
           "to": "backend",
-          "filter": ["**/*"]
+          "filter": [
+            "**/*"
+          ]
         },
         {
           "from": "../wine",
           "to": "wine",
-          "filter": ["**/*"]
+          "filter": [
+            "**/*"
+          ]
         },
         {
           "from": "../shared/resources",
           "to": "resources",
-          "filter": ["**/*"]
+          "filter": [
+            "**/*"
+          ]
         }
       ]
     },
@@ -72,7 +78,13 @@
           "to": "backend/XIVTheCalamity.Api"
         }
       ]
-    }
+    },
+    "extraResources": [
+      {
+        "from": "../Release/temp-backend-linux/XIVTheCalamity.Api",
+        "to": "backend/XIVTheCalamity.Api"
+      }
+    ]
   },
   "keywords": [
     "ff14",

@@ -278,6 +278,23 @@ chmod +x XIVTheCalamity-1.1.0-linux-x86_64.AppImage
 # Wine-XIV 會在首次運行時自動下載（~120MB）
 ```
 
+**Steam Deck / 遊戲模式啟動**：
+
+如果需要在 Steam 遊戲模式中執行，請添加 `--no-sandbox` 參數：
+
+```bash
+# 方式 1: 在 Steam 中添加為非 Steam 遊戲
+# 啟動選項中添加: --no-sandbox
+
+# 方式 2: 終端機執行
+./XIVTheCalamity-1.1.0-linux-x86_64.AppImage --no-sandbox
+```
+
+**注意**：
+- `--no-sandbox` 僅在 Steam 遊戲模式中需要（因為沙箱機制與 Steam Runtime 衝突）
+- 在一般桌面環境下**不需要**此參數
+- 使用此參數會降低應用程式的安全隔離性
+
 **首次啟動**：
 - Wine-XIV 自動下載和配置（需要網路連接）
 - 預計需要 3-5 分鐘

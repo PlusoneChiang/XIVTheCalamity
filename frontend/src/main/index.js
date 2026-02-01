@@ -15,11 +15,8 @@ const isMacOS = process.platform === 'darwin';
 const isLinux = process.platform === 'linux';
 const isWindows = process.platform === 'win32';
 
-// Linux-specific: Add --no-sandbox flag for AppImage compatibility
-if (isLinux) {
-  app.commandLine.appendSwitch('no-sandbox');
-  console.log('[Main] Linux detected: Added --no-sandbox flag for AppImage compatibility');
-}
+// Note: If you need to run in Steam Game Mode, add --no-sandbox flag manually:
+// ./XIVTheCalamity.AppImage --no-sandbox
 
 // Hide menu on Linux/Windows (macOS keeps native menu bar)
 if (!isMacOS) {
@@ -80,6 +77,9 @@ console.debug = (...args) => {
 log.info('XIVTheCalamity starting...');
 log.info('Log file:', logPath);
 
+// Track main window instance
+let mainWindow = null;
+
 // Track settings window instance (only one allowed)
 let settingsWindowInstance = null;
 
@@ -132,7 +132,7 @@ if (!fs.existsSync(userConfigDir)) {
  * Uses loadURL + baseURLForDataURL for HTTPS origin
  */
 function createWindow() {
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 910,
     height: 682,
     resizable: false,
@@ -164,11 +164,11 @@ function createWindow() {
     }
   });
   
-  // DevTools control - Open automatically in development mode
-  if (isDebugModeEnabled) {
-    mainWindow.webContents.openDevTools();
-    safeLog('[Main] DevTools opened (development mode)');
-  }
+  // DevTools control - Disabled auto-open, can be manually opened with Cmd+Opt+I (macOS) or F12 (Linux)
+  // if (isDebugModeEnabled) {
+  //   mainWindow.webContents.openDevTools();
+  //   safeLog('[Main] DevTools opened (development mode)');
+  // }
   
   mainWindow.webContents.on('devtools-opened', () => {
     // Allow DevTools to be manually opened if needed
@@ -179,6 +179,11 @@ function createWindow() {
     if (settingsWindowInstance && !settingsWindowInstance.isDestroyed()) {
       settingsWindowInstance.close();
     }
+  });
+  
+  // Clean up reference when window is closed
+  mainWindow.on('closed', () => {
+    mainWindow = null;
   });
 }
 

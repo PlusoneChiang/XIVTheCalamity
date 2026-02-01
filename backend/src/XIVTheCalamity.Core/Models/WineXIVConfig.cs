@@ -28,7 +28,7 @@ public class WineXIVConfig
     /// <summary>
     /// Enable GameMode for performance optimization (Linux only)
     /// </summary>
-    public bool GameModeEnabled { get; set; } = true;
+    public bool GameModeEnabled { get; set; } = false;
     
     /// <summary>
     /// Wine debug flags (e.g., "-all,+module" or empty to disable)

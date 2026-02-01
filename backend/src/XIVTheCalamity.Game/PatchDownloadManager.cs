@@ -57,6 +57,7 @@ public class PatchDownloadManager
         var lastTotalBytes = 0L;
         var lastSpeedUpdate = speedStopwatch.Elapsed;
         var lastYieldUpdate = speedStopwatch.Elapsed;
+        var currentSpeed = 0.0; // Keep track of last calculated speed
         
         // Initialize progress tracking
         foreach (var patch in patches)
@@ -120,14 +121,17 @@ public class PatchDownloadManager
             // Calculate aggregated progress
             var totalDownloaded = patchProgress.Values.Sum();
             
-            // Calculate speed (every second)
-            var downloadSpeed = 0.0;
+            // Calculate speed (every 500ms for smoother updates)
             var elapsed = speedStopwatch.Elapsed;
-            if ((elapsed - lastSpeedUpdate).TotalMilliseconds >= 1000)
+            if ((elapsed - lastSpeedUpdate).TotalMilliseconds >= 500)
             {
                 var timeDiff = (elapsed - lastSpeedUpdate).TotalSeconds;
                 var bytesDiff = totalDownloaded - lastTotalBytes;
-                downloadSpeed = timeDiff > 0 ? bytesDiff / timeDiff : 0;
+                
+                if (timeDiff > 0 && bytesDiff >= 0)
+                {
+                    currentSpeed = bytesDiff / timeDiff;
+                }
                 
                 lastSpeedUpdate = elapsed;
                 lastTotalBytes = totalDownloaded;
@@ -152,7 +156,7 @@ public class PatchDownloadManager
                     CurrentFileSize = update.TotalBytes,
                     TotalBytes = totalBytes,
                     TotalBytesDownloaded = totalDownloaded,
-                    DownloadSpeedBytesPerSec = downloadSpeed
+                    DownloadSpeedBytesPerSec = currentSpeed // Use persistent speed value
                 };
                 
                 lastYieldUpdate = elapsed;

@@ -195,7 +195,7 @@ function collectFormData() {
     wineXIV: {
       dxvkHudEnabled: document.getElementById('winexivDxvkHudEnabled')?.checked || false,
       maxFramerate: parseInt(document.getElementById('winexivMaxFramerate')?.value || 60),
-      gameModeEnabled: document.getElementById('winexivGameModeEnabled')?.checked !== false,
+      gameModeEnabled: false, // GameMode disabled by default due to compatibility issues
       esyncEnabled: document.getElementById('winexivEsyncEnabled')?.checked !== false,
       fsyncEnabled: document.getElementById('winexivFsyncEnabled')?.checked !== false,
       wineDebug: document.getElementById('winexivWineDebug')?.value || ''
@@ -544,8 +544,8 @@ function initWineXIVTab() {
   document.getElementById('winexivDxvkHudEnabled').checked = config.dxvkHudEnabled || false;
   document.getElementById('winexivMaxFramerate').value = config.maxFramerate || 60;
   
-  // Performance
-  document.getElementById('winexivGameModeEnabled').checked = config.gameModeEnabled !== false; // default true
+  // Performance - GameMode is now disabled by default and hidden from UI
+  // document.getElementById('winexivGameModeEnabled').checked = config.gameModeEnabled !== false;
   
   // Advanced
   document.getElementById('winexivEsyncEnabled').checked = config.esyncEnabled !== false; // default true
