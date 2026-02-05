@@ -82,35 +82,44 @@ public class ConfigController(
                 currentConfig.Game.Region = partialConfig.Game.Region;
             
             // Wine configuration
-            currentConfig.Wine.DxmtEnabled = partialConfig.Wine.DxmtEnabled;
-            currentConfig.Wine.MetalFxSpatialEnabled = partialConfig.Wine.MetalFxSpatialEnabled;
-            currentConfig.Wine.MetalFxSpatialFactor = partialConfig.Wine.MetalFxSpatialFactor;
-            currentConfig.Wine.Metal3PerformanceOverlay = partialConfig.Wine.Metal3PerformanceOverlay;
-            currentConfig.Wine.HudScale = partialConfig.Wine.HudScale;
-            currentConfig.Wine.NativeResolution = partialConfig.Wine.NativeResolution;
-            currentConfig.Wine.MaxFramerate = partialConfig.Wine.MaxFramerate;
-            currentConfig.Wine.AudioRouting = partialConfig.Wine.AudioRouting;
-            currentConfig.Wine.EsyncEnabled = partialConfig.Wine.EsyncEnabled;
-            currentConfig.Wine.Msync = partialConfig.Wine.Msync;
-            currentConfig.Wine.WineDebug = partialConfig.Wine.WineDebug;
-            currentConfig.Wine.LeftOptionIsAlt = partialConfig.Wine.LeftOptionIsAlt;
-            currentConfig.Wine.RightOptionIsAlt = partialConfig.Wine.RightOptionIsAlt;
-            currentConfig.Wine.LeftCommandIsCtrl = partialConfig.Wine.LeftCommandIsCtrl;
-            currentConfig.Wine.RightCommandIsCtrl = partialConfig.Wine.RightCommandIsCtrl;
+            if (partialConfig.Wine != null)
+            {
+                currentConfig.Wine.DxmtEnabled = partialConfig.Wine.DxmtEnabled;
+                currentConfig.Wine.MetalFxSpatialEnabled = partialConfig.Wine.MetalFxSpatialEnabled;
+                currentConfig.Wine.MetalFxSpatialFactor = partialConfig.Wine.MetalFxSpatialFactor;
+                currentConfig.Wine.Metal3PerformanceOverlay = partialConfig.Wine.Metal3PerformanceOverlay;
+                currentConfig.Wine.HudScale = partialConfig.Wine.HudScale;
+                currentConfig.Wine.NativeResolution = partialConfig.Wine.NativeResolution;
+                currentConfig.Wine.MaxFramerate = partialConfig.Wine.MaxFramerate;
+                currentConfig.Wine.AudioRouting = partialConfig.Wine.AudioRouting;
+                currentConfig.Wine.EsyncEnabled = partialConfig.Wine.EsyncEnabled;
+                currentConfig.Wine.Msync = partialConfig.Wine.Msync;
+                currentConfig.Wine.WineDebug = partialConfig.Wine.WineDebug;
+                currentConfig.Wine.LeftOptionIsAlt = partialConfig.Wine.LeftOptionIsAlt;
+                currentConfig.Wine.RightOptionIsAlt = partialConfig.Wine.RightOptionIsAlt;
+                currentConfig.Wine.LeftCommandIsCtrl = partialConfig.Wine.LeftCommandIsCtrl;
+                currentConfig.Wine.RightCommandIsCtrl = partialConfig.Wine.RightCommandIsCtrl;
+            }
             
             // Dalamud configuration
-            currentConfig.Dalamud.Enabled = partialConfig.Dalamud.Enabled;
-            currentConfig.Dalamud.InjectDelay = partialConfig.Dalamud.InjectDelay;
-            currentConfig.Dalamud.SafeMode = partialConfig.Dalamud.SafeMode;
-            if (!string.IsNullOrEmpty(partialConfig.Dalamud.PluginRepoUrl))
-                currentConfig.Dalamud.PluginRepoUrl = partialConfig.Dalamud.PluginRepoUrl;
+            if (partialConfig.Dalamud != null)
+            {
+                currentConfig.Dalamud.Enabled = partialConfig.Dalamud.Enabled;
+                currentConfig.Dalamud.InjectDelay = partialConfig.Dalamud.InjectDelay;
+                currentConfig.Dalamud.SafeMode = partialConfig.Dalamud.SafeMode;
+                if (!string.IsNullOrEmpty(partialConfig.Dalamud.PluginRepoUrl))
+                    currentConfig.Dalamud.PluginRepoUrl = partialConfig.Dalamud.PluginRepoUrl;
+            }
             
             // Launcher configuration
-            currentConfig.Launcher.EncryptedArguments = partialConfig.Launcher.EncryptedArguments;
-            currentConfig.Launcher.ExitWithGame = partialConfig.Launcher.ExitWithGame;
-            currentConfig.Launcher.NonZeroExitError = partialConfig.Launcher.NonZeroExitError;
-            currentConfig.Launcher.DevelopmentMode = partialConfig.Launcher.DevelopmentMode;
-            currentConfig.Launcher.ShowDalamudTab = partialConfig.Launcher.ShowDalamudTab;
+            if (partialConfig.Launcher != null)
+            {
+                currentConfig.Launcher.EncryptedArguments = partialConfig.Launcher.EncryptedArguments;
+                currentConfig.Launcher.ExitWithGame = partialConfig.Launcher.ExitWithGame;
+                currentConfig.Launcher.NonZeroExitError = partialConfig.Launcher.NonZeroExitError;
+                currentConfig.Launcher.DevelopmentMode = partialConfig.Launcher.DevelopmentMode;
+                currentConfig.Launcher.ShowDalamudTab = partialConfig.Launcher.ShowDalamudTab;
+            }
             
             await configService.SaveConfigAsync(currentConfig);
             

@@ -20,6 +20,8 @@ const translations = {
     'button.close': '關閉',
     'button.select': '選擇',
     'button.create': '建立',
+    'button.yes': '是',
+    'button.no': '否',
     
     // Account
     'account.login': '登入',
@@ -92,6 +94,11 @@ const translations = {
     'settings.general.test_success': '測試完成',
     'settings.general.test_failed': '測試失敗',
     'settings.general.abnormal_exit': '遊戲異常結束，Exit Code: {code}',
+    
+    // Konami Code
+    'settings.konami.prompt': '是否啟用 Dalamud 設定頁面？',
+    'settings.konami.success': '✓ Dalamud 功能已啟用',
+    'settings.konami.error': '✗ 啟用失敗，請重試',
     
     // Wine settings
     'settings.wine.graphics': '圖形設定',
@@ -361,6 +368,8 @@ const translations = {
     'button.close': 'Close',
     'button.select': 'Select',
     'button.create': 'Create',
+    'button.yes': 'Yes',
+    'button.no': 'No',
     
     // Account
     'account.login': 'Login',
@@ -433,6 +442,11 @@ const translations = {
     'settings.general.test_success': 'Test Complete',
     'settings.general.test_failed': 'Test Failed',
     'settings.general.abnormal_exit': 'Game exited abnormally, Exit Code: {code}',
+    
+    // Konami Code
+    'settings.konami.prompt': 'Enable Dalamud settings page?',
+    'settings.konami.success': '✓ Dalamud feature enabled',
+    'settings.konami.error': '✗ Failed to enable, please try again',
     
     // Wine settings
     'settings.wine.graphics': 'Graphics',

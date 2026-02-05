@@ -160,6 +160,10 @@ body {
   animation: fadeIn 0.3s;
 }
 
+.tab-content.hidden {
+  display: none !important;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -636,3 +640,8 @@ body.platform-win32 .tab-button[data-tab="wine"] {
   padding: 12px;
   font-size: 13px;
 }
+
+.hidden {
+  display: none !important;
+}
+

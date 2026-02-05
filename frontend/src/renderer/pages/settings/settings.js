@@ -8,6 +8,35 @@ let currentConfig = null;
 let currentPlatform = 'win32';
 
 /**
+ * Konami Code 偵測引擎 - 使用 KeyCode 避免大小寫問題
+ */
+const konamiCode = {
+  // KeyCode 序列: ↑↑↓↓←→←→BA
+  sequence: [38, 38, 40, 40, 37, 39, 37, 39, 66, 65],
+  input: [],
+  
+  reset() {
+    this.input = [];
+  },
+  
+  isMatching(keyCode) {
+    this.input.push(keyCode);
+    
+    // 檢查是否匹配
+    const isMatch = this.input.length === this.sequence.length && 
+                    this.input.every((code, index) => code === this.sequence[index]);
+    
+    // 只保留最後 10 個鍵
+    if (this.input.length > this.sequence.length) {
+      this.input.shift();
+    }
+    
+    return isMatch;
+  }
+};
+
+
+/**
  * Initialize settings page
  */
 async function init() {
@@ -22,8 +51,8 @@ async function init() {
   // Load configuration
   await loadConfig();
   
-  // Hide Dalamud tab if not enabled
-  hideDalamudTabIfDisabled();
+  // Update Dalamud tab visibility based on configuration
+  updateDalamudTabVisibility();
   
   // Initialize each tab
   initGeneralTab();
@@ -34,6 +63,9 @@ async function init() {
   
   // Setup event listeners
   setupEventListeners();
+  
+  // Add Konami Code listener
+  document.addEventListener('keydown', handleKonamiCodeInput);
   
   // Apply i18n
   i18n.updateElements();
@@ -115,24 +147,34 @@ async function loadConfig() {
 }
 
 /**
- * Hide Dalamud tab if showDalamudTab is disabled
+ * Update Dalamud tab visibility based on configuration
  */
-function hideDalamudTabIfDisabled() {
+function updateDalamudTabVisibility() {
+  const dalamudTabButton = document.querySelector('[data-tab="dalamud"]');
+  const dalamudTabContent = document.getElementById('tab-dalamud');
+  
   if (!currentConfig?.launcher?.showDalamudTab) {
-    const dalamudTabButton = document.querySelector('[data-tab="dalamud"]');
-    const dalamudTabContent = document.getElementById('tab-dalamud');
-    
+    // Hide Dalamud tab
     if (dalamudTabButton) {
-      dalamudTabButton.style.display = 'none';
+      dalamudTabButton.classList.add('hidden');
+      dalamudTabButton.classList.remove('active');
       console.log('[Settings] Dalamud tab button hidden');
     }
-    
     if (dalamudTabContent) {
-      dalamudTabContent.style.display = 'none';
+      dalamudTabContent.classList.add('hidden');
+      dalamudTabContent.classList.remove('active');
       console.log('[Settings] Dalamud tab content hidden');
     }
   } else {
-    console.log('[Settings] Dalamud tab is enabled');
+    // Show Dalamud tab
+    if (dalamudTabButton) {
+      dalamudTabButton.classList.remove('hidden');
+      console.log('[Settings] Dalamud tab button shown');
+    }
+    if (dalamudTabContent) {
+      dalamudTabContent.classList.remove('hidden');
+      console.log('[Settings] Dalamud tab content shown');
+    }
   }
 }
 
@@ -727,6 +769,17 @@ function setupEventListeners() {
   document.getElementById('exitCodeOkButton').addEventListener('click', () => {
     document.getElementById('exitCodeDialog').style.display = 'none';
   });
+  
+  // Konami Code Dialog buttons
+  document.getElementById('konamiYesBtn').addEventListener('click', () => setDalamudTabEnabled(true));
+  document.getElementById('konamiNoBtn').addEventListener('click', () => setDalamudTabEnabled(false));
+  
+  // Close Konami Code dialog when clicking overlay background
+  document.getElementById('konamiCodeOverlay').addEventListener('click', async (e) => {
+    if (e.target.id === 'konamiCodeOverlay') {
+      hideKonamiCodeDialog();
+    }
+  });
 }
 
 /**
@@ -745,6 +798,91 @@ function showError(message) {
   console.error('[Settings] Error:', message);
   // TODO: Implement error UI
   alert(message);
+}
+
+/**
+ * Show success
+ */
+function showSuccess(message) {
+  console.log('[Settings] Success:', message);
+  // TODO: Implement success UI
+  alert(message);
+}
+
+/**
+ * Handle Konami Code input
+ */
+function handleKonamiCodeInput(event) {
+  if (konamiCode.isMatching(event.keyCode)) {
+    showKonamiCodeDialog();
+    konamiCode.reset();
+  }
+}
+
+/**
+ * Show Konami Code dialog
+ */
+function showKonamiCodeDialog() {
+  const overlay = document.getElementById('konamiCodeOverlay');
+  if (overlay) {
+    overlay.style.display = 'flex';
+    overlay.classList.remove('hidden');
+    console.log('[Settings] Konami Code dialog shown');
+  }
+}
+
+/**
+ * Hide Konami Code dialog
+ */
+function hideKonamiCodeDialog() {
+  const overlay = document.getElementById('konamiCodeOverlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+    overlay.classList.add('hidden');
+    console.log('[Settings] Konami Code dialog hidden');
+  }
+}
+
+/**
+ * Set Dalamud tab enabled state via Konami code and save immediately
+ */
+async function setDalamudTabEnabled(enabled) {
+  try {
+    const action = enabled ? 'enable' : 'disable';
+    console.log(`[Settings] Setting Dalamud tab ${action} via Konami code`);
+    
+    // 1. Call API to update configuration - immediately save the setting
+    const response = await window.electronAPI.backend.call('/api/config', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        launcher: {
+          showDalamudTab: enabled
+        }
+      })
+    });
+    
+    if (response.ok && response.data) {
+      // 2. Hide dialog
+      hideKonamiCodeDialog();
+      
+      // 3. Reload configuration to ensure UI consistency
+      await loadConfig();
+      updateDalamudTabVisibility();
+      
+      // 4. Show feedback message
+      const message = enabled 
+        ? (i18n.t('settings.konami.success') || '✓ Dalamud 功能已啟用')
+        : '✓ Dalamud 功能已關閉';
+      showSuccess(message);
+      console.log(`[Settings] Dalamud tab ${action} successfully`);
+    } else {
+      throw new Error(`Failed to ${action} Dalamud tab`);
+    }
+  } catch (error) {
+    console.error(`[Settings] Failed to set Dalamud tab:`, error);
+    hideKonamiCodeDialog();
+    showError(i18n.t('settings.konami.error') || '✗ 操作失敗，請重試');
+  }
 }
 
 // Initialize on load

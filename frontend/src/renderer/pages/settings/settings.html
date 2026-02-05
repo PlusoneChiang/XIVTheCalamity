@@ -274,7 +274,7 @@
       </div>
 
       <!-- Dalamud Tab -->
-      <div id="tab-dalamud" class="tab-content">
+      <div id="tab-dalamud" class="tab-content hidden">
         <div class="settings-section">
           <h2 data-i18n="settings.tab.dalamud">Dalamud</h2>
           <div class="form-group">
@@ -387,6 +387,18 @@ data-styled.g160[id="sc-1ykasxb-0"]{content:"eDynhg,"}/*!sc*/
         <button id="existingGameButton" class="btn btn-primary" data-i18n="settings.game_setup.existing">我已有遊戲</button>
         <button id="installGameButton" class="btn btn-secondary" data-i18n="settings.game_setup.install">安裝新遊戲</button>
         <button id="cancelSetupButton" class="btn btn-secondary" data-i18n="button.cancel">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Konami Code Dialog -->
+  <div id="konamiCodeOverlay" class="modal-overlay hidden" style="display: none;">
+    <div class="modal-content">
+      <h2>🔓 KONAMI Code Detected!</h2>
+      <p data-i18n="settings.konami.prompt">是否啟用 Dalamud 設定頁面？</p>
+      <div class="modal-buttons">
+        <button id="konamiYesBtn" class="btn btn-primary" data-i18n="button.yes">是</button>
+        <button id="konamiNoBtn" class="btn btn-secondary" data-i18n="button.no">否</button>
       </div>
     </div>
   </div>

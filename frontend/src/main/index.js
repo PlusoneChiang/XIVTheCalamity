@@ -245,11 +245,6 @@ function createSettingsWindow() {
   const settingsPath = path.join(__dirname, '../renderer/pages/settings/settings.html');
   settingsWindowInstance.loadFile(settingsPath);
 
-  // DevTools control - Allow manual opening if needed
-  settingsWindowInstance.webContents.on('devtools-opened', () => {
-    // Allow DevTools to be manually opened if needed
-  });
-
   // Clean up reference when window is closed
   settingsWindowInstance.on('closed', () => {
     settingsWindowInstance = null;
