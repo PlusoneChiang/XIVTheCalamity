@@ -23,13 +23,32 @@ if (!isMacOS) {
   Menu.setApplicationMenu(null);
 }
 
-// Load version info
+// Load version info from package.json
 let versionInfo = { version: '0.1.0', appName: 'XIV The Calamity', description: 'Final Fantasy XIV Cross-Platform Launcher' };
 try {
-  const versionPath = path.join(__dirname, '../renderer/version.json');
-  versionInfo = JSON.parse(fs.readFileSync(versionPath, 'utf8'));
+  const possiblePaths = [
+    path.join(__dirname, '../package.json'),
+    path.join(__dirname, '../../package.json'),
+    path.join(process.resourcesPath, 'package.json'),
+  ];
+  
+  for (const packagePath of possiblePaths) {
+    try {
+      if (fs.existsSync(packagePath)) {
+        const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+        versionInfo = {
+          version: packageJson.version,
+          appName: packageJson.name === 'xivthecalamity' ? 'XIV The Calamity' : packageJson.name,
+          description: packageJson.description
+        };
+        break;
+      }
+    } catch (e) {
+      // Continue to next path
+    }
+  }
 } catch (error) {
-  console.error('[Main] Failed to load version.json:', error);
+  console.error('[Main] Failed to load version:', error.message);
 }
 
 // Configure electron-log
@@ -140,7 +159,7 @@ function createWindow() {
     titleBarStyle: 'hiddenInset',
     backgroundColor: '#00000000',
     vibrancy: 'dark',
-    title: 'XIV The Calamity',
+    title: versionInfo.appName,
     autoHideMenuBar: !isMacOS, // Hide menu bar on Linux/Windows
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

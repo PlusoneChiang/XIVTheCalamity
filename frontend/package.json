@@ -1,12 +1,11 @@
 {
   "name": "xivthecalamity",
-  "version": "1.2.2",
+  "version": "1.3.1",
   "description": "Final Fantasy XIV Cross-Platform Launcher",
   "main": "src/main/index.js",
   "scripts": {
     "postinstall": "patch-package",
     "start": "electron .",
-    "prebuild": "node ../scripts/sync-version.js",
     "build": "npm run build:cli && npm run build:backend && electron-builder",
     "build:cli": "node -e \"if(process.platform==='darwin'){require('child_process').execSync('cd ../XTCAudioRouter && ./build.sh release',{stdio:'inherit'})}else{console.log('Skipping XTCAudioRouter (macOS only)')}\"",
     "build:backend": "cd ../backend && dotnet publish src/XIVTheCalamity.Api/XIVTheCalamity.Api.csproj -c Release -r osx-arm64 --self-contained false -o ../Release/temp-backend",
