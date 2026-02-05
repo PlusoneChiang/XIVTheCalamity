@@ -18,77 +18,38 @@ exports.default = async function(context) {
     console.log('ℹ️  temp-backend already cleaned or does not exist');
   }
   
-  // 2. Remove unnecessary Electron locales (keep only en-US and zh-TW)
+  // 2. Remove unnecessary app-level locales (keep only en and zh variants)
+  // NOTE: Electron Framework locales are handled by electron-builder's 'electronLanguages' config
+  // Do NOT modify Electron Framework internals in afterPack - it breaks codesigning!
   if (context.electronPlatformName === 'darwin') {
-    console.log('\n[AfterPack] Optimizing Electron locales...');
+    console.log('\n[AfterPack] Cleaning app-level locales...');
     
-    const frameworkPath = path.join(
-      context.appOutDir,
-      'XIVTheCalamity.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Resources'
-    );
-    
-    // Locales to keep (including variants)
-    const keepLocales = [
-      'en.lproj', 'en_AU.lproj', 'en_CA.lproj', 'en_GB.lproj', 'en_IN.lproj', 'en_NZ.lproj', 'en_US.lproj',
-      'zh_TW.lproj', 'zh_HK.lproj',
-      // Keep gender variants for kept locales
-      'en_FEMININE.lproj', 'en_MASCULINE.lproj', 'en_NEUTER.lproj',
-      'zh_TW_FEMININE.lproj', 'zh_TW_MASCULINE.lproj', 'zh_TW_NEUTER.lproj'
-    ];
-    
-    let removedCount = 0;
-    let savedBytes = 0;
-    
-    try {
-      if (fs.existsSync(frameworkPath)) {
-        const files = fs.readdirSync(frameworkPath);
-        
-        files.forEach(file => {
-          if (file.endsWith('.lproj') && !keepLocales.includes(file)) {
-            const fullPath = path.join(frameworkPath, file);
-            try {
-              const stats = fs.statSync(fullPath);
-              const size = stats.isDirectory() 
-                ? getDirSize(fullPath)
-                : stats.size;
-              
-              fs.rmSync(fullPath, { recursive: true, force: true });
-              removedCount++;
-              savedBytes += size;
-            } catch (err) {
-              console.warn(`⚠️  Failed to remove locale ${file}:`, err.message);
-            }
-          }
-        });
-        
-        console.log(`✅ Removed ${removedCount} unused locales`);
-        console.log(`💾 Saved ${(savedBytes / 1024 / 1024).toFixed(2)} MB`);
-      } else {
-        console.warn('⚠️  Electron Framework path not found');
-      }
-    } catch (err) {
-      console.error('❌ Error optimizing locales:', err);
-    }
-    
-    // Also clean app-level locales
     const appLocalesPath = path.join(context.appOutDir, 'XIVTheCalamity.app/Contents/Resources');
     if (fs.existsSync(appLocalesPath)) {
       const appKeepLocales = ['en.lproj', 'zh_TW.lproj', 'zh_CN.lproj'];
       const appFiles = fs.readdirSync(appLocalesPath);
+      let removedCount = 0;
       
       appFiles.forEach(file => {
         if (file.endsWith('.lproj') && !appKeepLocales.includes(file)) {
           const fullPath = path.join(appLocalesPath, file);
           try {
             fs.rmSync(fullPath, { recursive: true, force: true });
+            removedCount++;
           } catch (err) {
             // Ignore errors
           }
         }
       });
+      
+      if (removedCount > 0) {
+        console.log(`✅ Removed ${removedCount} unused app-level locales`);
+      }
     }
   }
   
+  const signWine = process.env.SIGN_WINE !== '0';
+
   // 3. Strip Wine binaries to remove debug symbols (reduce size by ~30 MB)
   // 
   // ⚠️ IMPORTANT: Comment out this section if you need to debug Wine crashes
@@ -100,7 +61,7 @@ exports.default = async function(context) {
   //
   const STRIP_WINE_BINARIES = true; // Set to false to keep debug symbols
   
-  if (STRIP_WINE_BINARIES && context.electronPlatformName === 'darwin') {
+  if (STRIP_WINE_BINARIES && signWine && context.electronPlatformName === 'darwin') {
     console.log('\n[AfterPack] Stripping Wine binaries...');
     
     const { execSync } = require('child_process');
@@ -134,31 +95,110 @@ exports.default = async function(context) {
     }
   } else if (!STRIP_WINE_BINARIES) {
     console.log('\n[AfterPack] ℹ️  Wine stripping disabled (debug symbols preserved)');
+  } else if (!signWine && context.electronPlatformName === 'darwin') {
+    console.log('\n[AfterPack] ℹ️  Wine strip skipped (SIGN_WINE=0)');
+  }
+
+  // 4. Codesign Wine binaries for notarization
+  if (signWine && context.electronPlatformName === 'darwin') {
+    const signingIdentity = process.env.CSC_NAME;
+    
+    if (!signingIdentity) {
+      console.log('\n[AfterPack] ℹ️  Wine signing skipped (no CSC_NAME set)');
+    } else {
+      console.log('\n[AfterPack] Signing Wine binaries...');
+      const { execSync } = require('child_process');
+      const wineRootPath = path.join(
+        context.appOutDir,
+        'XIVTheCalamity.app/Contents/Resources/wine'
+      );
+      const entitlementsPath = path.join(
+        context.appOutDir,
+        '..',
+        '..',
+        'frontend',
+        'build',
+        'entitlements.mac.plist'
+      );
+      const useTimestamp = process.env.NOTARIZE !== '0';
+      const timestampFlag = useTimestamp ? '--timestamp' : '--timestamp=none';
+
+      if (fs.existsSync(wineRootPath)) {
+        if (!fs.existsSync(entitlementsPath)) {
+          throw new Error(`[AfterPack] Entitlements not found at ${entitlementsPath}`);
+        }
+        try {
+          const cpuCount = require('os').cpus().length || 4;
+          execSync(
+            `find "${wineRootPath}" -type f \\( -name "*.dylib" -o -name "*.so" -o -perm -111 \\) -print0 | xargs -0 -P ${cpuCount} -n 1 /bin/sh -c 'echo \"[Wine Sign] $0\"; codesign --force ${timestampFlag} --options runtime --entitlements \"${entitlementsPath}\" --sign \"${signingIdentity}\" \"$0\"'`,
+            { stdio: 'inherit' }
+          );
+          console.log('✅ Wine binaries signed');
+        } catch (err) {
+          console.error('❌ Failed to sign Wine binaries:', err.message);
+          throw err;
+        }
+      } else {
+        console.warn('⚠️  Wine path not found, skipping signing');
+      }
+    }
+  } else if (!signWine && context.electronPlatformName === 'darwin') {
+    console.log('\n[AfterPack] ℹ️  Wine signing skipped (SIGN_WINE=0)');
+  }
+
+  // 5. Codesign additional binaries for notarization (XTCAudioRouter, Backend API)
+  if (context.electronPlatformName === 'darwin') {
+    const signingIdentity = process.env.CSC_NAME;
+    if (signingIdentity) {
+      const { execSync } = require('child_process');
+      const entitlementsPath = path.join(
+        context.appOutDir,
+        '..',
+        '..',
+        'frontend',
+        'build',
+        'entitlements.mac.plist'
+      );
+      const useTimestamp = process.env.NOTARIZE !== '0';
+      const timestampFlag = useTimestamp ? '--timestamp' : '--timestamp=none';
+      const appPath = path.join(context.appOutDir, 'XIVTheCalamity.app');
+
+      // Sign XTCAudioRouter
+      console.log('\n[AfterPack] Signing additional binaries...');
+      const audioRouterPath = path.join(appPath, 'Contents/Resources/resources/bin/XTCAudioRouter');
+      if (fs.existsSync(audioRouterPath)) {
+        try {
+          execSync(
+            `codesign --force ${timestampFlag} --options runtime --entitlements "${entitlementsPath}" --sign "${signingIdentity}" "${audioRouterPath}"`,
+            { stdio: 'inherit' }
+          );
+          console.log('✅ XTCAudioRouter signed');
+        } catch (err) {
+          console.error('❌ Failed to sign XTCAudioRouter:', err.message);
+          throw err;
+        }
+      } else {
+        console.log('ℹ️  XTCAudioRouter not found, skipping');
+      }
+
+      // Sign Backend API
+      const backendApiPath = path.join(appPath, 'Contents/Resources/backend/XIVTheCalamity.Api');
+      if (fs.existsSync(backendApiPath)) {
+        try {
+          execSync(
+            `codesign --force ${timestampFlag} --options runtime --entitlements "${entitlementsPath}" --sign "${signingIdentity}" "${backendApiPath}"`,
+            { stdio: 'inherit' }
+          );
+          console.log('✅ Backend API signed');
+        } catch (err) {
+          console.error('❌ Failed to sign Backend API:', err.message);
+          throw err;
+        }
+      } else {
+        console.log('ℹ️  Backend API not found, skipping');
+      }
+    }
   }
   
   console.log('\n[AfterPack] ✅ Post-build optimization complete!\n');
 };
-
-// Helper function to calculate directory size
-function getDirSize(dirPath) {
-  let size = 0;
-  
-  try {
-    const files = fs.readdirSync(dirPath);
-    
-    files.forEach(file => {
-      const filePath = path.join(dirPath, file);
-      const stats = fs.statSync(filePath);
-      
-      if (stats.isDirectory()) {
-        size += getDirSize(filePath);
-      } else {
-        size += stats.size;
-      }
-    });
-  } catch (err) {
-    // Ignore errors
-  }
-  
-  return size;
-}

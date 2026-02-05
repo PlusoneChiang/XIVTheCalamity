@@ -4,6 +4,7 @@
   "description": "Final Fantasy XIV Cross-Platform Launcher",
   "main": "src/main/index.js",
   "scripts": {
+    "postinstall": "patch-package",
     "start": "electron .",
     "prebuild": "node ../scripts/sync-version.js",
     "build": "npm run build:cli && npm run build:backend && electron-builder",
@@ -19,6 +20,10 @@
     "appId": "com.XIVTheCalamity.launcher",
     "productName": "XIVTheCalamity",
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "electronLanguages": [
+      "en-US",
+      "zh-TW"
+    ],
     "directories": {
       "output": "../Release",
       "buildResources": "build"
@@ -29,6 +34,7 @@
       "package.json"
     ],
     "afterPack": "./electron-builder-afterpack.js",
+    "afterSign": "./electron-builder-aftersign.js",
     "mac": {
       "category": "public.app-category.games",
       "target": [
@@ -37,12 +43,24 @@
           "arch": [
             "arm64"
           ]
+        },
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
         }
       ],
       "icon": "build/XIVTC.icon",
-      "hardenedRuntime": false,
+      "hardenedRuntime": true,
       "gatekeeperAssess": false,
-      "identity": null,
+      "strictVerify": false,
+      "notarize": false,
+      "signIgnore": [
+        "Contents/Resources/wine/.*"
+      ],
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
       "extraResources": [
         {
           "from": "../Release/temp-backend",
@@ -78,13 +96,7 @@
           "to": "backend/XIVTheCalamity.Api"
         }
       ]
-    },
-    "extraResources": [
-      {
-        "from": "../Release/temp-backend-linux/XIVTheCalamity.Api",
-        "to": "backend/XIVTheCalamity.Api"
-      }
-    ]
+    }
   },
   "keywords": [
     "ff14",
@@ -96,7 +108,8 @@
   "license": "GPL-3.0-or-later",
   "devDependencies": {
     "electron": "^40.0.0",
-    "electron-builder": "^26.4.0"
+    "electron-builder": "^26.4.0",
+    "patch-package": "^8.0.1"
   },
   "dependencies": {
     "axios": "^1.13.4",

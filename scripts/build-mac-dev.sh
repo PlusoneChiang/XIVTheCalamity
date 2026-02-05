@@ -42,6 +42,10 @@ check_wine_build() {
         fi
         return
     fi
+
+    if [ -f "$WINE_DIR/.signed" ]; then
+        echo -e "${GREEN}✅ Wine is pre-signed${NC}"
+    fi
     
     # Check if Wine configuration has been updated
     if [ -d "$WINE_BUILDER_DIR" ]; then
@@ -106,7 +110,8 @@ echo "   2. Package frontend (no signing)"
 echo "   3. Copy resources"
 echo ""
 
-npm run pack
+# Disable code signing for development builds
+CSC_IDENTITY_AUTO_DISCOVERY=false SIGN_WINE=0 npm run pack
 
 # Check results
 if [ -d "$PROJECT_ROOT/Release/mac-arm64/XIVTheCalamity.app" ]; then
