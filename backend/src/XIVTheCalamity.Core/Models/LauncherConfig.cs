@@ -24,4 +24,9 @@ public class LauncherConfig
     /// Detect non-zero exit codes and report errors
     /// </summary>
     public bool NonZeroExitError { get; set; } = true;
+    
+    /// <summary>
+    /// Show Dalamud tab in settings (frontend-only, developer mode)
+    /// </summary>
+    public bool ShowDalamudTab { get; set; } = false;
 }

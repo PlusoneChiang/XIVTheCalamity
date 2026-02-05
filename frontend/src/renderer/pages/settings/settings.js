@@ -22,6 +22,9 @@ async function init() {
   // Load configuration
   await loadConfig();
   
+  // Hide Dalamud tab if not enabled
+  hideDalamudTabIfDisabled();
+  
   // Initialize each tab
   initGeneralTab();
   initWineTab();
@@ -108,6 +111,28 @@ async function loadConfig() {
   } catch (error) {
     console.error('[Settings] Failed to load configuration:', error);
     showError(i18n.t('settings.load_failed'));
+  }
+}
+
+/**
+ * Hide Dalamud tab if showDalamudTab is disabled
+ */
+function hideDalamudTabIfDisabled() {
+  if (!currentConfig?.launcher?.showDalamudTab) {
+    const dalamudTabButton = document.querySelector('[data-tab="dalamud"]');
+    const dalamudTabContent = document.getElementById('tab-dalamud');
+    
+    if (dalamudTabButton) {
+      dalamudTabButton.style.display = 'none';
+      console.log('[Settings] Dalamud tab button hidden');
+    }
+    
+    if (dalamudTabContent) {
+      dalamudTabContent.style.display = 'none';
+      console.log('[Settings] Dalamud tab content hidden');
+    }
+  } else {
+    console.log('[Settings] Dalamud tab is enabled');
   }
 }
 

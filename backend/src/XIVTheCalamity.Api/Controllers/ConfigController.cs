@@ -110,6 +110,7 @@ public class ConfigController(
             currentConfig.Launcher.ExitWithGame = partialConfig.Launcher.ExitWithGame;
             currentConfig.Launcher.NonZeroExitError = partialConfig.Launcher.NonZeroExitError;
             currentConfig.Launcher.DevelopmentMode = partialConfig.Launcher.DevelopmentMode;
+            currentConfig.Launcher.ShowDalamudTab = partialConfig.Launcher.ShowDalamudTab;
             
             await configService.SaveConfigAsync(currentConfig);
             
