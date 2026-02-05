@@ -85,6 +85,13 @@ const translations = {
     'settings.general.account': '帳號設定',
     'settings.general.remember_password': '記住密碼',
     'settings.general.remember_password_help': '儲存加密後的密碼',
+    'settings.general.test_section': '測試功能',
+    'settings.general.test_launch': '測試啟動遊戲',
+    'settings.general.test_launch_help': '不需登入即可測試遊戲啟動，無法連線至伺服器',
+    'settings.general.test_launching': '啟動中...',
+    'settings.general.test_success': '測試完成',
+    'settings.general.test_failed': '測試失敗',
+    'settings.general.abnormal_exit': '遊戲異常結束，Exit Code: {code}',
     
     // Wine settings
     'settings.wine.graphics': '圖形設定',
@@ -419,6 +426,13 @@ const translations = {
     'settings.general.account': 'Account Settings',
     'settings.general.remember_password': 'Remember Password',
     'settings.general.remember_password_help': 'Store encrypted password',
+    'settings.general.test_section': 'Test Features',
+    'settings.general.test_launch': 'Test Launch Game',
+    'settings.general.test_launch_help': 'Test game launch without login, cannot connect to server',
+    'settings.general.test_launching': 'Launching...',
+    'settings.general.test_success': 'Test Complete',
+    'settings.general.test_failed': 'Test Failed',
+    'settings.general.abnormal_exit': 'Game exited abnormally, Exit Code: {code}',
     
     // Wine settings
     'settings.wine.graphics': 'Graphics',

@@ -5,7 +5,7 @@
 
 // Import utilities
 import { toHex } from '../../utils/encoding.js';
-import { initAccountManagement, handleAutoFillOTPChange, getOTPSecretInput, cleanupAccountManagement } from './accountManagement.js';
+import { initAccountManagement, handleAutoFillOTPChange, getOTPSecretInput, cleanupAccountManagement, clearAutoFilledState, isAllAutoFilled } from './accountManagement.js';
 import { savePassword, saveOTPSecret, saveAutoFillOTP, hasOTPSecret } from '../../utils/accountStorage.js';
 import i18n from '../../i18n/index.js';
 import { startBackgroundUpdate, startLoginUpdate, cancelBackgroundUpdate, setAppVersionText, isUpdating, handleConfigChanged, setLoggedIn, setOnUpdateComplete } from './updateManager.js';
@@ -49,6 +49,9 @@ function init() {
   document.getElementById('loginButton').addEventListener('click', handleLogin);
   document.getElementById('reloginButton').addEventListener('click', handleRelogin);
   document.getElementById('launchButton').addEventListener('click', handleLaunchGame);
+  
+  // Bind keyboard navigation and auto-fill state tracking
+  bindKeyboardNavigation();
   
   // Settings button (initially disabled until Wine initialization completes)
   const settingsBtn = document.getElementById('settingsBtn');
@@ -100,6 +103,51 @@ function init() {
   });
   
   console.log('[Login] Initialization complete');
+}
+
+/**
+ * Bind keyboard navigation and auto-fill state tracking
+ * - OTP Enter key triggers login (unless all fields are auto-filled)
+ * - Manual input clears auto-filled state for reCaptcha consideration
+ */
+function bindKeyboardNavigation() {
+  const emailInput = document.getElementById('email');
+  const passwordInput = document.getElementById('password');
+  const otpInput = document.getElementById('otp');
+  
+  // Clear auto-filled state when user manually types
+  emailInput.addEventListener('input', () => {
+    clearAutoFilledState('email');
+  });
+  
+  passwordInput.addEventListener('input', () => {
+    clearAutoFilledState('password');
+  });
+  
+  otpInput.addEventListener('input', () => {
+    // Only clear if OTP is not readonly (manual input mode)
+    if (!otpInput.readOnly) {
+      clearAutoFilledState('otp');
+    }
+  });
+  
+  // OTP Enter key triggers login
+  otpInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      
+      // If all fields are auto-filled, block Enter login for reCaptcha scoring
+      // User must click the login button to collect enough interaction data
+      if (isAllAutoFilled()) {
+        console.log('[Login] All fields auto-filled, Enter login blocked. Please click the login button.');
+        // Optionally show a subtle hint (not blocking alert)
+        return;
+      }
+      
+      // Trigger login
+      handleLogin();
+    }
+  });
 }
 
 /**

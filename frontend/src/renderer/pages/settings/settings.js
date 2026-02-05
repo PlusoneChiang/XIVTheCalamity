@@ -580,7 +580,7 @@ async function handleTestLaunch() {
   try {
     console.log('[Settings] Test launch requested');
     button.disabled = true;
-    button.textContent = i18n.t('settings.dalamud.test_launching') || '啟動中...';
+    button.textContent = i18n.t('settings.general.test_launching') || '啟動中...';
     
     // Show game running overlay
     overlay.style.display = 'flex';
@@ -601,12 +601,12 @@ async function handleTestLaunch() {
       // Check if exit code is abnormal (not 0 or 1)
       if (exitCode !== 0 && exitCode !== 1) {
         // Show exit code dialog
-        exitCodeMessage.textContent = i18n.t('settings.dalamud.abnormal_exit', { code: exitCode }) 
+        exitCodeMessage.textContent = i18n.t('settings.general.abnormal_exit', { code: exitCode }) 
           || `遊戲異常結束，Exit Code: ${exitCode}`;
         exitCodeDialog.style.display = 'flex';
       } else {
         // Normal exit
-        button.textContent = i18n.t('settings.dalamud.test_success') || '測試完成';
+        button.textContent = i18n.t('settings.general.test_success') || '測試完成';
         setTimeout(() => {
           button.disabled = false;
           button.textContent = originalText;
@@ -618,14 +618,14 @@ async function handleTestLaunch() {
     } else {
       const errorMsg = response.data?.error?.message || response.data?.error || 'Unknown error';
       console.error('[Settings] Test launch failed:', errorMsg);
-      alert(i18n.t('settings.dalamud.test_failed') + ': ' + errorMsg);
+      alert(i18n.t('settings.general.test_failed') + ': ' + errorMsg);
       button.disabled = false;
       button.textContent = originalText;
     }
   } catch (error) {
     console.error('[Settings] Test launch exception:', error);
     overlay.style.display = 'none';
-    alert(i18n.t('settings.dalamud.test_failed') + ': ' + error.message);
+    alert(i18n.t('settings.general.test_failed') + ': ' + error.message);
     button.disabled = false;
     button.textContent = originalText;
   }

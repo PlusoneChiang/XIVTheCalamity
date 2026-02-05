@@ -214,6 +214,8 @@ function createSettingsWindow() {
     width: 800,
     height: 600,
     resizable: false,
+    modal: true,
+    parent: mainWindow,
     transparent: true,
     titleBarStyle: 'hiddenInset',
     backgroundColor: '#00000000',
@@ -226,6 +228,18 @@ function createSettingsWindow() {
       contextIsolation: true
     }
   });
+  
+  // Center the window relative to parent window
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    const [parentX, parentY] = mainWindow.getPosition();
+    const [parentWidth, parentHeight] = mainWindow.getSize();
+    const [windowWidth, windowHeight] = settingsWindowInstance.getSize();
+    
+    const x = Math.round(parentX + (parentWidth - windowWidth) / 2);
+    const y = Math.round(parentY + (parentHeight - windowHeight) / 2);
+    
+    settingsWindowInstance.setPosition(x, y);
+  }
   
   // Load settings page
   const settingsPath = path.join(__dirname, '../renderer/pages/settings/settings.html');

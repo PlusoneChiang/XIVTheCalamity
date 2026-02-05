@@ -10,6 +10,30 @@ import { generateTOTP, getRemainingSeconds, isValidTOTPSecret } from '../../util
 let otpInterval = null;
 let currentEmail = '';
 
+// Track auto-filled fields for reCaptcha consideration
+// When all fields are auto-filled, we require user interaction (click login button)
+export const autoFilledFields = {
+  email: false,
+  password: false,
+  otp: false
+};
+
+/**
+ * Reset auto-filled state for a specific field
+ */
+export function clearAutoFilledState(field) {
+  if (field in autoFilledFields) {
+    autoFilledFields[field] = false;
+  }
+}
+
+/**
+ * Check if all fields are auto-filled
+ */
+export function isAllAutoFilled() {
+  return autoFilledFields.email && autoFilledFields.password && autoFilledFields.otp;
+}
+
 /**
  * Initialize account management UI
  */
@@ -94,21 +118,31 @@ async function loadAccountDropdown() {
 
 /**
  * Select and fill account
+ * @param {string} email - The email to select
+ * @param {boolean} isStartup - Whether this is called during startup (affects focus behavior)
  */
-async function selectAccount(email) {
+async function selectAccount(email, isStartup = false) {
+  // Reset auto-filled states
+  autoFilledFields.email = false;
+  autoFilledFields.password = false;
+  autoFilledFields.otp = false;
+  
   // Fill email
   document.getElementById('email').value = email;
   currentEmail = email;
+  autoFilledFields.email = true;
   
   // Fill password and set remember checkbox
   const password = await getDecryptedPassword(email);
   const rememberCheckbox = document.getElementById('rememberPassword');
+  const passwordInput = document.getElementById('password');
   
   if (password) {
-    document.getElementById('password').value = password;
+    passwordInput.value = password;
     rememberCheckbox.checked = true;
+    autoFilledFields.password = true;
   } else {
-    document.getElementById('password').value = '';
+    passwordInput.value = '';
     rememberCheckbox.checked = false;
   }
   
@@ -121,6 +155,20 @@ async function selectAccount(email) {
   if (autoFill) {
     await handleAutoFillOTPChange();
   }
+  
+  // Handle focus based on what was auto-filled (only on startup)
+  if (isStartup) {
+    setTimeout(() => {
+      if (!autoFilledFields.password) {
+        // Only email filled, focus password
+        passwordInput.focus();
+      } else if (!autoFilledFields.otp) {
+        // Email and password filled, focus OTP
+        document.getElementById('otp').focus();
+      }
+      // If all filled, don't focus anything (force user to click login for reCaptcha)
+    }, 100);
+  }
 }
 
 /**
@@ -131,7 +179,7 @@ async function autoFillLastUsedAccount() {
     const lastEmail = await getLastUsedAccount();
     
     if (lastEmail) {
-      await selectAccount(lastEmail);
+      await selectAccount(lastEmail, true); // isStartup = true for focus handling
     }
   } catch (error) {
     console.error('[AccountManagement] Failed to auto-fill last account:', error);
@@ -232,6 +280,9 @@ async function startOTPAutoFill(email) {
   
   // Set OTP input to readonly
   otpInput.readOnly = true;
+  
+  // Mark OTP as auto-filled
+  autoFilledFields.otp = true;
   
   // Update OTP function
   const updateOTP = async () => {
