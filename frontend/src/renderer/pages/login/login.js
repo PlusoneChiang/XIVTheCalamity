@@ -1094,6 +1094,10 @@ function showGameSetupDialog() {
       await saveGamePath(result.path);
       dialog.style.display = 'none';
       
+      // Trigger update check after path is set
+      console.log('[GameSetup] Path saved, triggering update check');
+      startBackgroundUpdate();
+      
     } catch (error) {
       console.error('[GameSetup] Failed to select existing game:', error);
       alert(i18n.t('login.game_setup.error_general'));
@@ -1128,6 +1132,10 @@ function showGameSetupDialog() {
       // Save to config
       await saveGamePath(createResult.path);
       dialog.style.display = 'none';
+      
+      // Trigger update check after path is set
+      console.log('[GameSetup] Path saved, triggering update check');
+      startBackgroundUpdate();
       
     } catch (error) {
       console.error('[GameSetup] Failed to create game directory:', error);

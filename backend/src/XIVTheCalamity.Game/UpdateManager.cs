@@ -211,10 +211,10 @@ public class UpdateManager
         // Channel for download progress updates
         var progressChannel = Channel.CreateUnbounded<DownloadProgressUpdate>();
         
-        // Progress tracking
+        // Progress tracking (use volatile int for thread-safe access)
         var downloadProgress = new Dictionary<string, long>();
         var downloadedCount = 0;
-        var installedCount = 0;
+        var installedCount = 0; // Updated by install task, read by progress reporter
         var downloadingCount = 0;
         var lastSpeedUpdate = DateTime.UtcNow;
         var lastTotalBytes = 0L;
@@ -353,6 +353,7 @@ public class UpdateManager
                     Phase = "downloading",
                     TotalPatches = patches.Count,
                     CompletedPatches = downloadedCount,
+                    InstalledPatches = installedCount,
                     DownloadingCount = downloadingCount,
                     TotalBytes = totalBytes,
                     TotalBytesDownloaded = totalDownloaded,
@@ -364,11 +365,34 @@ public class UpdateManager
             }
         }
         
-        // Progress channel is complete, wait for install to finish silently
+        // Progress channel is complete, wait for install to finish with progress reporting
         _logger.LogInformation("All downloads complete, waiting for installations to finish...");
         
-        // Wait for both tasks to complete
+        // Wait for download task first
         await downloadTask;
+        
+        // Report installing progress while waiting for install task
+        while (!installTask.IsCompleted)
+        {
+            yield return new PatchProgressEvent
+            {
+                Stage = "installing",
+                MessageKey = "progress.installing",
+                Phase = "installing",
+                TotalPatches = patches.Count,
+                CompletedPatches = patches.Count, // All downloaded
+                InstalledPatches = installedCount,
+                DownloadingCount = 0,
+                TotalBytes = totalBytes,
+                TotalBytesDownloaded = totalBytes,
+                Percentage = patches.Count > 0 ? (int)((installedCount * 100.0) / patches.Count) : 100
+            };
+            
+            // Wait a bit before next progress report
+            await Task.Delay(500, cancellationToken);
+        }
+        
+        // Wait for install task to complete
         await installTask;
         
         // Check for errors
@@ -410,6 +434,7 @@ public class UpdateManager
             Phase = "complete",
             TotalPatches = patches.Count,
             CompletedPatches = patches.Count,
+            InstalledPatches = patches.Count,
             DownloadingCount = 0,
             TotalBytes = totalBytes,
             TotalBytesDownloaded = totalBytes,
