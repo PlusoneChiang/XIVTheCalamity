@@ -9,6 +9,7 @@ namespace XIVTheCalamity.Game.Patching.ZiPatch.Chunk
     public abstract class SqpkChunk : ZiPatchChunk
     {
         public new static string Type = "SQPK";
+        public override string ChunkType => Type;
         public static string Command { get; protected set; }
 
         private static readonly Dictionary<string, Func<BinaryReader, long, long, SqpkChunk>> CommandTypes =

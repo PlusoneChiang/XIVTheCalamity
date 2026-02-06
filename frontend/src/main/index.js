@@ -404,22 +404,18 @@ const BACKEND_URL = `http://localhost:${BACKEND_PORT}`;
  * Find the backend executable
  */
 function getBackendExecutable() {
-  // Development: backend/src/XIVTheCalamity.Api/bin/Debug/net9.0/XIVTheCalamity.Api
-  const devPath = path.join(__dirname, '..', '..', '..', 'backend', 'src', 'XIVTheCalamity.Api', 'bin', 'Debug', 'net9.0', 'XIVTheCalamity.Api');
-  if (fs.existsSync(devPath) || fs.existsSync(devPath + '.exe')) {
-    return devPath;
+  // Development: NativeAOT published executable
+  const nativeAotDevPath = path.join(__dirname, '..', '..', '..', 'backend', 'src', 'XIVTheCalamity.Api.NativeAOT', 'bin', 'Release', 'net9.0', 'osx-arm64', 'publish', 'XIVTheCalamity.Api.NativeAOT');
+  if (fs.existsSync(nativeAotDevPath)) {
+    log.info('[Backend] Using NativeAOT backend:', nativeAotDevPath);
+    return nativeAotDevPath;
   }
   
-  // Bundle: XIVTheCalamity.app/Contents/MacOS/XIVTheCalamity.Api
-  const bundlePath = path.join(process.resourcesPath, '..', 'MacOS', 'XIVTheCalamity.Api');
+  // Bundle: XIVTheCalamity.app/Contents/Resources/backend/XIVTheCalamity.Api.NativeAOT
+  const bundlePath = path.join(process.resourcesPath, 'backend', 'XIVTheCalamity.Api.NativeAOT');
   if (fs.existsSync(bundlePath)) {
+    log.info('[Backend] Using bundled NativeAOT backend:', bundlePath);
     return bundlePath;
-  }
-  
-  // Alternative bundle: XIVTheCalamity.app/Contents/Resources/backend/XIVTheCalamity.Api
-  const altBundlePath = path.join(process.resourcesPath, 'backend', 'XIVTheCalamity.Api');
-  if (fs.existsSync(altBundlePath)) {
-    return altBundlePath;
   }
   
   log.warn('[Backend] Backend executable not found');

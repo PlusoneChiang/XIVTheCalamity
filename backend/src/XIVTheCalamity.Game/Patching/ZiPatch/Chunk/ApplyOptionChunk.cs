@@ -6,6 +6,7 @@ namespace XIVTheCalamity.Game.Patching.ZiPatch.Chunk
     public class ApplyOptionChunk : ZiPatchChunk
     {
         public new static string Type = "APLY";
+        public override string ChunkType => Type;
 
         public enum ApplyOptionKind : uint
         {

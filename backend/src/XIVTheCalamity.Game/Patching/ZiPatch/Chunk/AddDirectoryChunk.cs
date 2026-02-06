@@ -6,6 +6,7 @@ namespace XIVTheCalamity.Game.Patching.ZiPatch.Chunk
     public class AddDirectoryChunk : ZiPatchChunk
     {
         public new static string Type = "ADIR";
+        public override string ChunkType => Type;
 
         public string DirName { get; protected set; }
 

@@ -7,6 +7,7 @@ namespace XIVTheCalamity.Game.Patching.ZiPatch.Chunk
     {
         // TODO: This... Never happens.
         public new static string Type = "XXXX";
+        public override string ChunkType => Type;
 
         protected override void ReadChunk()
         {

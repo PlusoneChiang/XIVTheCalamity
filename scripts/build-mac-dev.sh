@@ -125,10 +125,10 @@ if [ -d "$PROJECT_ROOT/Release/mac-arm64/XIVTheCalamity.app" ]; then
   echo "  Size: $(du -sh "$PROJECT_ROOT/Release/mac-arm64/XIVTheCalamity.app" | cut -f1)"
   echo ""
   
-  # Check backend
-  if [ -f "$PROJECT_ROOT/Release/mac-arm64/XIVTheCalamity.app/Contents/Resources/backend/XIVTheCalamity.Api" ]; then
-    BACKEND_SIZE=$(ls -lh "$PROJECT_ROOT/Release/mac-arm64/XIVTheCalamity.app/Contents/Resources/backend/XIVTheCalamity.Api" | awk '{print $5}')
-    echo -e "  ${GREEN}✅${NC} Backend: $BACKEND_SIZE"
+  # Check backend (NativeAOT)
+  if [ -f "$PROJECT_ROOT/Release/mac-arm64/XIVTheCalamity.app/Contents/Resources/backend/XIVTheCalamity.Api.NativeAOT" ]; then
+    BACKEND_SIZE=$(ls -lh "$PROJECT_ROOT/Release/mac-arm64/XIVTheCalamity.app/Contents/Resources/backend/XIVTheCalamity.Api.NativeAOT" | awk '{print $5}')
+    echo -e "  ${GREEN}✅${NC} Backend (NativeAOT): $BACKEND_SIZE"
   else
     echo -e "  ${RED}❌${NC} Backend: Not found"
   fi

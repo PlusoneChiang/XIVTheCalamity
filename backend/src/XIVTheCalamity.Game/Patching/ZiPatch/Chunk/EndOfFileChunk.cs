@@ -5,6 +5,7 @@ namespace XIVTheCalamity.Game.Patching.ZiPatch.Chunk
     public class EndOfFileChunk : ZiPatchChunk
     {
         public new static string Type = "EOF_";
+        public override string ChunkType => Type;
 
         protected override void ReadChunk()
         {

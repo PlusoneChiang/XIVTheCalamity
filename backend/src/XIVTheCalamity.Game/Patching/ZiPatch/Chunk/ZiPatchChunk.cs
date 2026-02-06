@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
 using System.Threading;
 using XIVTheCalamity.Game.Patching.Util;
 using XIVTheCalamity.Game.Patching.ZiPatch.Util;
@@ -11,10 +10,11 @@ namespace XIVTheCalamity.Game.Patching.ZiPatch.Chunk
     public abstract class ZiPatchChunk
     {
         public static string Type { get; protected set; }
-        // Hack: C# doesn't let you get static fields from instances.
-        public virtual string ChunkType => (string) GetType()
-            .GetField("Type", BindingFlags.Static | BindingFlags.FlattenHierarchy | BindingFlags.Public)
-            ?.GetValue(null);
+        
+        /// <summary>
+        /// Get the chunk type identifier. Override in subclasses.
+        /// </summary>
+        public abstract string ChunkType { get; }
 
         public long Offset { get; protected set; }
         public long Size { get; protected set; }

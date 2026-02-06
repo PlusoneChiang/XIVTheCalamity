@@ -7,6 +7,7 @@ using SharpCompress.Archives;
 using SharpCompress.Archives.SevenZip;
 using SharpCompress.Common;
 using SharpCompress.Readers;
+using XIVTheCalamity.Dalamud.Json;
 using XIVTheCalamity.Dalamud.Models;
 
 namespace XIVTheCalamity.Dalamud.Services;
@@ -108,7 +109,7 @@ public class DalamudUpdater
     {
         try
         {
-            return await _httpClient.GetFromJsonAsync<DalamudVersionInfo>(VersionUrl);
+            return await _httpClient.GetFromJsonAsync(VersionUrl, DalamudJsonContext.Default.DalamudVersionInfo);
         }
         catch (Exception ex)
         {
@@ -122,7 +123,7 @@ public class DalamudUpdater
     {
         try
         {
-            return await _httpClient.GetFromJsonAsync<DalamudAssetManifest>(AssetUrl);
+            return await _httpClient.GetFromJsonAsync(AssetUrl, DalamudJsonContext.Default.DalamudAssetManifest);
         }
         catch (Exception ex)
         {
@@ -237,7 +238,7 @@ public class DalamudUpdater
             await ExtractSevenZipAsync(tempFile, targetDir, ct);
             
             // 保存版本資訊
-            var versionJson = JsonSerializer.Serialize(versionInfo);
+            var versionJson = JsonSerializer.Serialize(versionInfo, DalamudJsonContext.Default.DalamudVersionInfo);
             await File.WriteAllTextAsync(Path.Combine(targetDir, "version.json"), versionJson, ct);
             
             // 更新 dev 目錄 (符號連結或複製)

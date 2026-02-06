@@ -7,6 +7,7 @@ namespace XIVTheCalamity.Game.Patching.ZiPatch.Chunk
     {
         // This is a NOP on recent patcher versions, so I don't think we'll be seeing it.
         public new static string Type = "APFS";
+        public override string ChunkType => Type;
 
         // TODO: No samples of this were found, so these fields are theoretical
         public long UnknownFieldA { get; protected set; }

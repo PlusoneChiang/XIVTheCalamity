@@ -741,46 +741,6 @@ body {
 }
 
 /* Dark Mode (Default) */
-@media (prefers-color-scheme: light) {
-    body {
-        background: linear-gradient(135deg, #f0f9ff 0%, #e0e7ff 100%);
-        color: #1f2937;
-    }
-    
-    .login-section {
-        background: rgba(255, 255, 255, 0.8);
-    }
-    
-    .login-container,
-    .loading-container,
-    .success-container {
-        background: rgba(255, 255, 255, 0.9);
-        border: 1px solid rgba(0, 0, 0, 0.1);
-    }
-    
-    .title {
-        color: #1f2937;
-    }
-    
-    .form-group label {
-        color: #374151;
-    }
-    
-    .form-group input {
-        background: rgba(0, 0, 0, 0.05);
-        color: #1f2937;
-        border-color: rgba(0, 0, 0, 0.1);
-    }
-    
-    .form-group input:focus {
-        background: rgba(0, 0, 0, 0.08);
-    }
-    
-    .form-group input::placeholder {
-        color: rgba(0, 0, 0, 0.4);
-    }
-}
-
 /* Modal Overlay */
 .modal-overlay {
     position: fixed;

@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using XIVTheCalamity.Core.Json;
 using XIVTheCalamity.Core.Models;
 
 namespace XIVTheCalamity.Core.Services;
@@ -11,16 +12,10 @@ public class ConfigService
 {
     private static readonly object _lock = new();
     private readonly string _configPath;
-    private readonly JsonSerializerOptions _jsonOptions;
 
     public ConfigService()
     {
         _configPath = GetConfigFilePath();
-        _jsonOptions = new JsonSerializerOptions
-        {
-            WriteIndented = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        };
         
         // Ensure config directory exists
         var configDir = Path.GetDirectoryName(_configPath);
@@ -54,7 +49,7 @@ public class ConfigService
         try
         {
             var json = await File.ReadAllTextAsync(_configPath);
-            var config = JsonSerializer.Deserialize<AppConfig>(json, _jsonOptions);
+            var config = JsonSerializer.Deserialize(json, CoreJsonContext.Default.AppConfig);
             
             if (config is null)
             {
@@ -142,7 +137,7 @@ public class ConfigService
     {
         try
         {
-            var json = JsonSerializer.Serialize(config, _jsonOptions);
+            var json = JsonSerializer.Serialize(config, CoreJsonContext.Default.AppConfig);
             File.WriteAllText(_configPath, json);
             Console.WriteLine("[Config] Config saved successfully");
         }

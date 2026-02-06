@@ -6,6 +6,7 @@ namespace XIVTheCalamity.Game.Patching.ZiPatch.Chunk
     public class FileHeaderChunk : ZiPatchChunk
     {
         public new static string Type = "FHDR";
+        public override string ChunkType => Type;
 
         // V1?/2
         public byte Version { get; protected set; }

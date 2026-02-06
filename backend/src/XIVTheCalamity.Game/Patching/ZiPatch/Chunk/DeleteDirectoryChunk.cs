@@ -7,6 +7,7 @@ namespace XIVTheCalamity.Game.Patching.ZiPatch.Chunk
     public class DeleteDirectoryChunk : ZiPatchChunk
     {
         public new static string Type = "DELD";
+        public override string ChunkType => Type;
 
         public string DirName { get; protected set; }
 

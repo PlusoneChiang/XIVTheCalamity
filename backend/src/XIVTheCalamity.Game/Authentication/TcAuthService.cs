@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using XIVTheCalamity.Core.Exceptions;
 using XIVTheCalamity.Core.Models;
+using XIVTheCalamity.Game.Json;
 
 namespace XIVTheCalamity.Game.Authentication;
 
@@ -51,25 +52,22 @@ public class TcAuthService(
         string recaptchaToken,
         CancellationToken cancellationToken)
     {
-        var payload = new
+        var payload = new LoginPayload
         {
-            email = emailHex,      // Already HEX encoded
-            password = passwordHex, // Already HEX encoded
-            code = otp,
-            token = recaptchaToken
+            Email = emailHex,      // Already HEX encoded
+            Password = passwordHex, // Already HEX encoded
+            Code = otp,
+            Token = recaptchaToken
         };
         
         logger.LogDebug("Calling launcherLogin API");
-        var response = await httpClient.PostAsJsonAsync(LoginApiUrl, payload, cancellationToken);
+        var response = await httpClient.PostAsJsonAsync(LoginApiUrl, payload, GameJsonContext.Default.LoginPayload, cancellationToken);
         
         // Read raw JSON
         var rawJson = await response.Content.ReadAsStringAsync(cancellationToken);
         
         // Parse as dictionary to capture all fields
-        var jsonDoc = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(rawJson, new JsonSerializerOptions 
-        { 
-            PropertyNameCaseInsensitive = true 
-        });
+        var jsonDoc = JsonSerializer.Deserialize(rawJson, GameJsonContext.Default.DictionaryStringJsonElement);
         
         if (!response.IsSuccessStatusCode || jsonDoc is null)
         {
@@ -105,19 +103,16 @@ public class TcAuthService(
         string loginToken,
         CancellationToken cancellationToken)
     {
-        var payload = new { token = loginToken };
+        var payload = new SessionPayload { Token = loginToken };
         
         logger.LogDebug("Calling launcherSession API");
-        var response = await httpClient.PostAsJsonAsync(SessionApiUrl, payload, cancellationToken);
+        var response = await httpClient.PostAsJsonAsync(SessionApiUrl, payload, GameJsonContext.Default.SessionPayload, cancellationToken);
         
         // Read raw JSON
         var rawJson = await response.Content.ReadAsStringAsync(cancellationToken);
         
         // Parse as dictionary to capture all fields
-        var jsonDoc = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(rawJson, new JsonSerializerOptions 
-        { 
-            PropertyNameCaseInsensitive = true 
-        });
+        var jsonDoc = JsonSerializer.Deserialize(rawJson, GameJsonContext.Default.DictionaryStringJsonElement);
         
         if (!response.IsSuccessStatusCode || jsonDoc is null)
         {

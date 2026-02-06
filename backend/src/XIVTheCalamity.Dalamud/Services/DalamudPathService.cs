@@ -1,4 +1,6 @@
+using System.Text.Json;
 using XIVTheCalamity.Core.Services;
+using XIVTheCalamity.Dalamud.Json;
 
 namespace XIVTheCalamity.Dalamud.Services;
 
@@ -91,7 +93,7 @@ public class DalamudPathService
         try
         {
             var json = File.ReadAllText(versionFile);
-            var versionInfo = System.Text.Json.JsonSerializer.Deserialize<Models.DalamudVersionInfo>(json);
+            var versionInfo = JsonSerializer.Deserialize(json, DalamudJsonContext.Default.DalamudVersionInfo);
             return versionInfo?.AssemblyVersion;
         }
         catch

@@ -181,15 +181,15 @@ exports.default = async function(context) {
         console.log('ℹ️  XTCAudioRouter not found, skipping');
       }
 
-      // Sign Backend API
-      const backendApiPath = path.join(appPath, 'Contents/Resources/backend/XIVTheCalamity.Api');
+      // Sign Backend API (NativeAOT)
+      const backendApiPath = path.join(appPath, 'Contents/Resources/backend/XIVTheCalamity.Api.NativeAOT');
       if (fs.existsSync(backendApiPath)) {
         try {
           execSync(
             `codesign --force ${timestampFlag} --options runtime --entitlements "${entitlementsPath}" --sign "${signingIdentity}" "${backendApiPath}"`,
             { stdio: 'inherit' }
           );
-          console.log('✅ Backend API signed');
+          console.log('✅ Backend API (NativeAOT) signed');
         } catch (err) {
           console.error('❌ Failed to sign Backend API:', err.message);
           throw err;
