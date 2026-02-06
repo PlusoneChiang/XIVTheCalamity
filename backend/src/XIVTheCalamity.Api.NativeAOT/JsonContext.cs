@@ -64,6 +64,22 @@ namespace XIVTheCalamity.Api.NativeAOT;
 [JsonSerializable(typeof(SseError))]
 [JsonSerializable(typeof(ToolLaunchResult))]
 
+// Wine Response Types
+[JsonSerializable(typeof(WineToolLaunchResponse))]
+[JsonSerializable(typeof(WineSettingsAppliedResponse))]
+[JsonSerializable(typeof(ApiResponse<WineToolLaunchResponse>))]
+[JsonSerializable(typeof(ApiResponse<WineSettingsAppliedResponse>))]
+
+// Game Response Types
+[JsonSerializable(typeof(GameLaunchResponse))]
+[JsonSerializable(typeof(GameExitResponse))]
+[JsonSerializable(typeof(ApiResponse<GameLaunchResponse>))]
+[JsonSerializable(typeof(ApiResponse<GameExitResponse>))]
+[JsonSerializable(typeof(ApiResponse<GameStatusResponse>))]
+
+// Dalamud Response Types
+[JsonSerializable(typeof(ApiResponse<DalamudStatus>))]
+
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -83,3 +99,11 @@ public record DalamudStatusResponse(DalamudStatus Status, string? Version);
 public record SseMessage(string Message);
 public record SseError(string Code, string Message);
 public record ToolLaunchResult(bool Success, int ExitCode, string Stdout, string Stderr);
+
+// Wine response types (NativeAOT compatible)
+public record WineToolLaunchResponse(bool Success, string Message, int? Pid = null);
+public record WineSettingsAppliedResponse(bool Success, string Message);
+
+// Game response types (NativeAOT compatible)
+public record GameLaunchResponse(int ProcessId, int? ExitCode = null);
+public record GameExitResponse(int ExitCode);

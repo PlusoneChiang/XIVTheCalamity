@@ -236,7 +236,9 @@ function populateForm(config) {
 function collectFormData() {
   const formData = {
     launcher: {
-      developmentMode: document.getElementById('debugLogging').checked
+      developmentMode: document.getElementById('debugLogging').checked,
+      // Preserve showDalamudTab from current config (set via Konami code)
+      showDalamudTab: currentConfig?.launcher?.showDalamudTab || false
     },
     game: {
       gamePath: document.getElementById('gamePath').value

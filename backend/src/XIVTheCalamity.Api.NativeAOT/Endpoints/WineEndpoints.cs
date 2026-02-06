@@ -44,7 +44,8 @@ public static class WineEndpoints
 
                 if (pid.HasValue)
                 {
-                    return Results.Ok(ApiResponse<object>.Ok(new { success = true, message = $"{tool} launched successfully", pid = pid.Value }));
+                    return Results.Ok(ApiResponse<WineToolLaunchResponse>.Ok(
+                        new WineToolLaunchResponse(true, $"{tool} launched successfully", pid.Value)));
                 }
                 else
                 {
@@ -160,7 +161,8 @@ public static class WineEndpoints
                 await winePrefixService.CommitBatchAsync(cancellationToken);
 
                 logger.LogInformation("Wine settings applied successfully");
-                return Results.Ok(ApiResponse<object>.Ok(new { success = true, message = "Wine settings applied successfully" }));
+                return Results.Ok(ApiResponse<WineSettingsAppliedResponse>.Ok(
+                    new WineSettingsAppliedResponse(true, "Wine settings applied successfully")));
             }
             catch (Exception ex)
             {
@@ -196,7 +198,8 @@ public static class WineEndpoints
 
             if (pid.HasValue)
             {
-                return Results.Ok(ApiResponse<object>.Ok(new { success = true, message = $"{tool} launched successfully", pid = pid.Value }));
+                return Results.Ok(ApiResponse<WineToolLaunchResponse>.Ok(
+                    new WineToolLaunchResponse(true, $"{tool} launched successfully", pid.Value)));
             }
             else
             {

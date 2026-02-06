@@ -76,12 +76,14 @@ public static class GameEndpoints
                     
                     logger.LogInformation("[GAME] Game exited with code: {ExitCode}", exitCode);
                     
-                    return Results.Ok(ApiResponse<object>.Ok(new { processId = result.ProcessId, exitCode }));
+                    return Results.Ok(ApiResponse<GameLaunchResponse>.Ok(
+                        new GameLaunchResponse(result.ProcessId ?? 0, exitCode)));
                 }
                 else if (result.Success)
                 {
                     logger.LogWarning("[GAME] Fake launch started but process reference lost");
-                    return Results.Ok(ApiResponse<object>.Ok(new { processId = result.ProcessId, exitCode = -1 }));
+                    return Results.Ok(ApiResponse<GameLaunchResponse>.Ok(
+                        new GameLaunchResponse(result.ProcessId ?? 0, -1)));
                 }
                 else
                 {
@@ -160,7 +162,8 @@ public static class GameEndpoints
                             cancellationToken);
                     }
                     
-                    return Results.Ok(ApiResponse<object>.Ok(new { processId = result.ProcessId }));
+                    return Results.Ok(ApiResponse<GameLaunchResponse>.Ok(
+                        new GameLaunchResponse(result.ProcessId ?? 0)));
                 }
                 else
                 {
@@ -192,7 +195,7 @@ public static class GameEndpoints
         {
             logger.LogInformation("[GAME] Waiting for game exit");
             var exitCode = await gameLaunchService.WaitForExitAsync(cancellationToken);
-            return Results.Ok(ApiResponse<object>.Ok(new { exitCode }));
+            return Results.Ok(ApiResponse<GameExitResponse>.Ok(new GameExitResponse(exitCode ?? 0)));
         });
     }
     

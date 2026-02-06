@@ -65,7 +65,9 @@
           "from": "../Release/temp-backend",
           "to": "backend",
           "filter": [
-            "**/*"
+            "**/*",
+            "!**/*.dSYM",
+            "!**/*.dSYM/**"
           ]
         },
         {
