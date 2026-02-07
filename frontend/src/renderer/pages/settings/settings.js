@@ -501,6 +501,39 @@ function initGeneralTab() {
       console.error('[Settings] Failed to browse game path:', error);
     }
   });
+  
+  // Clear OTP key
+  document.getElementById('clearOtpButton').addEventListener('click', async () => {
+    try {
+      const { getLastUsedAccount, deleteOTPSecret } = await import('../../utils/accountStorage.js');
+      
+      // Get current/last used account
+      const email = await getLastUsedAccount();
+      
+      if (!email) {
+        alert(i18n.t('settings.general.clear_otp_no_account'));
+        return;
+      }
+      
+      // Confirm deletion
+      const confirmMessage = i18n.t('settings.general.clear_otp_confirm', { email });
+      if (!confirm(confirmMessage)) {
+        return;
+      }
+      
+      // Delete OTP secret
+      const success = await deleteOTPSecret(email);
+      
+      if (success) {
+        alert(i18n.t('settings.general.clear_otp_success', { email }));
+      } else {
+        alert(i18n.t('settings.general.clear_otp_not_found', { email }));
+      }
+    } catch (error) {
+      console.error('[Settings] Failed to clear OTP secret:', error);
+      alert(i18n.t('settings.general.clear_otp_error'));
+    }
+  });
 }
 
 /**

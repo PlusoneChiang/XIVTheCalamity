@@ -83,6 +83,17 @@ public class PlatformPathService
             CacheDirectory = Path.Combine(baseDir, "cache");
             LogsDirectory = Path.Combine(baseDir, "logs");
         }
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            // Windows: Use %APPDATA% (Roaming) to match Electron's app.getPath('appData')
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var baseDir = Path.Combine(appData, "XIVTheCalamity");
+            
+            AppDataDirectory = baseDir;
+            UserDataDirectory = baseDir;
+            CacheDirectory = Path.Combine(baseDir, "cache");
+            LogsDirectory = Path.Combine(baseDir, "logs");
+        }
         else
         {
             throw new PlatformNotSupportedException(

@@ -3,6 +3,7 @@ using XIVTheCalamity.Core.Models;
 using XIVTheCalamity.Core.Models.Progress;
 using XIVTheCalamity.Dalamud.Models;
 using XIVTheCalamity.Api.NativeAOT.DTOs;
+using XIVTheCalamity.Platform.MacOS.Wine;
 
 namespace XIVTheCalamity.Api.NativeAOT;
 
@@ -15,6 +16,10 @@ namespace XIVTheCalamity.Api.NativeAOT;
 [JsonSerializable(typeof(WineXIVConfig))]
 [JsonSerializable(typeof(LoginResult))]
 [JsonSerializable(typeof(WineInitProgress))]
+
+// Wine Services (needed for DI parameter resolution on Windows)
+[JsonSerializable(typeof(WineConfigService))]
+[JsonSerializable(typeof(WinePrefixService))]
 
 // Progress Events
 [JsonSerializable(typeof(DownloadProgressEvent))]

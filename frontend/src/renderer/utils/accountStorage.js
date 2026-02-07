@@ -189,6 +189,29 @@ export async function saveOTPSecret(email, otpSecret) {
 }
 
 /**
+ * Delete OTP secret for a specific account
+ * @param {string} email
+ * @returns {Promise<boolean>}
+ */
+export async function deleteOTPSecret(email) {
+  try {
+    const otpSecrets = await loadFromFile(OTP_SECRETS_FILE);
+    if (otpSecrets[email]) {
+      delete otpSecrets[email];
+      const success = await saveToFile(OTP_SECRETS_FILE, otpSecrets);
+      if (success) {
+        console.log('[AccountStorage] OTP secret deleted for:', email);
+      }
+      return success;
+    }
+    return false;
+  } catch (error) {
+    console.error('[AccountStorage] Failed to delete OTP secret:', error);
+    return false;
+  }
+}
+
+/**
  * Delete account (both password and OTP secret)
  * @param {string} email
  * @returns {Promise<boolean>}

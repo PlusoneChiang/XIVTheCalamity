@@ -1,7 +1,7 @@
 import i18n from './i18n/index.js';
 import { initializeEnvironment, launchWineConfig } from './utils/environment.js';
 
-console.log('XIV The Calamity Launcher - Renderer Process Started');
+console.log('XIVTheCalamity Launcher - Renderer Process Started');
 
 let isEnvironmentInitialized = false;
 let isInitializing = false;

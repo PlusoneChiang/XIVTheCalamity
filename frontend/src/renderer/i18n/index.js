@@ -6,7 +6,7 @@
 const translations = {
   'zh-TW': {
     // Application
-    'app.title': 'XIV The Calamity',
+    'app.title': 'XIVTheCalamity',
     'app.subtitle': 'Final Fantasy XIV 跨平台啟動器',
     
     // Buttons
@@ -111,6 +111,14 @@ const translations = {
     'settings.general.account': '帳號設定',
     'settings.general.remember_password': '記住密碼',
     'settings.general.remember_password_help': '儲存加密後的密碼',
+    'settings.general.security': '安全設定',
+    'settings.general.clear_otp': '清除 OTP 金鑰',
+    'settings.general.clear_otp_help': '清除已儲存的雙重驗證金鑰，下次登入需重新輸入',
+    'settings.general.clear_otp_confirm': '確定要清除帳號 {email} 的 OTP 金鑰嗎？',
+    'settings.general.clear_otp_success': '已成功清除帳號 {email} 的 OTP 金鑰',
+    'settings.general.clear_otp_not_found': '帳號 {email} 沒有儲存的 OTP 金鑰',
+    'settings.general.clear_otp_no_account': '找不到帳號資訊',
+    'settings.general.clear_otp_error': '清除 OTP 金鑰時發生錯誤',
     'settings.general.test_section': '測試功能',
     'settings.general.test_launch': '測試啟動遊戲',
     'settings.general.test_launch_help': '不需登入即可測試遊戲啟動，無法連線至伺服器',
@@ -378,7 +386,7 @@ const translations = {
   
   'en-US': {
     // Application
-    'app.title': 'XIV The Calamity',
+    'app.title': 'XIVTheCalamity',
     'app.subtitle': 'Final Fantasy XIV Cross-Platform Launcher',
     
     // Buttons
@@ -483,6 +491,14 @@ const translations = {
     'settings.general.account': 'Account Settings',
     'settings.general.remember_password': 'Remember Password',
     'settings.general.remember_password_help': 'Store encrypted password',
+    'settings.general.security': 'Security Settings',
+    'settings.general.clear_otp': 'Clear OTP Key',
+    'settings.general.clear_otp_help': 'Remove saved two-factor authentication key, requires re-entry on next login',
+    'settings.general.clear_otp_confirm': 'Are you sure you want to clear the OTP key for account {email}?',
+    'settings.general.clear_otp_success': 'Successfully cleared OTP key for account {email}',
+    'settings.general.clear_otp_not_found': 'No OTP key found for account {email}',
+    'settings.general.clear_otp_no_account': 'No account information found',
+    'settings.general.clear_otp_error': 'An error occurred while clearing OTP key',
     'settings.general.test_section': 'Test Features',
     'settings.general.test_launch': 'Test Launch Game',
     'settings.general.test_launch_help': 'Test game launch without login, cannot connect to server',

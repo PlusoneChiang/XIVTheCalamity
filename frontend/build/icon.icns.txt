@@ -1,2 +1,0 @@
-# Placeholder - 需要实际的 .icns 文件
-# 暂时使用 Electron 默认图标

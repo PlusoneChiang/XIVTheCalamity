@@ -47,3 +47,5 @@ npm-debug.log*
 # Temporary files and test scripts
 temp/
 RefProjects/
+# Windows build temp config (frontend directory)
+frontend/electron-builder.config.js

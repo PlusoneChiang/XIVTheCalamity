@@ -24,7 +24,7 @@ if (!isMacOS) {
 }
 
 // Load version info from package.json
-let versionInfo = { version: '0.1.0', appName: 'XIV The Calamity', description: 'Final Fantasy XIV Cross-Platform Launcher' };
+let versionInfo = { version: '0.1.0', appName: 'XIVTheCalamity', description: 'Final Fantasy XIV Cross-Platform Launcher' };
 try {
   const possiblePaths = [
     path.join(__dirname, '../package.json'),
@@ -38,7 +38,7 @@ try {
         const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
         versionInfo = {
           version: packageJson.version,
-          appName: packageJson.name === 'xivthecalamity' ? 'XIV The Calamity' : packageJson.name,
+          appName: packageJson.name === 'xivthecalamity' ? 'XIVTheCalamity' : packageJson.name,
           description: packageJson.description
         };
         break;
@@ -129,15 +129,11 @@ function safeError(...args) {
  * Uses Electron's default appData paths:
  * - macOS: ~/Library/Application Support
  * - Linux: ~/.config
- * - Windows: %APPDATA%
+ * - Windows: %APPDATA% (Roaming, unified with backend)
  */
 const os = require('os');
 
-// Electron system files go to Caches
-const electronCacheDir = path.join(app.getPath('cache'), 'XIVTheCalamity');
-app.setPath('userData', electronCacheDir);
-
-// User config files go to Application Support (or .config on Linux)
+// User config files directory (unified location for all platforms)
 const userConfigDir = path.join(app.getPath('appData'), 'XIVTheCalamity');
 
 // Ensure user config directory exists
@@ -146,19 +142,19 @@ if (!fs.existsSync(userConfigDir)) {
   safeLog('[Main] Created user config directory:', userConfigDir);
 }
 
+// Set userData to same location as config (Electron will use this for session data, cache, etc.)
+app.setPath('userData', userConfigDir);
+
 /**
  * Create main window with Virtual Host for reCAPTCHA
  * Uses loadURL + baseURLForDataURL for HTTPS origin
  */
 function createWindow() {
-  mainWindow = new BrowserWindow({
+  // Platform-specific window configuration
+  const windowConfig = {
     width: 910,
     height: 682,
     resizable: false,
-    transparent: true,
-    titleBarStyle: 'hiddenInset',
-    backgroundColor: '#00000000',
-    vibrancy: 'dark',
     title: versionInfo.appName,
     autoHideMenuBar: !isMacOS, // Hide menu bar on Linux/Windows
     webPreferences: {
@@ -167,7 +163,28 @@ function createWindow() {
       contextIsolation: true,
       cache: true  // Always enable cache
     }
-  });
+  };
+
+  // macOS-specific styling
+  if (isMacOS) {
+    windowConfig.transparent = true;
+    windowConfig.titleBarStyle = 'hiddenInset';
+    windowConfig.backgroundColor = '#00000000';
+    windowConfig.vibrancy = 'dark';
+  } else if (isWindows) {
+    // Windows: Use standard frame with system title bar
+    // useContentSize: true means width/height refer to the content area (excluding title bar and frame)
+    // System will automatically add title bar height on top
+    windowConfig.frame = true;
+    windowConfig.useContentSize = true;
+    windowConfig.backgroundColor = '#1a1a1a';
+  } else {
+    // Linux: Already adjusted, use default height
+    windowConfig.frame = true;
+    windowConfig.backgroundColor = '#1a1a1a';
+  }
+
+  mainWindow = new BrowserWindow(windowConfig);
 
   // DISABLED: clearCache was deleting Application Support data
   // If you need to clear cache during development, do it manually:
@@ -183,14 +200,13 @@ function createWindow() {
     }
   });
   
-  // DevTools control - Disabled auto-open, can be manually opened with Cmd+Opt+I (macOS) or F12 (Linux)
-  // if (isDebugModeEnabled) {
-  //   mainWindow.webContents.openDevTools();
-  //   safeLog('[Main] DevTools opened (development mode)');
-  // }
+  // DevTools control - Commented out for production
+  // Uncomment to auto-open DevTools for debugging
+  // mainWindow.webContents.openDevTools();
+  // safeLog('[Main] DevTools opened');
   
   mainWindow.webContents.on('devtools-opened', () => {
-    // Allow DevTools to be manually opened if needed
+    // Allow DevTools to be manually opened if needed (F12 or right-click > Inspect)
   });
 
   // Close settings window when main window closes
@@ -229,24 +245,41 @@ function createSettingsWindow() {
   }
   
   safeLog('[Settings] Creating new settings window');
-  settingsWindowInstance = new BrowserWindow({
+  
+  // Platform-specific settings window configuration
+  const settingsConfig = {
     width: 800,
     height: 600,
     resizable: false,
     modal: true,
     parent: mainWindow,
-    transparent: true,
-    titleBarStyle: 'hiddenInset',
-    backgroundColor: '#00000000',
-    vibrancy: 'dark',
-    title: 'Settings - XIV The Calamity',
-    autoHideMenuBar: !isMacOS, // Hide menu bar on Linux/Windows
+    title: 'Settings - XIVTheCalamity',
+    autoHideMenuBar: !isMacOS,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true
     }
-  });
+  };
+  
+  // Apply platform-specific styling
+  if (isMacOS) {
+    settingsConfig.transparent = true;
+    settingsConfig.titleBarStyle = 'hiddenInset';
+    settingsConfig.backgroundColor = '#00000000';
+    settingsConfig.vibrancy = 'dark';
+  } else if (isWindows) {
+    // Windows: Use standard frame with system title bar
+    settingsConfig.frame = true;
+    settingsConfig.useContentSize = true; // Content area is 800x600, system adds title bar
+    settingsConfig.backgroundColor = '#1a1a1a';
+  } else {
+    // Linux: Already adjusted
+    settingsConfig.frame = true;
+    settingsConfig.backgroundColor = '#1a1a1a';
+  }
+  
+  settingsWindowInstance = new BrowserWindow(settingsConfig);
   
   // Center the window relative to parent window
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -354,15 +387,39 @@ function embedImageInCSS(css) {
  * Inline CSS and JavaScript into HTML
  */
 function inlineResources(html, css, js) {
-  return html
+  // Normalize line endings to handle both Unix (\n) and Windows (\r\n)
+  const stylePlaceholder = '<style>\n        /* CSS will be inlined here by main process */\n    </style>';
+  const scriptPlaceholder = '<script>\n        /* JavaScript will be inlined here by main process */\n    </script>';
+  
+  // Try Windows CRLF first, then Unix LF
+  let result = html
     .replace(
-      '<style>\n        /* CSS will be inlined here by main process */\n    </style>',
-      `<style>\n${css}\n    </style>`
+      stylePlaceholder.replace(/\n/g, '\r\n'),
+      `<style>\r\n${css}\r\n    </style>`
     )
     .replace(
-      '<script>\n        /* JavaScript will be inlined here by main process */\n    </script>',
-      `<script>\n${js}\n    </script>`
+      scriptPlaceholder.replace(/\n/g, '\r\n'),
+      `<script>\r\n${js}\r\n    </script>`
     );
+  
+  // If Windows replacement didn't work, try Unix
+  if (result.includes('/* CSS will be inlined here by main process */')) {
+    result = result
+      .replace(
+        stylePlaceholder,
+        `<style>\n${css}\n    </style>`
+      )
+      .replace(
+        scriptPlaceholder,
+        `<script>\n${js}\n    </script>`
+      );
+  }
+  
+  // Inject platform-specific CSS class to body
+  const platformClass = isMacOS ? 'platform-darwin' : (isWindows ? 'platform-windows' : 'platform-linux');
+  result = result.replace(/<body([^>]*)>/, `<body$1 class="${platformClass}">`);
+  
+  return result;
 }
 
 /**
@@ -374,13 +431,42 @@ function loadLoginPageWithVirtualHost(window) {
     safeLog('[Main] Loading login page with Virtual Host');
     
     const basePath = path.join(__dirname, '../renderer/pages/login');
-    const html = fs.readFileSync(path.join(basePath, 'index.html'), 'utf8');
-    const css = fs.readFileSync(path.join(basePath, 'style.css'), 'utf8');
+    safeLog('[Main] Base path:', basePath);
+    
+    const htmlPath = path.join(basePath, 'index.html');
+    const cssPath = path.join(basePath, 'style.css');
+    
+    safeLog('[Main] HTML path:', htmlPath);
+    safeLog('[Main] CSS path:', cssPath);
+    safeLog('[Main] HTML exists:', fs.existsSync(htmlPath));
+    safeLog('[Main] CSS exists:', fs.existsSync(cssPath));
+    
+    const html = fs.readFileSync(htmlPath, 'utf8');
+    const css = fs.readFileSync(cssPath, 'utf8');
+    
+    safeLog('[Main] HTML length:', html.length);
+    safeLog('[Main] CSS length:', css.length);
     
     const jsFiles = loadJavaScriptFiles();
     const combinedJs = combineJavaScriptModules(jsFiles);
+    safeLog('[Main] Combined JS length:', combinedJs.length);
+    
     const processedCSS = embedImageInCSS(css);
+    safeLog('[Main] Processed CSS length:', processedCSS.length);
+    
     const finalHTML = inlineResources(html, processedCSS, combinedJs);
+    safeLog('[Main] Final HTML length:', finalHTML.length);
+    
+    // Check if replacement actually happened
+    const hasStylePlaceholder = html.includes('/* CSS will be inlined here by main process */');
+    const hasJsPlaceholder = html.includes('/* JavaScript will be inlined here by main process */');
+    const hasStyleInFinal = finalHTML.includes('/* CSS will be inlined here by main process */');
+    const hasJsInFinal = finalHTML.includes('/* JavaScript will be inlined here by main process */');
+    
+    safeLog('[Main] Original has style placeholder:', hasStylePlaceholder);
+    safeLog('[Main] Original has JS placeholder:', hasJsPlaceholder);
+    safeLog('[Main] Final still has style placeholder:', hasStyleInFinal);
+    safeLog('[Main] Final still has JS placeholder:', hasJsInFinal);
     
     const baseURL = 'https://user.ffxiv.com.tw/';
     const dataURL = `data:text/html;charset=utf-8,${encodeURIComponent(finalHTML)}`;
@@ -406,24 +492,29 @@ const BACKEND_URL = `http://localhost:${BACKEND_PORT}`;
 function getBackendExecutable() {
   // Determine runtime identifier based on platform
   let rid;
+  let exeName = 'XIVTheCalamity.Api.NativeAOT';
+  
   if (process.platform === 'darwin') {
     rid = process.arch === 'arm64' ? 'osx-arm64' : 'osx-x64';
   } else if (process.platform === 'linux') {
     rid = 'linux-x64';
+  } else if (process.platform === 'win32') {
+    rid = 'win-x64';
+    exeName = 'XIVTheCalamity.Api.NativeAOT.exe';
   } else {
     log.error('[Backend] Unsupported platform:', process.platform);
     return null;
   }
   
   // Development: NativeAOT published executable
-  const nativeAotDevPath = path.join(__dirname, '..', '..', '..', 'backend', 'src', 'XIVTheCalamity.Api.NativeAOT', 'bin', 'Release', 'net9.0', rid, 'publish', 'XIVTheCalamity.Api.NativeAOT');
+  const nativeAotDevPath = path.join(__dirname, '..', '..', '..', 'backend', 'src', 'XIVTheCalamity.Api.NativeAOT', 'bin', 'Release', 'net9.0', rid, 'publish', exeName);
   if (fs.existsSync(nativeAotDevPath)) {
     log.info('[Backend] Using NativeAOT backend:', nativeAotDevPath);
     return nativeAotDevPath;
   }
   
   // Bundle: XIVTheCalamity.app/Contents/Resources/backend/XIVTheCalamity.Api.NativeAOT
-  const bundlePath = path.join(process.resourcesPath, 'backend', 'XIVTheCalamity.Api.NativeAOT');
+  const bundlePath = path.join(process.resourcesPath, 'backend', exeName);
   if (fs.existsSync(bundlePath)) {
     log.info('[Backend] Using bundled NativeAOT backend:', bundlePath);
     return bundlePath;
@@ -911,7 +1002,7 @@ ipcMain.handle('dialog:show-message-box', async (event, options) => {
   
   return await dialog.showMessageBox(focusedWindow, {
     type: options.type || 'info',
-    title: options.title || 'XIV The Calamity',
+    title: options.title || 'XIVTheCalamity',
     message: options.message || '',
     buttons: options.buttons || ['OK']
   });
