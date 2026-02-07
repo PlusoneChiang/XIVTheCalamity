@@ -404,8 +404,19 @@ const BACKEND_URL = `http://localhost:${BACKEND_PORT}`;
  * Find the backend executable
  */
 function getBackendExecutable() {
+  // Determine runtime identifier based on platform
+  let rid;
+  if (process.platform === 'darwin') {
+    rid = process.arch === 'arm64' ? 'osx-arm64' : 'osx-x64';
+  } else if (process.platform === 'linux') {
+    rid = 'linux-x64';
+  } else {
+    log.error('[Backend] Unsupported platform:', process.platform);
+    return null;
+  }
+  
   // Development: NativeAOT published executable
-  const nativeAotDevPath = path.join(__dirname, '..', '..', '..', 'backend', 'src', 'XIVTheCalamity.Api.NativeAOT', 'bin', 'Release', 'net9.0', 'osx-arm64', 'publish', 'XIVTheCalamity.Api.NativeAOT');
+  const nativeAotDevPath = path.join(__dirname, '..', '..', '..', 'backend', 'src', 'XIVTheCalamity.Api.NativeAOT', 'bin', 'Release', 'net9.0', rid, 'publish', 'XIVTheCalamity.Api.NativeAOT');
   if (fs.existsSync(nativeAotDevPath)) {
     log.info('[Backend] Using NativeAOT backend:', nativeAotDevPath);
     return nativeAotDevPath;

@@ -61,18 +61,15 @@ fi
 
 # ================== Compile Backend ==================
 echo ""
-echo "🔨 Compiling backend (linux-x64, self-contained)..."
+echo "🔨 Compiling backend (NativeAOT linux-x64)..."
 
 cd "$BACKEND_DIR"
 
-dotnet publish src/XIVTheCalamity.Api/XIVTheCalamity.Api.csproj \
+dotnet publish src/XIVTheCalamity.Api.NativeAOT/XIVTheCalamity.Api.NativeAOT.csproj \
   -c Release \
   -r linux-x64 \
   --self-contained true \
-  -p:PublishSingleFile=true \
-  -p:IncludeNativeLibrariesForSelfExtract=true \
-  -o "$RELEASE_DIR/temp-backend-linux" \
-  > /dev/null 2>&1
+  -o "$RELEASE_DIR/temp-backend-linux"
 
 if [ $? -eq 0 ]; then
   echo "   ✅ Backend compiled successfully"
@@ -87,23 +84,19 @@ echo "📝 Updating package.json configuration..."
 
 cd "$FRONTEND_DIR"
 
-# Read version from version.json (primary source)
-VERSION=$(node -e "console.log(require('./src/renderer/version.json').version)")
+# Read version from package.json
+VERSION=$(node -e "console.log(require('./package.json').version)")
 echo "   📦 Current version: $VERSION"
 
 node -e "
 const fs = require('fs');
 const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 
-// Read version from version.json
-const versionInfo = JSON.parse(fs.readFileSync('src/renderer/version.json', 'utf8'));
-pkg.version = versionInfo.version;
-
 // Update extraResources
 pkg.build.extraResources = [
   {
-    from: '../Release/temp-backend-linux/XIVTheCalamity.Api',
-    to: 'backend/XIVTheCalamity.Api'
+    from: '../Release/temp-backend-linux/XIVTheCalamity.Api.NativeAOT',
+    to: 'backend/XIVTheCalamity.Api.NativeAOT'
   }
 ];
 
@@ -116,7 +109,7 @@ if (!pkg.build.linux) {
 }
 
 fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-console.log('   ✅ package.json synced with version.json');
+console.log('   ✅ package.json updated');
 "
 
 # ================== Install Frontend Dependencies ==================

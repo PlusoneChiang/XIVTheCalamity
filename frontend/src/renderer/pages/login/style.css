@@ -85,9 +85,9 @@ html {
     font-size: 16px;
     font-weight: 400;
     line-height: 28px;
-    background: rgba(220, 38, 38, 0.3);  /* 红色透明背景 */
-    color: rgba(255, 255, 255, 0.9);
-    border: 1px solid rgba(220, 38, 38, 0.5);
+    background: rgba(220, 38, 38, 0.15);  /* 红色透明背景 - 玻璃质感 */
+    color: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.3);  /* 白色边框 - 玻璃边缘 */
     border-radius: 15px;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -104,17 +104,18 @@ html {
 }
 
 .close-btn:hover {
-    background: rgba(239, 68, 68, 0.5);  /* hover 时更亮的红色 */
+    background: rgba(239, 68, 68, 0.3);  /* hover 时更亮的红色 */
     color: rgba(255, 255, 255, 1);
-    border: 1px solid rgba(239, 68, 68, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.5);  /* 白色边框更明显 */
     box-shadow: 
-        0 6px 16px rgba(220, 38, 38, 0.4),
-        inset 0 1px 1px rgba(255, 255, 255, 0.2);
+        0 6px 16px rgba(220, 38, 38, 0.3),
+        inset 0 1px 1px rgba(255, 255, 255, 0.3);
     transform: scale(1.05);
 }
 
 .close-btn:active {
-    background: rgba(185, 28, 28, 0.6);
+    background: rgba(185, 28, 28, 0.25);  /* 按下时深红色 */
+    border: 1px solid rgba(255, 255, 255, 0.4);
     transform: scale(0.95);
 }
 

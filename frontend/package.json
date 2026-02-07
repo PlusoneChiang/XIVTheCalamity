@@ -1,6 +1,6 @@
 {
   "name": "xivthecalamity",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "Final Fantasy XIV Cross-Platform Launcher",
   "main": "src/main/index.js",
   "scripts": {
@@ -100,7 +100,13 @@
           ]
         }
       ]
-    }
+    },
+    "extraResources": [
+      {
+        "from": "../Release/temp-backend-linux/XIVTheCalamity.Api.NativeAOT",
+        "to": "backend/XIVTheCalamity.Api.NativeAOT"
+      }
+    ]
   },
   "keywords": [
     "ff14",

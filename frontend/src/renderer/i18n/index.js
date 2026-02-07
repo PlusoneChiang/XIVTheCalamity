@@ -47,9 +47,33 @@ const translations = {
     'progress.wine_ready': 'Wine 已就緒',
     'progress.wine_downloaded': 'Wine 下載完成',
     'progress.initializing_prefix': '初始化 Wine Prefix',
+    'progress.init_wine_prefix': '初始化 Wine Prefix',
     'progress.prefix_initialized': 'Wine Prefix 已就緒',
+    'progress.installing_dlls': '安裝 DXVK 動態庫',
+    'progress.environment_ready': '環境已就緒',
     'progress.complete': '環境初始化完成',
     'progress.skip_windows': 'Windows 平台無需初始化',
+    'progress.already_initialized': '環境已初始化',
+    'progress.detecting_distro': '偵測作業系統版本',
+    
+    // Update & Patch Progress
+    'progress.checking_updates': '檢查遊戲更新',
+    'progress.up_to_date': '遊戲已是最新版本',
+    'progress.downloading_patches': '下載更新檔',
+    'progress.download_started': '開始下載',
+    'progress.downloading': '下載中',
+    'progress.download_complete': '下載完成',
+    'progress.installing': '安裝中',
+    'progress.installing_graphics': '安裝圖形驅動',
+    'progress.all_complete': '全部完成',
+    'progress.download_error': '下載錯誤',
+    'progress.install_error': '安裝錯誤',
+    'progress.check_failed': '檢查失敗',
+    
+    // Error Messages
+    'error.wine_download_failed': 'Wine 下載失敗',
+    'error.init_failed': '初始化失敗',
+    'error.download_failed': '下載失敗',
     
     // Update
     'update.checking': '檢查更新中...',
@@ -395,9 +419,33 @@ const translations = {
     'progress.wine_ready': 'Wine is ready',
     'progress.wine_downloaded': 'Wine download complete',
     'progress.initializing_prefix': 'Initializing Wine Prefix',
+    'progress.init_wine_prefix': 'Initializing Wine Prefix',
     'progress.prefix_initialized': 'Wine Prefix is ready',
+    'progress.installing_dlls': 'Installing DXVK libraries',
+    'progress.environment_ready': 'Environment is ready',
     'progress.complete': 'Environment initialization complete',
     'progress.skip_windows': 'Windows platform requires no initialization',
+    'progress.already_initialized': 'Environment already initialized',
+    'progress.detecting_distro': 'Detecting operating system',
+    
+    // Update & Patch Progress
+    'progress.checking_updates': 'Checking for game updates',
+    'progress.up_to_date': 'Game is up to date',
+    'progress.downloading_patches': 'Downloading patches',
+    'progress.download_started': 'Download started',
+    'progress.downloading': 'Downloading',
+    'progress.download_complete': 'Download complete',
+    'progress.installing': 'Installing',
+    'progress.installing_graphics': 'Installing graphics drivers',
+    'progress.all_complete': 'All complete',
+    'progress.download_error': 'Download error',
+    'progress.install_error': 'Installation error',
+    'progress.check_failed': 'Check failed',
+    
+    // Error Messages
+    'error.wine_download_failed': 'Wine download failed',
+    'error.init_failed': 'Initialization failed',
+    'error.download_failed': 'Download failed',
     
     // Update
     'update.checking': 'Checking for updates...',

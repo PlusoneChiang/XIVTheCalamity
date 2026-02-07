@@ -68,6 +68,9 @@ try
         builder.Services.AddSingleton<XIVTheCalamity.Platform.IEnvironmentService, 
             XIVTheCalamity.Platform.Linux.Wine.WineXIVEnvironmentService>();
         builder.Services.AddSingleton<XIVTheCalamity.Platform.Linux.Wine.WineXIVDownloadService>();
+        // Add Wine services for Linux (using macOS implementation as it's cross-platform)
+        builder.Services.AddSingleton<WinePrefixService>();
+        builder.Services.AddSingleton<WineConfigService>();
     }
 
     // Configure HttpClient for TcAuthService
