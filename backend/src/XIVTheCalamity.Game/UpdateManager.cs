@@ -100,13 +100,13 @@ public class UpdateManager
     /// <summary>
     /// Check and install updates with progress reporting via IAsyncEnumerable
     /// Yields progress events for download, install, and cleanup phases
-    /// New flow: Download one → Install one → Delete one (saves disk space)
+    /// Iteratively checks for updates until no more updates are available
     /// </summary>
     public async IAsyncEnumerable<PatchProgressEvent> CheckAndInstallUpdatesAsync(
         string gamePath,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("=== Starting update check and install ===");
+        _logger.LogInformation("=== Starting iterative update check and install ===");
 
         // Yield initial progress immediately to keep SSE connection alive
         yield return new PatchProgressEvent
@@ -124,65 +124,85 @@ public class UpdateManager
             Directory.CreateDirectory(patchDownloadPath);
         }
 
-        // Check for updates
-        var checkResult = await CheckUpdatesAsync(gamePath, cancellationToken);
-        
-        if (!checkResult.NeedsUpdate)
-        {
-            yield return new PatchProgressEvent
-            {
-                Stage = "up_to_date",
-                MessageKey = "progress.up_to_date",
-                Phase = "checking",
-                IsComplete = true,
-                Percentage = 100
-            };
-            yield break;
-        }
+        // Track if we've successfully processed any patches
+        var hasProcessedPatches = false;
 
-        if (checkResult.RequiredPatches == null || checkResult.RequiredPatches.Count == 0)
+        // Iteratively check and install updates until no more updates are available
+        while (true)
         {
-            yield return new PatchProgressEvent
-            {
-                Stage = "error",
-                MessageKey = "progress.check_failed",
-                Phase = "checking",
-                HasError = true,
-                ErrorMessage = checkResult.ErrorMessage
-            };
-            yield break;
-        }
-
-        var requiredPatches = checkResult.RequiredPatches;
-        _logger.LogInformation("Found {Count} patches to process", requiredPatches.Count);
-
-        // New flow: Download → Install → Delete for each patch sequentially
-        await foreach (var progress in DownloadInstallAndCleanupPatchesAsync(
-            gamePath, requiredPatches, patchDownloadPath, cancellationToken))
-        {
-            yield return progress;
+            _logger.LogInformation("Checking for updates...");
             
-            // If error occurred, stop
-            if (progress.HasError)
+            // Check for updates
+            var checkResult = await CheckUpdatesAsync(gamePath, cancellationToken);
+            
+            // No more updates → exit loop
+            if (!checkResult.NeedsUpdate)
             {
+                _logger.LogInformation("No more updates available");
+                break;
+            }
+
+            // Check failed
+            if (checkResult.RequiredPatches == null || checkResult.RequiredPatches.Count == 0)
+            {
+                _logger.LogWarning("Update check failed: {Error}", checkResult.ErrorMessage);
+                
+                // Only report error if we haven't processed any patches yet
+                if (!hasProcessedPatches)
+                {
+                    yield return new PatchProgressEvent
+                    {
+                        Stage = "error",
+                        MessageKey = "progress.check_failed",
+                        Phase = "checking",
+                        HasError = true,
+                        ErrorMessage = checkResult.ErrorMessage
+                    };
+                }
                 yield break;
             }
+
+            var requiredPatches = checkResult.RequiredPatches;
+            _logger.LogInformation("Found {Count} patches to process", requiredPatches.Count);
+
+            // Download and install patches
+            await foreach (var progress in DownloadInstallAndCleanupPatchesAsync(
+                gamePath, requiredPatches, patchDownloadPath, cancellationToken))
+            {
+                // Filter out intermediate completion events - only show final completion
+                if (progress.Stage == "all_complete" && progress.IsComplete)
+                {
+                    _logger.LogDebug("Skipping intermediate completion event");
+                    continue;
+                }
+                
+                yield return progress;
+                
+                // If error occurred, stop
+                if (progress.HasError)
+                {
+                    yield break;
+                }
+            }
+
+            hasProcessedPatches = true;
+            _logger.LogInformation("Patches processed successfully");
+            
+            // Delay between rounds to avoid excessive API calls
+            await Task.Delay(1000, cancellationToken);
         }
 
-        // Final completion
+        // Final completion - only sent when no more updates are available
         yield return new PatchProgressEvent
         {
             Stage = "all_complete",
             MessageKey = "progress.all_complete",
             Phase = "complete",
-            TotalPatches = requiredPatches.Count,
-            CompletedPatches = requiredPatches.Count,
-            InstalledPatches = requiredPatches.Count,
             IsComplete = true,
             Percentage = 100
         };
 
-        _logger.LogInformation("=== Update completed successfully ===");
+        _logger.LogInformation("=== Update process completed ===");
     }
 
     /// <summary>
