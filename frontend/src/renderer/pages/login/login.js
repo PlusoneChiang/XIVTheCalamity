@@ -715,6 +715,15 @@ function startEnvironmentInitialization() {
       settingsBtn.disabled = false;
     }
     console.log('[ENV-INIT] ========== Initialization skipped (Windows) ==========');
+    
+    // Start game update check for Windows (same as non-Windows after env init)
+    console.log('[ENV-INIT] Starting game update check for Windows...');
+    setTimeout(() => {
+      startBackgroundUpdate().catch(err => {
+        console.error('[ENV-INIT] Failed to start update check:', err);
+      });
+    }, 1000); // Wait 1 second before starting update check
+    
     return;
   }
   
