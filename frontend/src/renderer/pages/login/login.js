@@ -19,6 +19,10 @@ const SITE_KEY = "6Ld6VmorAAAAANQdQeqkaOeScR42qHC7Hyalq00r";
 let currentState = 'idle';
 let appVersionText = 'XIV The Calamity';  // Will be updated by loadVersion()
 
+// Session & remain countdown timers
+let sessionTimerId = null;
+let remainTimerId = null;
+
 /**
  * Initialize the login page
  */
@@ -43,6 +47,8 @@ function init() {
   localStorage.removeItem('sessionId');
   localStorage.removeItem('subscriptionType');
   localStorage.removeItem('remain');
+  localStorage.removeItem('sessionObtainedAt');
+  clearCountdownTimers('all');
   console.log('[Login] Cleared previous session, ready for login');
   
   // Bind event listeners
@@ -392,8 +398,12 @@ function validateLoginForm() {
 function handleRelogin() {
   console.log('[Login] Re-login requested');
   
+  // Clear countdown timers
+  clearCountdownTimers('all');
+  
   // Clear session ID
   localStorage.removeItem('sessionId');
+  localStorage.removeItem('sessionObtainedAt');
   
   // 重置登入狀態
   setLoggedIn(false);
@@ -611,36 +621,116 @@ function setLoginState(state, sessionId = null, subscriptionType = null, remain 
 }
 
 /**
- * Update subscription information display
+ * Update subscription information display with live countdowns
  */
 function updateSubscriptionInfo(subscriptionType, remainSeconds) {
   const subTypeText = subscriptionType === 1 ? i18n.t('login.sub_crystal') : 
                       subscriptionType === 2 ? i18n.t('login.sub_credit') : 
                       i18n.t('login.sub_unknown');
   
-  // Convert seconds to days and hours (ignore minutes)
-  const days = Math.floor(remainSeconds / 86400);
-  const hours = Math.floor((remainSeconds % 86400) / 3600);
-  
-  let timeText = '';
-  if (days > 0) {
-    timeText += `${days} ${i18n.t('login.days')}`;
-  }
-  if (hours > 0) {
-    if (timeText) timeText += ' ';
-    timeText += `${hours} ${i18n.t('login.hours')}`;
-  }
-  if (!timeText) {
-    timeText = i18n.t('login.time_less_1h');
-  }
-  
   const sessionInfo = document.getElementById('sessionInfo');
   sessionInfo.innerHTML = `
     <div style="text-align: left; line-height: 1.8;">
       <div>${i18n.t('login.sub_type')}<strong>${subTypeText}</strong></div>
-      <div>${i18n.t('login.remain_time')}<strong>${timeText}</strong></div>
+      <div>${i18n.t('login.remain_time')}<strong id="remainCountdown"></strong></div>
+      <div>${i18n.t('login.session_time')}<strong id="sessionCountdown"></strong></div>
     </div>
+    <div id="sessionWarning" style="display: none;"></div>
   `;
+  
+  // Start remain countdown (subscription time)
+  startRemainCountdown(remainSeconds);
+  
+  // Start session countdown (3-hour session TTL)
+  startSessionCountdown();
+}
+
+/**
+ * Format seconds into a human-readable time string (days, hours, minutes, seconds)
+ */
+function formatCountdown(totalSeconds) {
+  if (totalSeconds <= 0) return i18n.t('login.time_less_1h');
+  
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  
+  let parts = [];
+  if (days > 0) parts.push(`${days} ${i18n.t('login.days')}`);
+  if (hours > 0) parts.push(`${hours} ${i18n.t('login.hours')}`);
+  if (minutes > 0) parts.push(`${minutes} ${i18n.t('login.minutes')}`);
+  if (seconds > 0 || parts.length === 0) parts.push(`${seconds} ${i18n.t('login.seconds')}`);
+  
+  return parts.join(' ');
+}
+
+/**
+ * Start remain countdown timer (subscription remaining time, precise to seconds)
+ */
+function startRemainCountdown(remainSeconds) {
+  clearCountdownTimers('remain');
+  
+  const expireTime = Date.now() + remainSeconds * 1000;
+  
+  function updateRemain() {
+    const el = document.getElementById('remainCountdown');
+    if (!el) { clearCountdownTimers('remain'); return; }
+    
+    const remaining = Math.max(0, Math.floor((expireTime - Date.now()) / 1000));
+    el.textContent = formatCountdown(remaining);
+  }
+  
+  updateRemain();
+  remainTimerId = setInterval(updateRemain, 1000);
+}
+
+/**
+ * Start session elapsed timer (shows how long since sessionId was obtained)
+ * Warns user to re-login after 3 hours
+ */
+const SESSION_TTL_SECONDS = 3 * 60 * 60; // 3 hours
+
+function startSessionCountdown() {
+  clearCountdownTimers('session');
+  
+  const sessionObtainedAt = Date.now();
+  localStorage.setItem('sessionObtainedAt', sessionObtainedAt.toString());
+  let warned = false;
+  
+  function updateSession() {
+    const el = document.getElementById('sessionCountdown');
+    const warningEl = document.getElementById('sessionWarning');
+    if (!el) { clearCountdownTimers('session'); return; }
+    
+    const elapsed = Math.floor((Date.now() - sessionObtainedAt) / 1000);
+    el.textContent = formatCountdown(elapsed);
+    
+    // Warning when session exceeds 3 hours
+    if (elapsed >= SESSION_TTL_SECONDS && !warned) {
+      warned = true;
+      el.style.color = '#ef4444';
+      if (warningEl) {
+        warningEl.style.display = 'block';
+        warningEl.textContent = i18n.t('login.session_expired_warning');
+      }
+    }
+  }
+  
+  updateSession();
+  sessionTimerId = setInterval(updateSession, 1000);
+}
+
+/**
+ * Clear countdown timers
+ */
+function clearCountdownTimers(type) {
+  if (type === 'remain' || type === 'all') {
+    if (remainTimerId) { clearInterval(remainTimerId); remainTimerId = null; }
+  }
+  if (type === 'session' || type === 'all') {
+    if (sessionTimerId) { clearInterval(sessionTimerId); sessionTimerId = null; }
+  }
 }
 
 /**
