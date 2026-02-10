@@ -703,6 +703,17 @@ body {
     word-break: break-all;
 }
 
+#sessionWarning {
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+    color: #fbbf24;
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 6px;
+    text-align: center;
+}
+
 .button-group {
     display: flex;
     flex-direction: column;
