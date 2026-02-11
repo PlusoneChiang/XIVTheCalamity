@@ -60,7 +60,7 @@ public class DalamudPathService
     public string InjectorPath => Path.Combine(HooksDevPath, "Dalamud.Injector.exe");
     
     /// <summary>Dalamud config file path</summary>
-    public string DalamudConfigPath => Path.Combine(ConfigPath, "dalamud.json");
+    public string DalamudConfigPath => Path.Combine(ConfigPath, "dalamudConfig.json");
     
     /// <summary>Dalamud Log directory (stored in application logs/Dalamud directory)</summary>
     public string LogPath

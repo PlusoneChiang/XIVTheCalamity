@@ -63,6 +63,10 @@ public class DalamudInjectorService
             var injectorEnv = new Dictionary<string, string>(environment);
             AddDalamudEnvironment(injectorEnv, winePath);
             
+            // Ensure Wine %APPDATA%/XIVLauncherTC symlink points to our Config directory
+            // Dalamud hardcodes %APPDATA%/XIVLauncherTC for safe mode, log commands, etc.
+            EnsureWineAppDataSymlink(injectorEnv);
+            
             // Wait for game process (using winedbg)
             var gamePid = await WaitForGameProcessAsync(winePath, injectorEnv, cancellationToken);
             if (gamePid == null)
@@ -263,6 +267,87 @@ public class DalamudInjectorService
     }
     
     /// <summary>
+    /// Ensure Wine %APPDATA%/XIVLauncherTC is a symlink pointing to our Dalamud Config directory.
+    /// Dalamud hardcodes paths like %APPDATA%/XIVLauncherTC/.dalamud_safemode and
+    /// %APPDATA%/XIVLauncherTC/dalamud.log internally. This symlink ensures those
+    /// accesses resolve to the same directory used by --dalamud-configuration-path.
+    /// </summary>
+    private void EnsureWineAppDataSymlink(Dictionary<string, string> environment)
+    {
+        try
+        {
+            if (!environment.TryGetValue("WINEPREFIX", out var winePrefix) || string.IsNullOrEmpty(winePrefix))
+            {
+                _logger.LogWarning("[DALAMUD-INJECT] WINEPREFIX not set, skipping AppData symlink");
+                return;
+            }
+            
+            // Wine maps %APPDATA% to drive_c/users/{username}/AppData/Roaming
+            var username = Environment.UserName;
+            var appDataRoaming = Path.Combine(winePrefix, "drive_c", "users", username, "AppData", "Roaming");
+            var xivLauncherTCPath = Path.Combine(appDataRoaming, "XIVLauncherTC");
+            var targetConfigDir = _pathService.ConfigPath;
+            
+            // Ensure the config directory exists
+            Directory.CreateDirectory(targetConfigDir);
+            
+            // Check current state
+            var linkInfo = new FileInfo(xivLauncherTCPath);
+            if (linkInfo.Exists || Directory.Exists(xivLauncherTCPath))
+            {
+                // If it's already a symlink pointing to our config dir, we're done
+                if (linkInfo.Attributes.HasFlag(FileAttributes.ReparsePoint))
+                {
+                    var currentTarget = Path.GetFullPath(Directory.ResolveLinkTarget(xivLauncherTCPath, true)?.FullName ?? "");
+                    var expectedTarget = Path.GetFullPath(targetConfigDir);
+                    if (currentTarget == expectedTarget)
+                    {
+                        _logger.LogDebug("[DALAMUD-INJECT] AppData symlink already correct: {Link} -> {Target}", xivLauncherTCPath, targetConfigDir);
+                        return;
+                    }
+                    
+                    // Symlink points elsewhere, remove and recreate
+                    _logger.LogInformation("[DALAMUD-INJECT] Updating AppData symlink target from {Old} to {New}", currentTarget, expectedTarget);
+                    Directory.Delete(xivLauncherTCPath);
+                }
+                else
+                {
+                    // It's a real directory — move its contents to our config dir, then replace with symlink
+                    _logger.LogInformation("[DALAMUD-INJECT] Migrating existing XIVLauncherTC directory to config path");
+                    foreach (var file in Directory.GetFiles(xivLauncherTCPath))
+                    {
+                        var destFile = Path.Combine(targetConfigDir, Path.GetFileName(file));
+                        if (!File.Exists(destFile))
+                        {
+                            File.Move(file, destFile);
+                        }
+                    }
+                    foreach (var dir in Directory.GetDirectories(xivLauncherTCPath))
+                    {
+                        var destDir = Path.Combine(targetConfigDir, Path.GetFileName(dir));
+                        if (!Directory.Exists(destDir))
+                        {
+                            Directory.Move(dir, destDir);
+                        }
+                    }
+                    Directory.Delete(xivLauncherTCPath, true);
+                }
+            }
+            
+            // Ensure parent directory exists
+            Directory.CreateDirectory(appDataRoaming);
+            
+            // Create symlink: XIVLauncherTC -> our Config directory
+            Directory.CreateSymbolicLink(xivLauncherTCPath, targetConfigDir);
+            _logger.LogInformation("[DALAMUD-INJECT] Created AppData symlink: {Link} -> {Target}", xivLauncherTCPath, targetConfigDir);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[DALAMUD-INJECT] Failed to create AppData symlink (non-fatal)");
+        }
+    }
+    
+    /// <summary>
     /// Build injector arguments
     /// </summary>
     private string BuildInjectorArguments(int gamePid, DalamudInjectionOptions options)
@@ -276,9 +361,9 @@ public class DalamudInjectorService
         var workingDir = ConvertToWinePath(_pathService.HooksDevPath);
         sb.Append($" --dalamud-working-directory=\"{workingDir}\"");
         
-        // Configuration directory
-        var configDir = ConvertToWinePath(_pathService.ConfigPath);
-        sb.Append($" --dalamud-configuration-path=\"{configDir}\"");
+        // Configuration file path (Dalamud expects a file path, not a directory)
+        var configFile = ConvertToWinePath(_pathService.DalamudConfigPath);
+        sb.Append($" --dalamud-configuration-path=\"{configFile}\"");
         
         // Log directory
         var logDir = ConvertToWinePath(_pathService.LogPath);
