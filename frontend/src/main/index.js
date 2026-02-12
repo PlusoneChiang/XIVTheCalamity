@@ -142,8 +142,8 @@ if (!fs.existsSync(userConfigDir)) {
   safeLog('[Main] Created user config directory:', userConfigDir);
 }
 
-// Set userData to same location as config (Electron will use this for session data, cache, etc.)
-app.setPath('userData', userConfigDir);
+// Set userData to a subdirectory so Electron/Chromium cache files don't clutter the app data root
+app.setPath('userData', path.join(userConfigDir, 'electron'));
 
 /**
  * Create main window with Virtual Host for reCAPTCHA
