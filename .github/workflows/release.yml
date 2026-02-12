@@ -252,6 +252,19 @@ jobs:
           > - `*.yml` — 自動更新元資料（`latest-mac.yml`、`latest-linux.yml`、`latest.yml`）
           > - `*.zip` — macOS 自動更新差異包
           > - `*.blockmap` — 差異更新索引檔
+          
+          ---
+          
+          ## 📂 資料路徑 / Data Paths
+          
+          啟動器資料存放於各平台的 `AppData` 目錄的 `XIVTheCalamity` 子目錄下，
+          遊戲設定檔（FFXIV.cfg 等）位於其中的 `ffxivConfig/` 子目錄中。
+          
+          | 平台 Platform | AppData 路徑 |
+          |---|---|
+          | **macOS** | `~/Library/Application Support/` |
+          | **Linux** | `~/.config/` |
+          | **Windows** | `%APPDATA%\` |
           GUIDE_EOF
           )
           

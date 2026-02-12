@@ -60,6 +60,10 @@ autoUpdater.on('error', (error) => {
 
 // IPC handlers
 ipcMain.handle('app:check-updates', async () => {
+  if (process.env.NODE_ENV === 'development' || process.argv.includes('--dev')) {
+    log.info('[Updater] Skipping update check in development mode');
+    return { success: true, skipped: true };
+  }
   try {
     const result = await autoUpdater.checkForUpdates();
     return { success: true, version: result?.updateInfo?.version };
@@ -91,20 +95,4 @@ function initUpdater(window) {
   mainWindow = window;
 }
 
-/**
- * Check for updates (called on app startup)
- */
-async function checkForUpdates() {
-  if (process.env.NODE_ENV === 'development' || process.argv.includes('--dev')) {
-    log.info('[Updater] Skipping update check in development mode');
-    return;
-  }
-
-  try {
-    await autoUpdater.checkForUpdates();
-  } catch (error) {
-    log.error('[Updater] Startup check failed:', error.message);
-  }
-}
-
-module.exports = { initUpdater, checkForUpdates };
+module.exports = { initUpdater };

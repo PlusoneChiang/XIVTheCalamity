@@ -126,14 +126,19 @@ public class GameLaunchService
                 .Append("SYS.resetConfig", "0")
                 .Append("DEV.SaveDataBankHost", "config-dl.ffxiv.com.tw");
             
-            // On macOS/Linux, set UserPath (game config directory)
+            // Set UserPath (game config directory) to keep configs under our app data
+            var ffxivConfigPath = GetFfxivConfigPath();
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) || 
                 RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
-                var ffxivConfigPath = GetFfxivConfigPath();
                 var wineUserPath = ConvertToWinePath(ffxivConfigPath);
                 argumentBuilder.Append("UserPath", wineUserPath);
                 _logger.LogInformation("[GAME] UserPath: {Path}", wineUserPath);
+            }
+            else
+            {
+                argumentBuilder.Append("UserPath", ffxivConfigPath);
+                _logger.LogInformation("[GAME] UserPath: {Path}", ffxivConfigPath);
             }
             
             // Taiwan server uses unencrypted arguments

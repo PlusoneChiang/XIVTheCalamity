@@ -5,7 +5,7 @@ const https = require('https');
 const http = require('http');
 const log = require('electron-log');
 const { spawn } = require('child_process');
-const { initUpdater, checkForUpdates } = require('./updater');
+const { initUpdater } = require('./updater');
 
 // Set application name FIRST to ensure correct case in directory names
 // Must be called before any app.getPath() calls
@@ -333,6 +333,7 @@ function loadJavaScriptFiles() {
     accountStorage: path.join(basePath, 'utils/accountStorage.js'),
     apiError: path.join(basePath, 'utils/apiError.js'),
     accountManagement: path.join(basePath, 'pages/login/accountManagement.js'),
+    appUpdater: path.join(basePath, 'pages/login/appUpdater.js'),
     updateManager: path.join(basePath, 'pages/login/updateManager.js'),
     dalamudManager: path.join(basePath, 'pages/login/dalamudManager.js'),
     login: path.join(basePath, 'pages/login/login.js')
@@ -365,6 +366,8 @@ function combineJavaScriptModules(jsFiles) {
     stripModuleSyntax(jsFiles.apiError),
     '// Account management UI',
     stripModuleSyntax(jsFiles.accountManagement),
+    '// App auto-updater',
+    stripModuleSyntax(jsFiles.appUpdater),
     '// Update manager',
     stripModuleSyntax(jsFiles.updateManager),
     '// Dalamud manager',
@@ -663,9 +666,8 @@ app.whenReady().then(async () => {
   
   createWindow();
 
-  // Initialize auto-updater (checks before environment initialization)
+  // Initialize auto-updater (renderer will trigger check via IPC when ready)
   initUpdater(mainWindow);
-  checkForUpdates();
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

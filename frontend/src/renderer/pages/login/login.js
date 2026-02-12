@@ -27,7 +27,7 @@ let remainTimerId = null;
 /**
  * Initialize the login page
  */
-function init() {
+async function init() {
   console.log('[Login] Initializing login page');
   
   if (!window.electronAPI) {
@@ -93,15 +93,20 @@ function init() {
     });
   }
   
-  // Initialize app auto-update (before environment initialization)
-  initAppUpdater();
+  // Check for launcher updates first (blocking)
+  // Subsequent steps wait until the check completes and the user responds
+  try {
+    await initAppUpdater();
+  } catch (err) {
+    console.error('[Login] Failed to check app updates:', err);
+  }
   
-  // Start environment initialization immediately on page load
+  // Check game directory setup before environment initialization
+  checkGameDirectorySetup();
+  
+  // Start environment initialization (Wine)
   console.log('[Login] Starting environment initialization...');
   startEnvironmentInitialization();
-  
-  // Check game directory setup
-  checkGameDirectorySetup();
   
   // Cleanup on page unload
   window.addEventListener('beforeunload', () => {
