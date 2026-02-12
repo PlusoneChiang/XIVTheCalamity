@@ -72,7 +72,8 @@ jobs:
           security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
           
           # Extract signing identity name for afterPack/afterSign hooks
-          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep "Developer ID" | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          # electron-builder requires name WITHOUT "Developer ID Application:" prefix
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep "Developer ID" | head -1 | sed 's/.*"Developer ID Application: \(.*\)".*/\1/')
           echo "CSC_NAME=$IDENTITY" >> $GITHUB_ENV
           echo "Signing identity: $IDENTITY"
 
