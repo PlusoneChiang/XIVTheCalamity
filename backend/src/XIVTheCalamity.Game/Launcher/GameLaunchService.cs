@@ -151,7 +151,7 @@ public class GameLaunchService
             // Launch based on platform
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                return await LaunchWindowsAsync(exePath, workingDir, arguments, cancellationToken);
+                return await LaunchWindowsAsync(exePath, workingDir, arguments, dalamudRuntimePath, cancellationToken);
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) || 
                      RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
@@ -262,6 +262,7 @@ public class GameLaunchService
         string exePath,
         string workingDir,
         string arguments,
+        string? dalamudRuntimePath,
         CancellationToken cancellationToken)
     {
         _logger.LogInformation("[GAME] Launching on Windows: {ExePath}", exePath);
@@ -274,6 +275,14 @@ public class GameLaunchService
             UseShellExecute = false,
             CreateNoWindow = false
         };
+        
+        // Set DALAMUD_RUNTIME so Dalamud.Boot can find .NET runtime inside the game process
+        if (!string.IsNullOrEmpty(dalamudRuntimePath))
+        {
+            startInfo.Environment["DALAMUD_RUNTIME"] = dalamudRuntimePath;
+            startInfo.Environment["DOTNET_ROOT"] = dalamudRuntimePath;
+            _logger.LogInformation("[GAME] Dalamud Runtime path: {Path}", dalamudRuntimePath);
+        }
         
         _gameProcess = Process.Start(startInfo);
         

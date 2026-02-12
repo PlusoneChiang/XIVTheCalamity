@@ -815,11 +815,38 @@ function startEnvironmentInitialization() {
     }
     console.log('[ENV-INIT] ========== Initialization skipped (Windows) ==========');
     
+    // Set Dalamud update complete callback (same as Mac/Linux)
+    setOnDalamudComplete(() => {
+      console.log('[ENV-INIT] Dalamud update complete, ensuring launch button is enabled');
+      const btn = document.getElementById('launchButton');
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = i18n.t('button.launch');
+      }
+    });
+    
+    // Set game update complete callback: trigger Dalamud update after game update
+    setOnUpdateComplete(() => {
+      console.log('[ENV-INIT] Game update complete, starting Dalamud update check...');
+      startDalamudUpdate().then(() => {
+        console.log('[ENV-INIT] Dalamud update complete');
+      }).catch(err => {
+        console.error('[ENV-INIT] Failed to start Dalamud update:', err);
+      });
+    });
+    
     // Start game update check for Windows (same as non-Windows after env init)
     console.log('[ENV-INIT] Starting game update check for Windows...');
     setTimeout(() => {
       startBackgroundUpdate().catch(err => {
         console.error('[ENV-INIT] Failed to start update check:', err);
+        // Even if game update fails, try Dalamud update
+        console.log('[ENV-INIT] Trying Dalamud update anyway...');
+        startDalamudUpdate().then(() => {
+          console.log('[ENV-INIT] Dalamud update complete (after game update failure)');
+        }).catch(dalamudErr => {
+          console.error('[ENV-INIT] Failed to start Dalamud update:', dalamudErr);
+        });
       });
     }, 1000); // Wait 1 second before starting update check
     

@@ -209,26 +209,6 @@ public static class GameEndpoints
     {
         try
         {
-            var emulatorDir = environmentService.GetEmulatorDirectory();
-            
-            string winePath;
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) || RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                winePath = Path.Combine(emulatorDir, "bin", "wine64");
-            }
-            else
-            {
-                throw new PlatformNotSupportedException("Wine is only supported on macOS and Linux");
-            }
-            
-            if (string.IsNullOrEmpty(emulatorDir) || !File.Exists(winePath))
-            {
-                logger.LogWarning("[GAME] Wine/Wine-XIV not available, cannot inject Dalamud");
-                return;
-            }
-            
-            var environment = environmentService.GetEnvironment();
-            
             var options = new DalamudInjectionOptions
             {
                 InjectionDelayMs = dalamudConfig.InjectDelay > 0 ? dalamudConfig.InjectDelay : null,
@@ -237,7 +217,35 @@ public static class GameEndpoints
                 NoThirdPartyPlugin = dalamudConfig.SafeMode
             };
             
-            var result = await dalamudInjector.InjectAsync(winePath, environment, options, cancellationToken);
+            DalamudInjectionResult result;
+            
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                // Windows: native injection (no Wine needed)
+                logger.LogInformation("[GAME] Using Windows native Dalamud injection");
+                result = await dalamudInjector.InjectNativeAsync(options, cancellationToken);
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) || RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                // macOS/Linux: Wine-based injection
+                var emulatorDir = environmentService.GetEmulatorDirectory();
+                var winePath = Path.Combine(emulatorDir, "bin", "wine64");
+                
+                if (string.IsNullOrEmpty(emulatorDir) || !File.Exists(winePath))
+                {
+                    logger.LogWarning("[GAME] Wine/Wine-XIV not available, cannot inject Dalamud");
+                    return;
+                }
+                
+                var environment = environmentService.GetEnvironment();
+                logger.LogInformation("[GAME] Using Wine Dalamud injection");
+                result = await dalamudInjector.InjectAsync(winePath, environment, options, cancellationToken);
+            }
+            else
+            {
+                logger.LogWarning("[GAME] Dalamud injection not supported on this platform");
+                return;
+            }
             
             if (result.Success)
             {

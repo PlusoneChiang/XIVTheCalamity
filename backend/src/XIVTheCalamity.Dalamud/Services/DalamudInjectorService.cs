@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using XIVTheCalamity.Core.Models;
@@ -8,6 +9,7 @@ namespace XIVTheCalamity.Dalamud.Services;
 /// <summary>
 /// Dalamud injection service
 /// Injects Dalamud into game process after game launch
+/// Supports both Wine-based injection (macOS/Linux) and native injection (Windows)
 /// </summary>
 public class DalamudInjectorService
 {
@@ -32,7 +34,7 @@ public class DalamudInjectorService
     }
     
     /// <summary>
-    /// Inject Dalamud into game process
+    /// Inject Dalamud into game process (Wine-based, for macOS/Linux)
     /// </summary>
     /// <param name="winePath">Wine executable path</param>
     /// <param name="environment">Wine environment variables</param>
@@ -46,7 +48,7 @@ public class DalamudInjectorService
     {
         try
         {
-            _logger.LogInformation("[DALAMUD-INJECT] Starting Dalamud injection...");
+            _logger.LogInformation("[DALAMUD-INJECT] Starting Dalamud injection (Wine)...");
             
             // Check if Dalamud is installed
             if (!File.Exists(_pathService.InjectorPath))
@@ -92,6 +94,81 @@ public class DalamudInjectorService
             
             // Execute injection
             var result = await ExecuteInjectorAsync(winePath, injectorArgs, injectorEnv, cancellationToken);
+            
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning("[DALAMUD-INJECT] Injection cancelled");
+            return new DalamudInjectionResult
+            {
+                Success = false,
+                ErrorMessage = "Injection cancelled"
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[DALAMUD-INJECT] Injection failed");
+            return new DalamudInjectionResult
+            {
+                Success = false,
+                ErrorMessage = ex.Message
+            };
+        }
+    }
+    
+    /// <summary>
+    /// Inject Dalamud into game process (native Windows, no Wine)
+    /// </summary>
+    /// <param name="options">Injection options</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    public async Task<DalamudInjectionResult> InjectNativeAsync(
+        DalamudInjectionOptions options,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogInformation("[DALAMUD-INJECT] Starting Dalamud injection (Windows native)...");
+            
+            // Check if Dalamud is installed
+            if (!File.Exists(_pathService.InjectorPath))
+            {
+                _logger.LogError("[DALAMUD-INJECT] Dalamud.Injector.exe not found at: {Path}", _pathService.InjectorPath);
+                return new DalamudInjectionResult
+                {
+                    Success = false,
+                    ErrorMessage = "Dalamud.Injector.exe not found. Please update Dalamud first."
+                };
+            }
+            
+            // Wait for game process (using .NET Process API)
+            var gamePid = await WaitForGameProcessWindowsAsync(cancellationToken);
+            if (gamePid == null)
+            {
+                _logger.LogError("[DALAMUD-INJECT] Failed to detect game process");
+                return new DalamudInjectionResult
+                {
+                    Success = false,
+                    ErrorMessage = "Failed to detect game process (ffxiv_dx11.exe)"
+                };
+            }
+            
+            _logger.LogInformation("[DALAMUD-INJECT] Game process detected with PID: {Pid}", gamePid);
+            
+            // Wait for injection delay
+            var delayMs = options.InjectionDelayMs ?? DefaultInjectionDelayMs;
+            _logger.LogInformation("[DALAMUD-INJECT] Waiting {Delay}ms before injection...", delayMs);
+            await Task.Delay(delayMs, cancellationToken);
+            
+            // Build injector arguments (Windows native paths, no Wine conversion)
+            var injectorArgs = BuildInjectorArgumentsWindows(gamePid.Value, options);
+            _logger.LogInformation("[DALAMUD-INJECT] Injector arguments: {Args}", injectorArgs);
+            
+            // Build environment variables
+            var injectorEnv = BuildInjectorEnvironmentWindows();
+            
+            // Execute injection (directly, no Wine)
+            var result = await ExecuteInjectorWindowsAsync(injectorArgs, injectorEnv, cancellationToken);
             
             return result;
         }
@@ -589,11 +666,213 @@ public class DalamudInjectorService
             };
         }
     }
+    
+    #region Windows Native Injection
+    
+    /// <summary>
+    /// Wait for game process to appear (Windows native, using Process API)
+    /// </summary>
+    private async Task<int?> WaitForGameProcessWindowsAsync(CancellationToken ct)
+    {
+        _logger.LogInformation("[DALAMUD-INJECT] Waiting for game process (Windows native)...");
+        
+        for (int i = 0; i < ProcessDetectionMaxRetries; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+            
+            var processes = Process.GetProcessesByName("ffxiv_dx11");
+            if (processes.Length > 0)
+            {
+                var gameProcess = processes[processes.Length - 1]; // newest
+                var pid = gameProcess.Id;
+                _logger.LogInformation("[DALAMUD-INJECT] Found {Count} ffxiv_dx11.exe process(es), using PID: {Pid}", 
+                    processes.Length, pid);
+                
+                // Dispose all process handles
+                foreach (var p in processes) p.Dispose();
+                
+                return pid;
+            }
+            
+            _logger.LogDebug("[DALAMUD-INJECT] Game process not found, retry {Attempt}/{Max}...", 
+                i + 1, ProcessDetectionMaxRetries);
+            await Task.Delay(ProcessDetectionRetryDelayMs, ct);
+        }
+        
+        return null;
+    }
+    
+    /// <summary>
+    /// Build injector arguments for Windows (native paths, no Wine conversion)
+    /// </summary>
+    private string BuildInjectorArgumentsWindows(int gamePid, DalamudInjectionOptions options)
+    {
+        var sb = new StringBuilder();
+        
+        sb.Append($"inject {gamePid}");
+        
+        sb.Append($" --dalamud-working-directory=\"{_pathService.HooksDevPath}\"");
+        sb.Append($" --dalamud-configuration-path=\"{_pathService.DalamudConfigPath}\"");
+        sb.Append($" --logpath=\"{_pathService.LogPath}\"");
+        sb.Append($" --dalamud-plugin-directory=\"{_pathService.PluginsPath}\"");
+        sb.Append($" --dalamud-asset-directory=\"{_pathService.AssetsDevPath}\"");
+        sb.Append($" --dalamud-client-language={ClientLanguageChinese}");
+        
+        var delayInit = options.DelayInitializeMs ?? DefaultInjectionDelayMs;
+        sb.Append($" --dalamud-delay-initialize={delayInit}");
+        
+        if (options.NoPlugin)
+        {
+            sb.Append(" --no-plugin");
+        }
+        if (options.NoThirdPartyPlugin)
+        {
+            sb.Append(" --no-3rd-plugin");
+        }
+        
+        return sb.ToString();
+    }
+    
+    /// <summary>
+    /// Build environment variables for Windows native injection
+    /// </summary>
+    private Dictionary<string, string> BuildInjectorEnvironmentWindows()
+    {
+        var env = new Dictionary<string, string>();
+        
+        var runtimePath = _pathService.RuntimePath;
+        env["DALAMUD_RUNTIME"] = runtimePath;
+        env["DOTNET_ROOT"] = runtimePath;
+        
+        _logger.LogInformation("[DALAMUD-INJECT] Windows environment: DALAMUD_RUNTIME={RuntimePath}", runtimePath);
+        
+        return env;
+    }
+    
+    /// <summary>
+    /// Execute Dalamud.Injector.exe directly on Windows (no Wine)
+    /// </summary>
+    private async Task<DalamudInjectionResult> ExecuteInjectorWindowsAsync(
+        string arguments,
+        Dictionary<string, string> environment,
+        CancellationToken ct)
+    {
+        var injectorPath = _pathService.InjectorPath;
+        
+        _logger.LogInformation("[DALAMUD-INJECT] Executing (Windows native): {Injector} {Args}", 
+            injectorPath, arguments);
+        
+        var psi = new ProcessStartInfo
+        {
+            FileName = injectorPath,
+            Arguments = arguments,
+            WorkingDirectory = Path.GetDirectoryName(injectorPath) ?? "",
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+        
+        // Set environment variables
+        foreach (var (key, value) in environment)
+        {
+            psi.Environment[key] = value;
+        }
+        
+        // Log relevant environment variables
+        _logger.LogDebug("[DALAMUD-INJECT] Environment variables:");
+        foreach (var (key, value) in environment)
+        {
+            _logger.LogDebug("[DALAMUD-INJECT]   {Key}={Value}", key, value);
+        }
+        
+        var stdout = new StringBuilder();
+        var stderr = new StringBuilder();
+        
+        using var process = Process.Start(psi);
+        if (process == null)
+        {
+            return new DalamudInjectionResult
+            {
+                Success = false,
+                ErrorMessage = "Failed to start Dalamud.Injector.exe"
+            };
+        }
+        
+        // Read output asynchronously
+        var stdoutTask = Task.Run(async () =>
+        {
+            while (!process.StandardOutput.EndOfStream)
+            {
+                var line = await process.StandardOutput.ReadLineAsync();
+                if (line != null)
+                {
+                    stdout.AppendLine(line);
+                    _logger.LogDebug("[DALAMUD-INJECT] stdout: {Line}", line);
+                }
+            }
+        }, ct);
+        
+        var stderrTask = Task.Run(async () =>
+        {
+            while (!process.StandardError.EndOfStream)
+            {
+                var line = await process.StandardError.ReadLineAsync();
+                if (line != null)
+                {
+                    stderr.AppendLine(line);
+                    _logger.LogWarning("[DALAMUD-INJECT] stderr: {Line}", line);
+                }
+            }
+        }, ct);
+        
+        // Wait for completion (with timeout)
+        using var timeoutCts = new CancellationTokenSource(InjectorTimeoutMs);
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
+        
+        try
+        {
+            await process.WaitForExitAsync(linkedCts.Token);
+            await Task.WhenAll(stdoutTask, stderrTask);
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
+        {
+            _logger.LogError("[DALAMUD-INJECT] Injector timeout after {Timeout}ms", InjectorTimeoutMs);
+            try { process.Kill(); } catch { }
+            return new DalamudInjectionResult
+            {
+                Success = false,
+                ErrorMessage = "Injector timeout"
+            };
+        }
+        
+        var exitCode = process.ExitCode;
+        _logger.LogInformation("[DALAMUD-INJECT] Injector exited with code: {ExitCode}", exitCode);
+        
+        if (exitCode == 0)
+        {
+            _logger.LogInformation("[DALAMUD-INJECT] Dalamud injection successful!");
+            return new DalamudInjectionResult
+            {
+                Success = true,
+                ExitCode = exitCode
+            };
+        }
+        else
+        {
+            var errorMsg = stderr.Length > 0 ? stderr.ToString() : stdout.ToString();
+            _logger.LogError("[DALAMUD-INJECT] Injection failed: {Error}", errorMsg);
+            return new DalamudInjectionResult
+            {
+                Success = false,
+                ExitCode = exitCode,
+                ErrorMessage = $"Injector exited with code {exitCode}: {errorMsg}"
+            };
+        }
+    }
+    
+    #endregion
 }
-
-/// <summary>
-/// Injection options
-/// </summary>
 public class DalamudInjectionOptions
 {
     /// <summary>Wait time before injection (milliseconds)</summary>
