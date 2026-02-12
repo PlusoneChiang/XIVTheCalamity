@@ -25,7 +25,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -86,6 +86,17 @@ jobs:
           API_KEY_PATH=$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8
           echo "$APPLE_API_KEY" | base64 --decode > "$API_KEY_PATH"
           echo "APPLE_API_KEY_PATH=$API_KEY_PATH" >> $GITHUB_ENV
+
+      # Use .icns on CI (actool for .icon requires Xcode 26+)
+      - name: Use icns icon for CI
+        working-directory: frontend
+        run: |
+          node -e "
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          pkg.build.mac.icon = 'build/XIVTC.icns';
+          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
 
       # Package Electron app
       - name: Package app
@@ -148,7 +159,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -185,7 +196,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - uses: actions/setup-dotnet@v4
         with:

@@ -91,12 +91,7 @@
         }
       ]
     },
-    "extraResources": [
-      {
-        "from": "../Release/temp-backend-linux/XIVTheCalamity.Api.NativeAOT",
-        "to": "backend/XIVTheCalamity.Api.NativeAOT"
-      }
-    ]
+    "extraResources": []
   },
   "keywords": [
     "ff14",
