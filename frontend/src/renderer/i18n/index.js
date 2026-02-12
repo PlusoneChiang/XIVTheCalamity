@@ -396,7 +396,9 @@ const translations = {
     'app_update.downloading': '下載更新中',
     'app_update.ready_msg': '版本 {{version}} 已下載完成',
     'app_update.restart': '立即重啟更新',
-    'app_update.restart_later': '下次啟動時安裝'
+    'app_update.restart_later': '下次啟動時安裝',
+    'app_update.reminder_available': '🔔 發現新版本',
+    'app_update.reminder_ready': '✅ 更新已就緒，點此重啟'
   },
   
   'en-US': {
@@ -789,7 +791,9 @@ const translations = {
     'app_update.downloading': 'Downloading update',
     'app_update.ready_msg': 'Version {{version}} is ready to install',
     'app_update.restart': 'Restart Now',
-    'app_update.restart_later': 'Install on next launch'
+    'app_update.restart_later': 'Install on next launch',
+    'app_update.reminder_available': '🔔 Update available',
+    'app_update.reminder_ready': '✅ Update ready, click to restart'
   }
 };
 

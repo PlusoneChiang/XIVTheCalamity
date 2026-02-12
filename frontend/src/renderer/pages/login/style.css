@@ -310,6 +310,7 @@ body {
 .login-container,
 .loading-container,
 .success-container {
+    position: relative;
     width: 340px;
     height: 630px;
     padding: 2rem;
@@ -820,64 +821,146 @@ body {
     font-size: 13px;
 }
 
-/* App Update Banner */
-.app-update-banner {
+/* App Update Dialog */
+.app-update-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10000;
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 14px;
-    margin-bottom: 8px;
-    background: rgba(59, 130, 246, 0.2);
-    border: 1px solid rgba(59, 130, 246, 0.4);
-    border-radius: 10px;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.9);
-    animation: slideDown 0.3s ease;
+    justify-content: center;
+    pointer-events: auto;
 }
 
-.app-update-banner.app-update-ready {
-    background: rgba(34, 197, 94, 0.2);
-    border-color: rgba(34, 197, 94, 0.4);
+.app-update-dialog {
+    background: rgba(30, 30, 30, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    padding: 24px 28px;
+    width: 300px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    animation: dialogFadeIn 0.25s ease;
 }
 
-.app-update-text {
+.app-update-dialog-icon {
+    font-size: 28px;
+}
+
+.app-update-dialog-title {
+    color: rgba(255, 255, 255, 0.95);
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+    margin: 0;
+}
+
+.app-update-dialog-buttons {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+}
+
+.app-update-dialog-buttons .app-update-btn {
     flex: 1;
-}
-
-.app-update-btn {
-    padding: 4px 12px;
+    padding: 8px 16px;
     border: none;
-    border-radius: 6px;
-    font-size: 11px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
     cursor: pointer;
+    transition: all 0.2s ease;
     white-space: nowrap;
 }
 
-.app-update-download, .app-update-install {
-    background: rgba(59, 130, 246, 0.8);
+.app-update-btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
 }
 
-.app-update-install {
-    background: rgba(34, 197, 94, 0.8);
+.app-update-btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
-.app-update-download:hover, .app-update-install:hover {
-    filter: brightness(1.2);
+.app-update-btn-primary.app-update-btn-green {
+    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
 }
 
-.app-update-dismiss {
+.app-update-btn-primary.app-update-btn-green:hover {
+    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+}
+
+.app-update-btn-secondary {
     background: rgba(255, 255, 255, 0.1);
     color: rgba(255, 255, 255, 0.7);
 }
 
-.app-update-dismiss:hover {
+.app-update-btn-secondary:hover {
     background: rgba(255, 255, 255, 0.2);
 }
 
-@keyframes slideDown {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
+/* Loading spinner in dialog */
+.app-update-spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid rgba(255, 255, 255, 0.15);
+    border-top-color: #667eea;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+/* Minimized update reminder button */
+.app-update-reminder {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 5px 14px;
+    border: 1px solid rgba(102, 126, 234, 0.5);
+    border-radius: 6px;
+    background: rgba(102, 126, 234, 0.2);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 11px;
+    cursor: pointer;
+    white-space: nowrap;
+    animation: breathe 2.5s ease-in-out infinite;
+    z-index: 100;
+    transition: all 0.2s ease;
+}
+
+.app-update-reminder:hover {
+    background: rgba(102, 126, 234, 0.35);
+    animation: none;
+}
+
+.app-update-reminder.app-update-reminder-ready {
+    border-color: rgba(34, 197, 94, 0.5);
+    background: rgba(34, 197, 94, 0.2);
+}
+
+.app-update-reminder.app-update-reminder-ready:hover {
+    background: rgba(34, 197, 94, 0.35);
+}
+
+@keyframes dialogFadeIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes breathe {
+    0%, 100% { transform: translateX(-50%) scale(1); }
+    50% { transform: translateX(-50%) scale(1.06); }
 }

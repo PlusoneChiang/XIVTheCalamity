@@ -162,7 +162,8 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      cache: true  // Always enable cache
+      cache: true,  // Always enable cache
+      devTools: isDebugModeEnabled
     }
   };
 
@@ -201,13 +202,9 @@ function createWindow() {
     }
   });
   
-  // DevTools control - Commented out for production
-  // Uncomment to auto-open DevTools for debugging
-  // mainWindow.webContents.openDevTools();
-  // safeLog('[Main] DevTools opened');
   
   mainWindow.webContents.on('devtools-opened', () => {
-    // Allow DevTools to be manually opened if needed (F12 or right-click > Inspect)
+    // Allow DevTools to be manually opened if needed (Cmd+Shift+I or right-click > Inspect)
   });
 
   // Close settings window when main window closes
@@ -657,6 +654,12 @@ app.whenReady().then(async () => {
   // Initialize debug mode from config
   isDebugModeEnabled = isDevelopmentMode();
   log.info('[Main] Debug mode:', isDebugModeEnabled ? 'enabled' : 'disabled');
+  
+  // Adjust log level based on development mode
+  if (!isDebugModeEnabled) {
+    log.transports.file.level = 'warn';
+    log.transports.console.level = 'warn';
+  }
   
   // Start backend first
   const backendStarted = await startBackend();
