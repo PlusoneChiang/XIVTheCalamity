@@ -258,9 +258,19 @@ jobs:
           # Replace VERSION placeholder
           GUIDE="${GUIDE//VERSION/$VERSION}"
           
-          # Generate release notes from commits, then append download guide
-          gh release edit "$TAG" --generate-notes --repo "$GITHUB_REPOSITORY"
-          EXISTING_BODY=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q '.body' 2>/dev/null || echo "")
+          # Generate release notes via GitHub API
+          PREVIOUS_TAG=$(gh api repos/$GITHUB_REPOSITORY/releases/latest --jq '.tag_name' 2>/dev/null || echo "")
+          GENERATE_BODY=""
+          if [ -n "$PREVIOUS_TAG" ] && [ "$PREVIOUS_TAG" != "$TAG" ]; then
+            GENERATE_BODY=$(gh api repos/$GITHUB_REPOSITORY/releases/generate-notes \
+              -f tag_name="$TAG" -f previous_tag_name="$PREVIOUS_TAG" \
+              --jq '.body' 2>/dev/null || echo "")
+          fi
+          if [ -z "$GENERATE_BODY" ]; then
+            GENERATE_BODY=$(gh api repos/$GITHUB_REPOSITORY/releases/generate-notes \
+              -f tag_name="$TAG" \
+              --jq '.body' 2>/dev/null || echo "")
+          fi
           
-          FULL_BODY="${EXISTING_BODY}${GUIDE}"
+          FULL_BODY="${GENERATE_BODY}${GUIDE}"
           gh release edit "$TAG" --draft=false --notes "$FULL_BODY" --repo "$GITHUB_REPOSITORY"
