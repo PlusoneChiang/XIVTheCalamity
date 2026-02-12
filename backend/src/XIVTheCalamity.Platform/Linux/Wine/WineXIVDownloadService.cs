@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using XIVTheCalamity.Core.Models;
+using XIVTheCalamity.Core.Models.Progress;
 using XIVTheCalamity.Core.Services;
 
 namespace XIVTheCalamity.Platform.Linux.Wine;
@@ -53,13 +54,13 @@ public class WineXIVDownloadService(
     /// <summary>
     /// Download and install Wine-XIV with progress streaming
     /// </summary>
-    public async IAsyncEnumerable<DownloadProgress> DownloadAsync(
+    public async IAsyncEnumerable<DownloadProgressEvent> DownloadAsync(
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         logger?.LogInformation("[WINE-XIV] Starting Wine-XIV download");
         
         // Step 1: Detect distro
-        yield return new DownloadProgress
+        yield return new DownloadProgressEvent
         {
             Stage = "detecting_distro",
             MessageKey = "progress.detecting_distro",
@@ -69,7 +70,7 @@ public class WineXIVDownloadService(
         var distro = DetectDistro();
         if (string.IsNullOrEmpty(distro))
         {
-            yield return new DownloadProgress
+            yield return new DownloadProgressEvent
             {
                 Stage = "error",
                 MessageKey = "error.wine_download_failed",
@@ -94,7 +95,7 @@ public class WineXIVDownloadService(
         
         var archivePath = Path.Combine(tempDir, "wine-xiv.tar.xz");
         
-        yield return new DownloadProgress
+        yield return new DownloadProgressEvent
         {
             Stage = "downloading",
             MessageKey = "progress.downloading_wine",
@@ -109,7 +110,7 @@ public class WineXIVDownloadService(
         }
         
         // Step 3: Extract archive
-        yield return new DownloadProgress
+        yield return new DownloadProgressEvent
         {
             Stage = "extracting",
             MessageKey = "progress.extracting_wine",
@@ -119,7 +120,7 @@ public class WineXIVDownloadService(
         await ExtractArchiveAsync(archivePath, tempDir, cancellationToken);
         
         // Step 4: Move to installation directory (same filesystem, no copy needed)
-        yield return new DownloadProgress
+        yield return new DownloadProgressEvent
         {
             Stage = "installing",
             MessageKey = "progress.installing_wine",
@@ -130,7 +131,7 @@ public class WineXIVDownloadService(
         var extractedDirs = Directory.GetDirectories(tempDir, "wine-xiv-*");
         if (extractedDirs.Length == 0)
         {
-            yield return new DownloadProgress
+            yield return new DownloadProgressEvent
             {
                 Stage = "error",
                 MessageKey = "error.wine_download_failed",
@@ -168,7 +169,7 @@ public class WineXIVDownloadService(
         // Verify installation
         if (!File.Exists(WinePath))
         {
-            yield return new DownloadProgress
+            yield return new DownloadProgressEvent
             {
                 Stage = "error",
                 MessageKey = "error.wine_download_failed",
@@ -180,7 +181,7 @@ public class WineXIVDownloadService(
         
         logger?.LogInformation("[WINE-XIV] Wine-XIV {Version} installed successfully", WineXIVVersion);
         
-        yield return new DownloadProgress
+        yield return new DownloadProgressEvent
         {
             Stage = "complete",
             MessageKey = "progress.wine_downloaded",
@@ -192,7 +193,7 @@ public class WineXIVDownloadService(
     /// <summary>
     /// Download file with progress reporting via IAsyncEnumerable
     /// </summary>
-    private async IAsyncEnumerable<DownloadProgress> DownloadFileAsync(
+    private async IAsyncEnumerable<DownloadProgressEvent> DownloadFileAsync(
         string url,
         string destinationPath,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
@@ -227,11 +228,8 @@ public class WineXIVDownloadService(
                 var downloadSpeed = elapsedSeconds > 0 ? bytesDownloadedSinceLastReport / elapsedSeconds : 0;
                 
                 var percentage = (int)(10 + (totalRead * 60.0 / totalBytes));
-                var downloadedMB = totalRead / (1024.0 * 1024.0);
-                var totalMB = totalBytes / (1024.0 * 1024.0);
-                var speedMBps = downloadSpeed / (1024.0 * 1024.0);
                 
-                yield return new DownloadProgress
+                yield return new DownloadProgressEvent
                 {
                     Stage = "downloading",
                     MessageKey = "progress.downloading_wine",
@@ -239,9 +237,7 @@ public class WineXIVDownloadService(
                     TotalBytes = totalBytes,
                     Percentage = percentage,
                     CurrentFile = fileName,
-                    DownloadedMB = downloadedMB,
-                    TotalMB = totalMB,
-                    DownloadSpeedMBps = speedMBps
+                    DownloadSpeedBytesPerSec = downloadSpeed
                 };
                 
                 lastReportTime = now;
@@ -254,21 +250,16 @@ public class WineXIVDownloadService(
         {
             var totalElapsedSeconds = (DateTime.UtcNow - startTime).TotalSeconds;
             var avgSpeed = totalElapsedSeconds > 0 ? totalRead / totalElapsedSeconds : 0;
-            var downloadedMB = totalRead / (1024.0 * 1024.0);
-            var totalMB = totalBytes / (1024.0 * 1024.0);
-            var speedMBps = avgSpeed / (1024.0 * 1024.0);
             
-            yield return new DownloadProgress
+            yield return new DownloadProgressEvent
             {
                 Stage = "downloading",
                 MessageKey = "progress.downloading_wine",
                 BytesDownloaded = totalRead,
                 TotalBytes = totalBytes,
-                Percentage = 70, // Ready for extraction
+                Percentage = 70,
                 CurrentFile = fileName,
-                DownloadedMB = downloadedMB,
-                TotalMB = totalMB,
-                DownloadSpeedMBps = speedMBps
+                DownloadSpeedBytesPerSec = avgSpeed
             };
         }
     }
@@ -362,26 +353,4 @@ public class DownloadStatus
     public bool IsInstalled { get; set; }
     public string? Version { get; set; }
     public string? InstalledPath { get; set; }
-}
-
-/// <summary>
-/// Download progress information
-/// </summary>
-public class DownloadProgress
-{
-    public string Stage { get; set; } = string.Empty;
-    public string MessageKey { get; set; } = string.Empty;
-    public string? CurrentFile { get; set; }
-    public long BytesDownloaded { get; set; }
-    public long TotalBytes { get; set; }
-    public double Percentage { get; set; }
-    
-    // New fields for detailed progress display
-    public double DownloadedMB { get; set; }
-    public double TotalMB { get; set; }
-    public double DownloadSpeedMBps { get; set; }
-    
-    public bool IsComplete { get; set; }
-    public bool HasError { get; set; }
-    public string? ErrorMessage { get; set; }
 }

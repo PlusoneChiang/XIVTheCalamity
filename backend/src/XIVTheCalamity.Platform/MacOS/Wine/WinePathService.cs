@@ -53,25 +53,34 @@ public class WinePathService
         AppSupport = Path.Combine(homeDir, "Library", "Application Support", "XIVTheCalamity");
         WinePrefix = Path.Combine(AppSupport, "wineprefix");
         
-        // Wine runtime directory
-        // Dev: project root wine/
-        // Bundle: XIVTheCalamity.app/Contents/Resources/wine/
+        // Wine runtime directory search
+        // Priority: AppData (downloaded) > Dev (project root wine/) > Bundle (Resources/wine/)
         var appDir = AppContext.BaseDirectory;
         
-        // Strategy 1: Dev environment - search upward for wine/
-        var currentDir = new DirectoryInfo(appDir);
-        while (currentDir is not null)
+        // Strategy 1: AppData - downloaded Wine
+        var appDataWine = Path.Combine(AppSupport, "wine");
+        if (Directory.Exists(appDataWine) && Directory.Exists(Path.Combine(appDataWine, "bin")))
         {
-            var winePath = Path.Combine(currentDir.FullName, "wine");
-            if (Directory.Exists(winePath) && Directory.Exists(Path.Combine(winePath, "bin")))
-            {
-                WineRoot = winePath;
-                break;
-            }
-            currentDir = currentDir.Parent;
+            WineRoot = appDataWine;
         }
         
-        // Strategy 2: Bundle environment
+        // Strategy 2: Dev environment - search upward for wine/
+        if (string.IsNullOrEmpty(WineRoot))
+        {
+            var currentDir = new DirectoryInfo(appDir);
+            while (currentDir is not null)
+            {
+                var winePath = Path.Combine(currentDir.FullName, "wine");
+                if (Directory.Exists(winePath) && Directory.Exists(Path.Combine(winePath, "bin")))
+                {
+                    WineRoot = winePath;
+                    break;
+                }
+                currentDir = currentDir.Parent;
+            }
+        }
+        
+        // Strategy 3: Bundle environment (legacy)
         if (string.IsNullOrEmpty(WineRoot))
         {
             var bundleWinePath = Path.Combine(appDir, "..", "..", "Resources", "wine");
@@ -82,9 +91,10 @@ public class WinePathService
             }
         }
         
-        if (string.IsNullOrEmpty(WineRoot) || !Directory.Exists(WineRoot))
+        // Fallback: use appData path (will be created by download service)
+        if (string.IsNullOrEmpty(WineRoot))
         {
-            throw new DirectoryNotFoundException($"Wine directory not found. Searched from: {appDir}");
+            WineRoot = appDataWine;
         }
         
         WineBin = Path.Combine(WineRoot, "bin");
@@ -115,6 +125,22 @@ public class WinePathService
         
         FontFile = "NotoSansTC-Regular.ttf";
         FontName = "Noto Sans TC";
+    }
+
+    /// <summary>
+    /// Check if Wine is actually installed (binary exists)
+    /// </summary>
+    public bool IsWineInstalled => File.Exists(WineExecutable);
+
+    /// <summary>
+    /// Reset singleton to re-detect Wine path after download
+    /// </summary>
+    public static void Reset()
+    {
+        lock (_lock)
+        {
+            _instance = null;
+        }
     }
 
     public static WinePathService Instance

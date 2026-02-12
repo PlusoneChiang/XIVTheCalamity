@@ -14,11 +14,12 @@ namespace XIVTheCalamity.Platform.MacOS.Wine;
 /// </summary>
 public class WineEnvironmentService(
     ConfigService configService,
+    WineMacOSDownloadService downloadService,
     AudioRouterService? audioRouterService = null,
     ILogger<WineEnvironmentService>? logger = null
 ) : IEnvironmentService
 {
-    private readonly WinePathService _paths = WinePathService.Instance;
+    private WinePathService _paths = WinePathService.Instance;
     private readonly WinePrefixService _prefixService = new();
 
     public async IAsyncEnumerable<EnvironmentProgressEvent> InitializeAsync(
@@ -30,10 +31,65 @@ public class WineEnvironmentService(
         {
             Stage = "checking",
             MessageKey = "progress.checking_wine",
+            Percentage = 5
+        };
+        
+        // Step 1: Check if Wine is installed, download if needed
+        if (!downloadService.IsInstalled())
+        {
+            logger?.LogInformation("[WINE-ENV] Wine not found, starting download");
+            
+            var downloadFailed = false;
+            string? downloadError = null;
+            
+            await foreach (var downloadProgress in downloadService.DownloadAsync(cancellationToken))
+            {
+                // Map download progress (5-70%) to environment progress
+                var mappedPercentage = 5 + (int)(downloadProgress.Percentage * 0.65);
+                
+                yield return new EnvironmentProgressEvent
+                {
+                    Stage = downloadProgress.Stage,
+                    MessageKey = downloadProgress.MessageKey,
+                    CompletedItems = mappedPercentage,
+                    TotalItems = 100
+                };
+                
+                if (downloadProgress.HasError)
+                {
+                    downloadFailed = true;
+                    downloadError = downloadProgress.ErrorMessage;
+                    break;
+                }
+            }
+            
+            if (downloadFailed)
+            {
+                yield return new EnvironmentProgressEvent
+                {
+                    Stage = "error",
+                    MessageKey = "error.wine_download_failed",
+                    HasError = true,
+                    ErrorMessage = downloadError ?? "Wine download failed"
+                };
+                yield break;
+            }
+            
+            // Reset path service to pick up newly downloaded Wine
+            WinePathService.Reset();
+            _paths = WinePathService.Instance;
+            
+            logger?.LogInformation("[WINE-ENV] Wine downloaded successfully to: {Path}", _paths.WineRoot);
+        }
+        
+        yield return new EnvironmentProgressEvent
+        {
+            Stage = "checking",
+            MessageKey = "progress.checking_wine",
             Percentage = 10
         };
         
-        // Delegate to WinePrefixService and convert progress events
+        // Step 2: Initialize Wine prefix (existing logic)
         await foreach (var wineProgress in _prefixService.InitializePrefixAsyncEnumerable(cancellationToken))
         {
             // Convert WineInitProgress to EnvironmentProgressEvent

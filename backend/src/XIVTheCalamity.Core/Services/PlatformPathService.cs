@@ -171,14 +171,22 @@ public class PlatformPathService
 
     /// <summary>
     /// Get macOS Wine directory
-    /// Priority: 1. Dev environment (project root), 2. Resources (production)
+    /// Priority: 1. AppData (downloaded), 2. Dev environment (project root), 3. Resources (production)
+    /// Returns null if Wine is not found (will be downloaded on first launch)
     /// </summary>
     private string GetMacOSWineDirectory()
     {
         var appDir = AppContext.BaseDirectory;
+        
+        // Priority 1: AppData - downloaded Wine
+        var appDataWine = Path.Combine(AppDataDirectory, "wine");
+        if (Directory.Exists(appDataWine) && Directory.Exists(Path.Combine(appDataWine, "bin")))
+        {
+            return appDataWine;
+        }
+        
+        // Priority 2: Dev environment - search upward for wine/
         var currentDir = new DirectoryInfo(appDir);
-
-        // Priority 1: Dev environment - search upward for wine/
         while (currentDir != null)
         {
             var winePath = Path.Combine(currentDir.FullName, "wine");
@@ -189,15 +197,15 @@ public class PlatformPathService
             currentDir = currentDir.Parent;
         }
 
-        // Priority 2: Production environment - Resources directory
+        // Priority 3: Production environment - Resources directory (legacy bundle)
         var resourcesPath = Path.Combine(appDir, "..", "Resources", "wine");
         if (Directory.Exists(resourcesPath))
         {
             return resourcesPath;
         }
 
-        throw new DirectoryNotFoundException(
-            $"Wine not found. Searched from: {appDir}");
+        // Wine not found - return expected appData path (will be created by download)
+        return appDataWine;
     }
 
     /// <summary>

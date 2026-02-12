@@ -10,7 +10,6 @@ cd "$PROJECT_ROOT/frontend"
 
 NOTARIZE="${NOTARIZE:-1}"
 SIGNING_DEBUG="${SIGNING_DEBUG:-1}"
-WINE_DIR="${WINE_DIR:-$PROJECT_ROOT/wine}"
 APPLE_API_KEY_PATH="${APPLE_API_KEY_PATH:-}"
 APPLE_API_KEY_ID="${APPLE_API_KEY_ID:-}"
 APPLE_API_ISSUER="${APPLE_API_ISSUER:-}"
@@ -25,7 +24,6 @@ else
   echo "   4. Notarization skipped (NOTARIZE=0)"
 fi
 echo "   5. Signing debug: ${SIGNING_DEBUG}"
-echo "   6. Wine dir: ${WINE_DIR}"
 echo ""
 
 if [ -z "${CSC_NAME:-}" ]; then
@@ -37,18 +35,6 @@ if [ "$SIGNING_DEBUG" = "1" ]; then
   export DEBUG="electron-builder,app-builder,app-builder-lib"
   export CSC_DEBUG=1
 fi
-
-if [ -z "${SIGN_WINE:-}" ] && [ -f "$WINE_DIR/.signed" ]; then
-  export SIGN_WINE=0
-fi
-
-if [ "${SIGN_WINE:-}" = "0" ] && [ ! -f "$WINE_DIR/.signed" ]; then
-  echo "❌ SIGN_WINE=0 but $WINE_DIR/.signed is missing."
-  echo "   Run: CSC_NAME=\"...\" ./scripts/build-winecx-and-signing.sh"
-  exit 1
-fi
-
-echo "   7. Wine signing: ${SIGN_WINE:-1} (0 = skip)"
 
 if [ -d "$PROJECT_ROOT/Release/mac-arm64" ]; then
   chmod -R +w "$PROJECT_ROOT/Release/mac-arm64" 2>/dev/null || true

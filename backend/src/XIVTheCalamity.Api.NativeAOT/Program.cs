@@ -59,6 +59,7 @@ try
     {
         builder.Services.AddSingleton<XIVTheCalamity.Platform.IEnvironmentService, 
             XIVTheCalamity.Platform.MacOS.Wine.WineEnvironmentService>();
+        builder.Services.AddSingleton<WineMacOSDownloadService>();
         builder.Services.AddSingleton<WinePrefixService>();
         builder.Services.AddSingleton<WineConfigService>();
         builder.Services.AddSingleton<XIVTheCalamity.Platform.MacOS.Audio.AudioRouterService>();

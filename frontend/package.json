@@ -55,9 +55,6 @@
       "gatekeeperAssess": false,
       "strictVerify": false,
       "notarize": false,
-      "signIgnore": [
-        "Contents/Resources/wine/.*"
-      ],
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "extraResources": [
@@ -68,13 +65,6 @@
             "**/*",
             "!**/*.dSYM",
             "!**/*.dSYM/**"
-          ]
-        },
-        {
-          "from": "../wine",
-          "to": "wine",
-          "filter": [
-            "**/*"
           ]
         },
         {
