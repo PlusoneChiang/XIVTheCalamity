@@ -10,6 +10,7 @@ import { savePassword, saveOTPSecret, saveAutoFillOTP, hasOTPSecret } from '../.
 import i18n from '../../i18n/index.js';
 import { startBackgroundUpdate, startLoginUpdate, cancelBackgroundUpdate, setAppVersionText, isUpdating, handleConfigChanged, setLoggedIn, setOnUpdateComplete } from './updateManager.js';
 import { startDalamudUpdate, cancelDalamudUpdate, handleDalamudConfigChanged, isDalamudUpdating, setOnDalamudComplete } from './dalamudManager.js';
+import { initAppUpdater } from './appUpdater.js';
 import { handleApiResponse, getErrorMessage } from '../../utils/apiError.js';
 
 // Constants
@@ -91,6 +92,9 @@ function init() {
       }
     });
   }
+  
+  // Initialize app auto-update (before environment initialization)
+  initAppUpdater();
   
   // Start environment initialization immediately on page load
   console.log('[Login] Starting environment initialization...');

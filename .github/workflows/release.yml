@@ -99,16 +99,17 @@ jobs:
           fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
           "
 
-      # Package Electron app
-      - name: Package app
+      # Package and publish to GitHub Release
+      - name: Package and publish
         working-directory: frontend
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           NOTARIZE: ${{ inputs.skip_notarize && '0' || '1' }}
         run: |
           npm ci
-          npx electron-builder --mac --arm64
+          npx electron-builder --mac --arm64 --publish always
 
       # Notarize
       - name: Notarize app
@@ -140,16 +141,6 @@ jobs:
             xcrun stapler staple "$DMG_PATH"
           fi
 
-      # Upload artifacts
-      - name: Upload macOS artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-release
-          path: |
-            Release/*.dmg
-            Release/*-darwin-*.zip
-          if-no-files-found: warn
-
   # ==================== Linux ====================
   build-linux:
     runs-on: ubuntu-latest
@@ -174,18 +165,14 @@ jobs:
             -c Release -r linux-x64 --self-contained true \
             -o ../Release/temp-backend-linux
 
-      # Package AppImage
-      - name: Package AppImage
+      # Package and publish
+      - name: Package and publish
         working-directory: frontend
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           npm ci
-          npx electron-builder --linux --x64
-
-      - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-release
-          path: Release/*.AppImage
+          npx electron-builder --linux --x64 --publish always
 
   # ==================== Windows ====================
   build-windows:
@@ -212,10 +199,11 @@ jobs:
             -o ../Release/temp-backend-windows `
             /p:PublishTrimmed=true /p:PublishSingleFile=true
 
-      # Package NSIS installer
-      - name: Package installer
+      # Package and publish
+      - name: Package and publish
         working-directory: frontend
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: |
           npm ci
@@ -231,34 +219,4 @@ jobs:
           fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
           "
           
-          npx electron-builder --win --x64
-
-      - name: Upload Windows artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-release
-          path: Release/*.exe
-
-  # ==================== Create Release ====================
-  release:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build-macos, build-linux, build-windows]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: List artifacts
-        run: find artifacts -type f | head -20
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          draft: true
-          generate_release_notes: true
-          files: |
-            artifacts/macos-release/*
-            artifacts/linux-release/*
-            artifacts/windows-release/*
+          npx electron-builder --win --x64 --publish always

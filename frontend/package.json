@@ -23,6 +23,11 @@
       "en-US",
       "zh-TW"
     ],
+    "publish": {
+      "provider": "github",
+      "owner": "PlusoneChiang",
+      "repo": "XIVTheCalamity"
+    },
     "directories": {
       "output": "../Release",
       "buildResources": "build"
@@ -45,6 +50,12 @@
         },
         {
           "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
           "arch": [
             "arm64"
           ]
@@ -109,6 +120,7 @@
   },
   "dependencies": {
     "axios": "^1.13.4",
-    "electron-log": "^5.4.3"
+    "electron-log": "^5.4.3",
+    "electron-updater": "^6.7.3"
   }
 }

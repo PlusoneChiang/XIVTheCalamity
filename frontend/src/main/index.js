@@ -5,6 +5,7 @@ const https = require('https');
 const http = require('http');
 const log = require('electron-log');
 const { spawn } = require('child_process');
+const { initUpdater, checkForUpdates } = require('./updater');
 
 // Set application name FIRST to ensure correct case in directory names
 // Must be called before any app.getPath() calls
@@ -661,6 +662,10 @@ app.whenReady().then(async () => {
   }
   
   createWindow();
+
+  // Initialize auto-updater (checks before environment initialization)
+  initUpdater(mainWindow);
+  checkForUpdates();
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

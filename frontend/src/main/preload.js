@@ -133,6 +133,41 @@ contextBridge.exposeInMainWorld('electronAPI', {
    */
   showMessageBox: async (options) => {
     return await ipcRenderer.invoke('dialog:show-message-box', options);
+  },
+  
+  // App auto-update
+  updater: {
+    check: async () => ipcRenderer.invoke('app:check-updates'),
+    download: async () => ipcRenderer.invoke('app:download-update'),
+    install: async () => ipcRenderer.invoke('app:install-update'),
+    onChecking: (callback) => {
+      ipcRenderer.on('app-update:checking', () => callback());
+      return () => ipcRenderer.removeListener('app-update:checking', callback);
+    },
+    onAvailable: (callback) => {
+      const handler = (_event, data) => callback(data);
+      ipcRenderer.on('app-update:available', handler);
+      return () => ipcRenderer.removeListener('app-update:available', handler);
+    },
+    onNotAvailable: (callback) => {
+      ipcRenderer.on('app-update:not-available', () => callback());
+      return () => ipcRenderer.removeListener('app-update:not-available', callback);
+    },
+    onProgress: (callback) => {
+      const handler = (_event, data) => callback(data);
+      ipcRenderer.on('app-update:download-progress', handler);
+      return () => ipcRenderer.removeListener('app-update:download-progress', handler);
+    },
+    onDownloaded: (callback) => {
+      const handler = (_event, data) => callback(data);
+      ipcRenderer.on('app-update:downloaded', handler);
+      return () => ipcRenderer.removeListener('app-update:downloaded', handler);
+    },
+    onError: (callback) => {
+      const handler = (_event, data) => callback(data);
+      ipcRenderer.on('app-update:error', handler);
+      return () => ipcRenderer.removeListener('app-update:error', handler);
+    }
   }
 });
 

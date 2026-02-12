@@ -385,7 +385,18 @@ const translations = {
     // API Error codes - System
     'error.internal_error': '系統內部錯誤',
     'error.validation_failed': '資料驗證失敗',
-    'error.service_unavailable': '服務暫時無法使用'
+    'error.service_unavailable': '服務暫時無法使用',
+    
+    // App auto-update
+    'app_update.checking': '檢查應用程式更新...',
+    'app_update.available_msg': '新版本 {{version}} 已發布',
+    'app_update.download': '下載更新',
+    'app_update.later': '稍後提醒',
+    'app_update.starting': '準備下載...',
+    'app_update.downloading': '下載更新中',
+    'app_update.ready_msg': '版本 {{version}} 已下載完成',
+    'app_update.restart': '立即重啟更新',
+    'app_update.restart_later': '下次啟動時安裝'
   },
   
   'en-US': {
@@ -767,7 +778,18 @@ const translations = {
     // API Error codes - System
     'error.internal_error': 'Internal server error',
     'error.validation_failed': 'Validation failed',
-    'error.service_unavailable': 'Service temporarily unavailable'
+    'error.service_unavailable': 'Service temporarily unavailable',
+    
+    // App auto-update
+    'app_update.checking': 'Checking for app updates...',
+    'app_update.available_msg': 'Version {{version}} is available',
+    'app_update.download': 'Download Update',
+    'app_update.later': 'Later',
+    'app_update.starting': 'Preparing download...',
+    'app_update.downloading': 'Downloading update',
+    'app_update.ready_msg': 'Version {{version}} is ready to install',
+    'app_update.restart': 'Restart Now',
+    'app_update.restart_later': 'Install on next launch'
   }
 };
 
