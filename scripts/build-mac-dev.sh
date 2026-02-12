@@ -21,53 +21,8 @@ NC='\033[0m' # No Color
 # Check if Wine needs to be rebuilt
 check_wine_build() {
     echo ""
-    echo "🍷 Checking Wine build status..."
-    
-    WINE_DIR="$PROJECT_ROOT/wine"
-    WINE_BUILDER_DIR="$PROJECT_ROOT/wine-builder"
-    
-    # Check if Wine exists
-    if [ ! -d "$WINE_DIR" ] || [ ! -f "$WINE_DIR/bin/wine64" ]; then
-        echo -e "${YELLOW}⚠️  Wine not found, needs to be built${NC}"
-        read -p "   Build Wine now? (y/n) " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            echo "   Building Wine..."
-            cd "$WINE_BUILDER_DIR"
-            ./build.sh
-            cd "$PROJECT_ROOT"
-            echo -e "${GREEN}✅ Wine build completed${NC}"
-        else
-            echo -e "${RED}❌ Skipped Wine build, may affect game launch${NC}"
-        fi
-        return
-    fi
-
-    if [ -f "$WINE_DIR/.signed" ]; then
-        echo -e "${GREEN}✅ Wine is pre-signed${NC}"
-    fi
-    
-    # Check if Wine configuration has been updated
-    if [ -d "$WINE_BUILDER_DIR" ]; then
-        # Check if wine-builder directory is newer than wine
-        BUILDER_MTIME=$(find "$WINE_BUILDER_DIR" -name "*.sh" -o -name "*.nix" | xargs stat -f %m 2>/dev/null | sort -n | tail -1)
-        WINE_MTIME=$(stat -f %m "$WINE_DIR/bin/wine64" 2>/dev/null || echo "0")
-        
-        if [ "$BUILDER_MTIME" -gt "$WINE_MTIME" ]; then
-            echo -e "${YELLOW}⚠️  Wine configuration has been updated${NC}"
-            read -p "   Rebuild Wine? (y/n) " -n 1 -r
-            echo
-            if [[ $REPLY =~ ^[Yy]$ ]]; then
-                echo "   Rebuilding Wine..."
-                cd "$WINE_BUILDER_DIR"
-                ./build.sh
-                cd "$PROJECT_ROOT"
-                echo -e "${GREEN}✅ Wine rebuild completed${NC}"
-            fi
-        else
-            echo -e "${GREEN}✅ Wine is up to date${NC}"
-        fi
-    fi
+    echo "🍷 Wine status: Downloaded at runtime (not bundled)"
+    echo -e "   ${GREEN}ℹ️${NC}  Wine will be downloaded from GitHub Release on first launch"
 }
 
 # Clean up old processes
@@ -141,13 +96,8 @@ if [ -d "$PROJECT_ROOT/Release/mac-arm64/XIVTheCalamity.app" ]; then
     echo -e "  ${RED}❌${NC} Resources: Not found"
   fi
   
-  # Check Wine
-  if [ -d "$PROJECT_ROOT/Release/mac-arm64/XIVTheCalamity.app/Contents/Resources/wine" ]; then
-    WINE_SIZE=$(du -sh "$PROJECT_ROOT/Release/mac-arm64/XIVTheCalamity.app/Contents/Resources/wine" | cut -f1)
-    echo -e "  ${GREEN}✅${NC} Wine: $WINE_SIZE"
-  else
-    echo -e "  ${RED}❌${NC} Wine: Not found"
-  fi
+  # Check Wine (now downloaded at runtime, not bundled)
+  echo -e "  ${GREEN}ℹ️${NC}  Wine: Downloaded at runtime (not bundled)"
   
   echo ""
   
