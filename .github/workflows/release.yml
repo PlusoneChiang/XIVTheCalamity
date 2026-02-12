@@ -258,9 +258,9 @@ jobs:
           # Replace VERSION placeholder
           GUIDE="${GUIDE//VERSION/$VERSION}"
           
-          # Get existing release body
+          # Generate release notes from commits, then append download guide
+          gh release edit "$TAG" --generate-notes --repo "$GITHUB_REPOSITORY"
           EXISTING_BODY=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q '.body' 2>/dev/null || echo "")
           
-          # Combine and update
           FULL_BODY="${EXISTING_BODY}${GUIDE}"
           gh release edit "$TAG" --draft=false --notes "$FULL_BODY" --repo "$GITHUB_REPOSITORY"
