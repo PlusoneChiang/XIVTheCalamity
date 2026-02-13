@@ -1,4 +1,5 @@
 const { ipcMain, app } = require('electron');
+const { spawn } = require('child_process');
 const log = require('electron-log');
 
 let autoUpdater = null;
@@ -102,7 +103,26 @@ ipcMain.handle('app:download-update', async () => {
 
 ipcMain.handle('app:install-update', () => {
   if (autoUpdater) {
-    autoUpdater.quitAndInstall(false, true);
+    // On Linux (AppImage), quitAndInstall restarts without preserving command-line
+    // args like --no-sandbox (required for SteamOS Gaming Mode).
+    // Register a will-quit handler to spawn the new process with original args.
+    if (process.platform === 'linux' && process.env.APPIMAGE) {
+      const appPath = process.env.APPIMAGE;
+      const args = process.argv.slice(1);
+      log.info('[Updater] Linux AppImage: scheduling restart with args:', [appPath, ...args]);
+
+      app.once('will-quit', () => {
+        spawn(appPath, args, {
+          detached: true,
+          stdio: 'ignore',
+          env: { ...process.env }
+        }).unref();
+      });
+      // Install silently, do not auto-relaunch (we handle it above)
+      autoUpdater.quitAndInstall(true, false);
+    } else {
+      autoUpdater.quitAndInstall(false, true);
+    }
   }
 });
 
