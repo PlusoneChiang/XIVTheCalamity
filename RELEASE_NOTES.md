@@ -1,5 +1,16 @@
 # Release Notes
 
+## v1.6.1
+<!-- zh-TW -->
+### 🎨 改善
+- Linux執行檔圖示修正。
+<!-- end -->
+
+<!-- en -->
+### 🎨 Improvements
+- Fixed Linux executable icon.
+<!-- end -->
+
 ## v1.6.0
 
 <!-- zh-TW -->
