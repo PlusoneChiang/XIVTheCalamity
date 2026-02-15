@@ -869,7 +869,9 @@ class I18n {
   updateElements() {
     document.querySelectorAll('[data-i18n]').forEach(element => {
       const key = element.getAttribute('data-i18n');
-      const translated = this.t(key);
+      const optionsStr = element.getAttribute('data-i18n-options');
+      const options = optionsStr ? JSON.parse(optionsStr) : undefined;
+      const translated = this.t(key, options);
       
       // Always update text content
       element.textContent = translated;

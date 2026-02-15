@@ -92,7 +92,7 @@ export async function initAppUpdater() {
 
 // ── Dialog helpers ──────────────────────────────────
 
-/** Parse release notes: extract locale block, convert basic Markdown to HTML */
+/** Parse release notes from GitHub Atom feed (HTML format) */
 function parseReleaseNotes(releaseNotes, locale) {
   if (!releaseNotes) return '';
   
@@ -103,41 +103,42 @@ function parseReleaseNotes(releaseNotes, locale) {
   }
   if (typeof raw !== 'string') return '';
   
-  // Take content before first "---" (strip auto-gen notes and download guide)
-  const parts = raw.split(/\n---\s*\n/);
-  let changelog = parts[0] || '';
+  // Content from GitHub Atom feed is HTML (Markdown already rendered)
+  // Strip content after first <hr> (auto-gen notes and download guide)
+  const hrIndex = raw.indexOf('<hr>');
+  let changelog = hrIndex >= 0 ? raw.substring(0, hrIndex) : raw;
   
-  // Extract locale block: <!-- zh-TW --> ... <!-- end -->
-  const localeTag = locale === 'en' || locale === 'en-US' ? 'en' : 'zh-TW';
-  const localeRegex = new RegExp(`<!--\\s*${localeTag}\\s*-->([\\s\\S]*?)<!--\\s*end\\s*-->`, 'i');
-  const match = changelog.match(localeRegex);
-  if (match) {
-    changelog = match[1].trim();
-  } else {
-    // Fallback: strip all locale markers and show everything
-    changelog = changelog.replace(/<!--\s*(zh-TW|en|end)\s*-->/gi, '').trim();
+  // Split by <h4> locale headings: "🇹🇼 zh-TW" / "🇺🇸 English"
+  const isEn = locale === 'en' || locale === 'en-US';
+  const localePattern = isEn ? /🇺🇸\s*English/i : /🇹🇼\s*zh-TW/i;
+  const h4Regex = /<h4>.*?<\/h4>/gi;
+  const h4Matches = [...changelog.matchAll(h4Regex)];
+  
+  let localeBlock = '';
+  for (let i = 0; i < h4Matches.length; i++) {
+    if (localePattern.test(h4Matches[i][0])) {
+      const start = h4Matches[i].index + h4Matches[i][0].length;
+      const end = i + 1 < h4Matches.length ? h4Matches[i + 1].index : changelog.length;
+      localeBlock = changelog.substring(start, end).trim();
+      break;
+    }
   }
   
-  if (!changelog) return '';
+  if (!localeBlock) {
+    // Fallback: strip all h4 locale headings and show everything
+    localeBlock = changelog.replace(/<h4>.*?<\/h4>/gi, '').trim();
+  }
   
-  // Basic Markdown → HTML
-  return changelog
-    .split('\n')
-    .map(line => {
-      // ### heading
-      if (line.match(/^###\s+/)) return `<div class="notes-heading">${line.replace(/^###\s+/, '')}</div>`;
-      // - list item (with **bold** support)
-      if (line.match(/^-\s+/)) {
-        const content = line.replace(/^-\s+/, '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-        return `<div class="notes-item">• ${content}</div>`;
-      }
-      // empty line
-      if (line.trim() === '') return '';
-      // plain text
-      return `<div>${line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')}</div>`;
-    })
-    .filter(Boolean)
-    .join('');
+  if (!localeBlock) return '';
+  
+  // Wrap headings and list items with styled classes
+  localeBlock = localeBlock
+    .replace(/<h3>(.*?)<\/h3>/gi, '<div class="notes-heading">$1</div>')
+    .replace(/<li>(.*?)<\/li>/gi, '<div class="notes-item">• $1</div>')
+    .replace(/<\/?ul>/gi, '')
+    .replace(/<\/?ol>/gi, '');
+  
+  return localeBlock;
 }
 
 let pendingReleaseNotes = null;
@@ -149,7 +150,7 @@ function showUpdateDialog(version, releaseNotes) {
 
   const notesHtml = parseReleaseNotes(releaseNotes, i18n.locale);
   const notesSection = notesHtml
-    ? `<div class="app-update-dialog-notes-label">${i18n.t('app_update.whats_new')}</div>
+    ? `<div class="app-update-dialog-notes-label" data-i18n="app_update.whats_new">${i18n.t('app_update.whats_new')}</div>
        <div class="app-update-dialog-notes">${notesHtml}</div>`
     : '';
 
@@ -159,14 +160,14 @@ function showUpdateDialog(version, releaseNotes) {
   overlay.innerHTML = `
     <div class="app-update-dialog">
       <div class="app-update-dialog-icon">🎉</div>
-      <p class="app-update-dialog-title">${i18n.t('app_update.available_msg', { version })}</p>
+      <p class="app-update-dialog-title" data-i18n="app_update.available_msg" data-i18n-options='${JSON.stringify({ version })}'>${i18n.t('app_update.available_msg', { version })}</p>
       ${notesSection}
       <div class="app-update-dialog-buttons">
         <button class="app-update-btn app-update-btn-primary" id="appUpdateDownloadBtn">
-          ${i18n.t('app_update.download')}
+          <span data-i18n="app_update.download">${i18n.t('app_update.download')}</span>
         </button>
         <button class="app-update-btn app-update-btn-secondary" id="appUpdateLaterBtn">
-          ${i18n.t('app_update.later')}
+          <span data-i18n="app_update.later">${i18n.t('app_update.later')}</span>
         </button>
       </div>
     </div>
@@ -204,13 +205,13 @@ function showRestartDialog(version) {
   overlay.innerHTML = `
     <div class="app-update-dialog">
       <div class="app-update-dialog-icon">✅</div>
-      <p class="app-update-dialog-title">${i18n.t('app_update.ready_msg', { version })}</p>
+      <p class="app-update-dialog-title" data-i18n="app_update.ready_msg" data-i18n-options='${JSON.stringify({ version })}'>${i18n.t('app_update.ready_msg', { version })}</p>
       <div class="app-update-dialog-buttons">
         <button class="app-update-btn app-update-btn-primary app-update-btn-green" id="appUpdateInstallBtn">
-          ${i18n.t('app_update.restart')}
+          <span data-i18n="app_update.restart">${i18n.t('app_update.restart')}</span>
         </button>
         <button class="app-update-btn app-update-btn-secondary" id="appUpdateLaterBtn">
-          ${i18n.t('app_update.restart_later')}
+          <span data-i18n="app_update.restart_later">${i18n.t('app_update.restart_later')}</span>
         </button>
       </div>
     </div>
@@ -237,14 +238,16 @@ function showReminder(type) {
   removeReminder();
 
   const isReady = type === 'downloaded';
-  const text = isReady
-    ? i18n.t('app_update.reminder_ready')
-    : i18n.t('app_update.reminder_available');
+  const i18nKey = isReady ? 'app_update.reminder_ready' : 'app_update.reminder_available';
 
   const btn = document.createElement('button');
   btn.id = 'appUpdateReminder';
   btn.className = 'app-update-reminder' + (isReady ? ' app-update-reminder-ready' : '');
-  btn.textContent = text;
+  
+  const span = document.createElement('span');
+  span.setAttribute('data-i18n', i18nKey);
+  span.textContent = i18n.t(i18nKey);
+  btn.appendChild(span);
 
   // Place inside login-container so it's positioned relative to the login card
   const loginContainer = document.querySelector('.login-container') || document.querySelector('.login-section') || document.body;
