@@ -268,50 +268,43 @@ jobs:
           # Download guide
           GUIDE=$(cat << 'GUIDE_EOF'
           
-## 📥 下載指南 / Download Guide
-
-| 平台 Platform | 檔案 File | 說明 Description |
-|---|---|---|
-| **macOS** (Apple Silicon) | `XIVTheCalamity-VERSION-darwin-arm64.dmg` | 安裝檔，拖曳至 Applications 即可使用 |
-| **Linux** (x64) | `XIVTheCalamity-VERSION-linux-x64.AppImage` | 執行前需加上執行權限：`chmod +x *.AppImage`</br> 如果在Steam App中使用或是透過Game Mode執行，需額外加上 `--no-sandbox` 執行參數 |
-| **Windows** (x64) | `XIVTheCalamity-VERSION-win-x64.exe` | 安裝程式，依提示完成安裝 |
-
-> ⚠️ 以下檔案為自動更新系統使用，**一般使用者請勿下載**：
-> - `*.yml` — 自動更新元資料（`latest-mac.yml`、`latest-linux.yml`、`latest.yml`）
-> - `*.zip` — macOS 自動更新差異包
-> - `*.blockmap` — 差異更新索引檔
-
----
-
-## 📂 資料路徑 / Data Paths
-
-啟動器資料存放於各平台的 `AppData` 目錄的 `XIVTheCalamity` 子目錄下，
-遊戲設定檔（FFXIV.cfg 等）位於其中的 `ffxivConfig/` 子目錄中。
-
-| 平台 Platform | AppData 路徑 |
-|---|---|
-| **macOS** | `~/Library/Application Support/` |
-| **Linux** | `~/.config/` |
-| **Windows** | `%APPDATA%\` |
+          ## 📥 下載指南 / Download Guide
+          
+          | 平台 Platform | 檔案 File | 說明 Description |
+          |---|---|---|
+          | **macOS** (Apple Silicon) | `XIVTheCalamity-VERSION-darwin-arm64.dmg` | 安裝檔，拖曳至 Applications 即可使用 |
+          | **Linux** (x64) | `XIVTheCalamity-VERSION-linux-x64.AppImage` | 執行前需加上執行權限：`chmod +x *.AppImage`</br> 如果在Steam App中使用或是透過Game Mode執行，需額外加上 `--no-sandbox` 執行參數 |
+          | **Windows** (x64) | `XIVTheCalamity-VERSION-win-x64.exe` | 安裝程式，依提示完成安裝 |
+          
+          > ⚠️ 以下檔案為自動更新系統使用，**一般使用者請勿下載**：
+          > - `*.yml` — 自動更新元資料（`latest-mac.yml`、`latest-linux.yml`、`latest.yml`）
+          > - `*.zip` — macOS 自動更新差異包
+          > - `*.blockmap` — 差異更新索引檔
+          
+          ---
+          
+          ## 📂 資料路徑 / Data Paths
+          
+          啟動器資料存放於各平台的 `AppData` 目錄的 `XIVTheCalamity` 子目錄下，
+          遊戲設定檔（FFXIV.cfg 等）位於其中的 `ffxivConfig/` 子目錄中。
+          
+          | 平台 Platform | AppData 路徑 |
+          |---|---|
+          | **macOS** | `~/Library/Application Support/` |
+          | **Linux** | `~/.config/` |
+          | **Windows** | `%APPDATA%\` |
           GUIDE_EOF
           )
           GUIDE="${GUIDE//VERSION/$VERSION}"
           
           # Compose full body: changelog + --- + auto-gen + --- + guide
           FULL_BODY=""
+          SEP=$'\n---\n'
           if [ -n "$RELEASE_NOTES" ]; then
-            FULL_BODY="${RELEASE_NOTES}"
-            FULL_BODY="${FULL_BODY}
-
----
-"
+            FULL_BODY="${RELEASE_NOTES}${SEP}"
           fi
           if [ -n "$GENERATE_BODY" ]; then
-            FULL_BODY="${FULL_BODY}
-${GENERATE_BODY}
-
----
-"
+            FULL_BODY="${FULL_BODY}${GENERATE_BODY}${SEP}"
           fi
           FULL_BODY="${FULL_BODY}${GUIDE}"
           
