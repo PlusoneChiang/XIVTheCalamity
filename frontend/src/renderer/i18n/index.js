@@ -403,7 +403,8 @@ const translations = {
     'app_update.restart': '立即重啟更新',
     'app_update.restart_later': '下次啟動時安裝',
     'app_update.reminder_available': '🔔 發現新版本',
-    'app_update.reminder_ready': '✅ 更新已就緒，點此重啟'
+    'app_update.reminder_ready': '✅ 更新已就緒，點此重啟',
+    'app_update.whats_new': '📋 更新內容'
   },
   
   'en-US': {
@@ -804,7 +805,8 @@ const translations = {
     'app_update.restart': 'Restart Now',
     'app_update.restart_later': 'Install on next launch',
     'app_update.reminder_available': '🔔 Update available',
-    'app_update.reminder_ready': '✅ Update ready, click to restart'
+    'app_update.reminder_ready': '✅ Update ready, click to restart',
+    'app_update.whats_new': "📋 What's New"
   }
 };
 

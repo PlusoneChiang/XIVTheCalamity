@@ -227,6 +227,8 @@ jobs:
     needs: [build-macos, build-linux, build-windows]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: Publish release with download guide
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -235,43 +237,21 @@ jobs:
           VERSION="${TAG#v}"
           echo "Publishing release for tag: $TAG"
           
-          # Append download guide to existing release notes
-          GUIDE=$(cat << 'GUIDE_EOF'
+          # Extract release notes for current version from RELEASE_NOTES.md
+          RELEASE_NOTES=""
+          if [ -f "RELEASE_NOTES.md" ]; then
+            RELEASE_NOTES=$(awk -v tag="## ${TAG}" 'BEGIN{f=0} $0==tag{f=1;next} f && /^## v/{exit} f{print}' RELEASE_NOTES.md)
+            # Trim leading/trailing blank lines
+            RELEASE_NOTES=$(echo "$RELEASE_NOTES" | sed '/./,$!d' | sed -e :a -e '/^\n*$/{$d;N;ba;}')
+          fi
           
-          ---
+          if [ -n "$RELEASE_NOTES" ]; then
+            echo "Found release notes for $TAG"
+          else
+            echo "No release notes found for $TAG in RELEASE_NOTES.md"
+          fi
           
-          ## 📥 下載指南 / Download Guide
-          
-          | 平台 Platform | 檔案 File | 說明 Description |
-          |---|---|---|
-          | **macOS** (Apple Silicon) | `XIVTheCalamity-VERSION-darwin-arm64.dmg` | 安裝檔，拖曳至 Applications 即可使用 |
-          | **Linux** (x64) | `XIVTheCalamity-VERSION-linux-x64.AppImage` | 執行前需加上執行權限：`chmod +x *.AppImage`</br> 如果在Steam App中使用或是透過Game Mode執行，需額外加上 `--no-sandbox` 執行參數 |
-          | **Windows** (x64) | `XIVTheCalamity-VERSION-win-x64.exe` | 安裝程式，依提示完成安裝 |
-          
-          > ⚠️ 以下檔案為自動更新系統使用，**一般使用者請勿下載**：
-          > - `*.yml` — 自動更新元資料（`latest-mac.yml`、`latest-linux.yml`、`latest.yml`）
-          > - `*.zip` — macOS 自動更新差異包
-          > - `*.blockmap` — 差異更新索引檔
-          
-          ---
-          
-          ## 📂 資料路徑 / Data Paths
-          
-          啟動器資料存放於各平台的 `AppData` 目錄的 `XIVTheCalamity` 子目錄下，
-          遊戲設定檔（FFXIV.cfg 等）位於其中的 `ffxivConfig/` 子目錄中。
-          
-          | 平台 Platform | AppData 路徑 |
-          |---|---|
-          | **macOS** | `~/Library/Application Support/` |
-          | **Linux** | `~/.config/` |
-          | **Windows** | `%APPDATA%\` |
-          GUIDE_EOF
-          )
-          
-          # Replace VERSION placeholder
-          GUIDE="${GUIDE//VERSION/$VERSION}"
-          
-          # Generate release notes via GitHub API
+          # Generate auto-generated notes via GitHub API
           PREVIOUS_TAG=$(gh api repos/$GITHUB_REPOSITORY/releases/latest --jq '.tag_name' 2>/dev/null || echo "")
           GENERATE_BODY=""
           if [ -n "$PREVIOUS_TAG" ] && [ "$PREVIOUS_TAG" != "$TAG" ]; then
@@ -285,5 +265,59 @@ jobs:
               --jq '.body' 2>/dev/null || echo "")
           fi
           
-          FULL_BODY="${GENERATE_BODY}${GUIDE}"
-          gh release edit "$TAG" --draft=false --notes "$FULL_BODY" --repo "$GITHUB_REPOSITORY"
+          # Download guide
+          GUIDE=$(cat << 'GUIDE_EOF'
+          
+## 📥 下載指南 / Download Guide
+
+| 平台 Platform | 檔案 File | 說明 Description |
+|---|---|---|
+| **macOS** (Apple Silicon) | `XIVTheCalamity-VERSION-darwin-arm64.dmg` | 安裝檔，拖曳至 Applications 即可使用 |
+| **Linux** (x64) | `XIVTheCalamity-VERSION-linux-x64.AppImage` | 執行前需加上執行權限：`chmod +x *.AppImage`</br> 如果在Steam App中使用或是透過Game Mode執行，需額外加上 `--no-sandbox` 執行參數 |
+| **Windows** (x64) | `XIVTheCalamity-VERSION-win-x64.exe` | 安裝程式，依提示完成安裝 |
+
+> ⚠️ 以下檔案為自動更新系統使用，**一般使用者請勿下載**：
+> - `*.yml` — 自動更新元資料（`latest-mac.yml`、`latest-linux.yml`、`latest.yml`）
+> - `*.zip` — macOS 自動更新差異包
+> - `*.blockmap` — 差異更新索引檔
+
+---
+
+## 📂 資料路徑 / Data Paths
+
+啟動器資料存放於各平台的 `AppData` 目錄的 `XIVTheCalamity` 子目錄下，
+遊戲設定檔（FFXIV.cfg 等）位於其中的 `ffxivConfig/` 子目錄中。
+
+| 平台 Platform | AppData 路徑 |
+|---|---|
+| **macOS** | `~/Library/Application Support/` |
+| **Linux** | `~/.config/` |
+| **Windows** | `%APPDATA%\` |
+          GUIDE_EOF
+          )
+          GUIDE="${GUIDE//VERSION/$VERSION}"
+          
+          # Compose full body: changelog + --- + auto-gen + --- + guide
+          FULL_BODY=""
+          if [ -n "$RELEASE_NOTES" ]; then
+            FULL_BODY="${RELEASE_NOTES}"
+            FULL_BODY="${FULL_BODY}
+
+---
+"
+          fi
+          if [ -n "$GENERATE_BODY" ]; then
+            FULL_BODY="${FULL_BODY}
+${GENERATE_BODY}
+
+---
+"
+          fi
+          FULL_BODY="${FULL_BODY}${GUIDE}"
+          
+          # Create release if it doesn't exist, or edit existing one
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release edit "$TAG" --draft=false --notes "$FULL_BODY" --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" --title "$VERSION" --notes "$FULL_BODY" --repo "$GITHUB_REPOSITORY"
+          fi

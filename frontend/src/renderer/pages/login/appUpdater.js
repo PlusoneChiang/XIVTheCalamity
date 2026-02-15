@@ -42,7 +42,7 @@ export async function initAppUpdater() {
       pendingVersion = data.version;
       console.log('[APP-UPDATE] Update available:', data.version);
       hideTitleBarProgress();
-      showUpdateDialog(data.version);
+      showUpdateDialog(data.version, data.releaseNotes);
     });
 
     window.electronAPI.updater.onNotAvailable(() => {
@@ -92,9 +92,66 @@ export async function initAppUpdater() {
 
 // ── Dialog helpers ──────────────────────────────────
 
-function showUpdateDialog(version) {
+/** Parse release notes: extract locale block, convert basic Markdown to HTML */
+function parseReleaseNotes(releaseNotes, locale) {
+  if (!releaseNotes) return '';
+  
+  // Handle array format (multi-version jump): take latest
+  let raw = releaseNotes;
+  if (Array.isArray(releaseNotes)) {
+    raw = releaseNotes[0]?.note || releaseNotes[0] || '';
+  }
+  if (typeof raw !== 'string') return '';
+  
+  // Take content before first "---" (strip auto-gen notes and download guide)
+  const parts = raw.split(/\n---\s*\n/);
+  let changelog = parts[0] || '';
+  
+  // Extract locale block: <!-- zh-TW --> ... <!-- end -->
+  const localeTag = locale === 'en' || locale === 'en-US' ? 'en' : 'zh-TW';
+  const localeRegex = new RegExp(`<!--\\s*${localeTag}\\s*-->([\\s\\S]*?)<!--\\s*end\\s*-->`, 'i');
+  const match = changelog.match(localeRegex);
+  if (match) {
+    changelog = match[1].trim();
+  } else {
+    // Fallback: strip all locale markers and show everything
+    changelog = changelog.replace(/<!--\s*(zh-TW|en|end)\s*-->/gi, '').trim();
+  }
+  
+  if (!changelog) return '';
+  
+  // Basic Markdown → HTML
+  return changelog
+    .split('\n')
+    .map(line => {
+      // ### heading
+      if (line.match(/^###\s+/)) return `<div class="notes-heading">${line.replace(/^###\s+/, '')}</div>`;
+      // - list item (with **bold** support)
+      if (line.match(/^-\s+/)) {
+        const content = line.replace(/^-\s+/, '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        return `<div class="notes-item">• ${content}</div>`;
+      }
+      // empty line
+      if (line.trim() === '') return '';
+      // plain text
+      return `<div>${line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')}</div>`;
+    })
+    .filter(Boolean)
+    .join('');
+}
+
+let pendingReleaseNotes = null;
+
+function showUpdateDialog(version, releaseNotes) {
   removeDialog();
   removeReminder();
+  pendingReleaseNotes = releaseNotes || null;
+
+  const notesHtml = parseReleaseNotes(releaseNotes, i18n.locale);
+  const notesSection = notesHtml
+    ? `<div class="app-update-dialog-notes-label">${i18n.t('app_update.whats_new')}</div>
+       <div class="app-update-dialog-notes">${notesHtml}</div>`
+    : '';
 
   const overlay = document.createElement('div');
   overlay.id = 'appUpdateOverlay';
@@ -103,6 +160,7 @@ function showUpdateDialog(version) {
     <div class="app-update-dialog">
       <div class="app-update-dialog-icon">🎉</div>
       <p class="app-update-dialog-title">${i18n.t('app_update.available_msg', { version })}</p>
+      ${notesSection}
       <div class="app-update-dialog-buttons">
         <button class="app-update-btn app-update-btn-primary" id="appUpdateDownloadBtn">
           ${i18n.t('app_update.download')}
@@ -197,7 +255,7 @@ function showReminder(type) {
     if (updateState === 'downloaded') {
       showRestartDialog(pendingVersion);
     } else {
-      showUpdateDialog(pendingVersion);
+      showUpdateDialog(pendingVersion, pendingReleaseNotes);
     }
   });
 }
