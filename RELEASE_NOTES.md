@@ -1,5 +1,29 @@
 # Release Notes
 
+## v1.6.8
+
+#### 🇹🇼 zh-TW
+### 🎨 改善
+- 主題變更，新年快樂！
+- i18n顯示同步問題。
+- 隱藏reCAPTCHA浮動元件。
+
+### 🐛 修復
+- 修正開發模式行為錯誤問題。
+- 修正Steam Gaming Mode自動更新卡死問題。
+- 修正Release Note顯示錯誤問題。
+
+#### 🇺🇸 English
+### 🎨 Improvements
+- Theme update, Happy New Year!
+- Fixed i18n display sync issue.
+- Hidden reCAPTCHA floating widget.
+
+### 🐛 Bug Fixes
+- Fixed development mode behavior error.
+- Fixed auto-update freeze in Steam Gaming Mode.
+- Fixed release notes display error.
+
 ## v1.6.2
 
 #### 🇹🇼 zh-TW
