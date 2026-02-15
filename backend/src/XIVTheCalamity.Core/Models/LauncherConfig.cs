@@ -11,6 +11,11 @@ public class LauncherConfig
     public bool DevelopmentMode { get; set; } = false;
     
     /// <summary>
+    /// UI language (zh-TW or en-US)
+    /// </summary>
+    public string Language { get; set; } = "zh-TW";
+    
+    /// <summary>
     /// Use encrypted launch arguments
     /// </summary>
     public bool EncryptedArguments { get; set; } = true;

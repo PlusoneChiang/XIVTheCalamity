@@ -113,6 +113,7 @@ public static class ConfigEndpoints
                     currentConfig.Launcher.NonZeroExitError = partialConfig.Launcher.NonZeroExitError;
                     currentConfig.Launcher.DevelopmentMode = partialConfig.Launcher.DevelopmentMode;
                     currentConfig.Launcher.ShowDalamudTab = partialConfig.Launcher.ShowDalamudTab;
+                    currentConfig.Launcher.Language = partialConfig.Launcher.Language;
                 }
                 
                 await configService.SaveConfigAsync(currentConfig);

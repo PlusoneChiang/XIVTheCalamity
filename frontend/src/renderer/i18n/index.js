@@ -10,7 +10,7 @@ const translations = {
     'app.subtitle': 'Final Fantasy XIV 跨平台啟動器',
     
     // Buttons
-    'button.launch': '啟動遊戲',
+    'button.launch': '🎮 啟動遊戲',
     'button.settings': '設定',
     'button.cancel': '取消',
     'button.confirm': '確認',
@@ -22,7 +22,8 @@ const translations = {
     'button.create': '建立',
     'button.yes': '是',
     'button.no': '否',
-    
+    'button.relogin': '🔄 重新登入',
+    'button.delete': '刪除',
     // Account
     'account.login': '登入',
     'account.logout': '登出',
@@ -31,6 +32,8 @@ const translations = {
     'account.otp': '一次性密碼',
     'account.remember': '記住帳號',
     'account.management': '帳號管理',
+    'account.no_saved': '尚無儲存的帳號',
+    'account.delete_confirm': '確定要刪除帳號 {email} 嗎？',
     
     // Game
     'game.launching': '正在啟動遊戲...',
@@ -245,6 +248,8 @@ const translations = {
     'login.password': '密碼',
     'login.otp': 'OTP 驗證碼',
     'login.otp.placeholder': '000000',
+    'login.otpSecret': 'OTP 金鑰 (Base32)',
+    'login.otpSecret.help': '請輸入您的 OTP 金鑰以啟用自動填入功能',
     'login.button': '登入遊戲',
     'login.loading': '登入中...',
     'login.success': '登入成功！',
@@ -407,7 +412,7 @@ const translations = {
     'app.subtitle': 'Final Fantasy XIV Cross-Platform Launcher',
     
     // Buttons
-    'button.launch': 'Launch Game',
+    'button.launch': '🎮 Launch Game',
     'button.settings': 'Settings',
     'button.cancel': 'Cancel',
     'button.confirm': 'Confirm',
@@ -419,6 +424,8 @@ const translations = {
     'button.create': 'Create',
     'button.yes': 'Yes',
     'button.no': 'No',
+    'button.relogin': '🔄 Re-login',
+    'button.delete': 'Delete',
     
     // Account
     'account.login': 'Login',
@@ -428,6 +435,8 @@ const translations = {
     'account.otp': 'One-Time Password',
     'account.remember': 'Remember Account',
     'account.management': 'Account Management',
+    'account.no_saved': 'No saved accounts',
+    'account.delete_confirm': 'Are you sure you want to delete account {email}?',
     
     // Game
     'game.launching': 'Launching game...',
@@ -642,6 +651,8 @@ const translations = {
     'login.password': 'Password',
     'login.otp': 'OTP Code',
     'login.otp.placeholder': '000000',
+    'login.otpSecret': 'OTP Secret (Base32)',
+    'login.otpSecret.help': 'Enter your OTP secret key to enable auto-fill',
     'login.button': 'Login to Game',
     'login.loading': 'Logging in...',
     'login.success': 'Login Successful!',
@@ -799,8 +810,8 @@ const translations = {
 
 class I18n {
   constructor() {
-    // Get saved locale or default to Traditional Chinese
-    this.locale = localStorage.getItem('locale') || 'zh-TW';
+    // Default to Traditional Chinese; will be updated from config on init
+    this.locale = 'zh-TW';
     this.translations = translations;
   }
   
@@ -832,7 +843,6 @@ class I18n {
     }
     
     this.locale = locale;
-    localStorage.setItem('locale', locale);
     
     // Update all elements with data-i18n attribute
     this.updateElements();
@@ -859,13 +869,21 @@ class I18n {
       const key = element.getAttribute('data-i18n');
       const translated = this.t(key);
       
-      // Update text content or specific attribute
+      // Always update text content
+      element.textContent = translated;
+      
+      // Also update specific attribute if specified
       const attr = element.getAttribute('data-i18n-attr');
       if (attr) {
-        element.setAttribute(attr, translated);
-      } else {
-        element.textContent = translated;
+        const [attrName, attrKey] = attr.split(':');
+        element.setAttribute(attrName, this.t(attrKey || key));
       }
+    });
+
+    // Update placeholder attributes
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(element => {
+      const key = element.getAttribute('data-i18n-placeholder');
+      element.placeholder = this.t(key);
     });
   }
   

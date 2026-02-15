@@ -86,14 +86,14 @@ async function loadAccountDropdown() {
   const accounts = await getSavedAccounts();
   
   if (accounts.length === 0) {
-    dropdown.innerHTML = '<div class="dropdown-empty">尚無儲存的帳號</div>';
+    dropdown.innerHTML = `<div class="dropdown-empty">${i18n.t('account.no_saved')}</div>`;
     return;
   }
   
   dropdown.innerHTML = accounts.map(account => `
     <div class="dropdown-item" data-email="${account.email}">
       <span>${account.email}</span>
-      <button class="delete-btn" data-email="${account.email}">刪除</button>
+      <button class="delete-btn" data-email="${account.email}">${i18n.t('button.delete')}</button>
     </div>
   `).join('');
   
@@ -103,7 +103,7 @@ async function loadAccountDropdown() {
       if (e.target.classList.contains('delete-btn')) {
         e.stopPropagation();
         const email = e.target.dataset.email;
-        if (confirm(`確定要刪除帳號 ${email} 嗎？`)) {
+        if (confirm(i18n.t('account.delete_confirm', { email }))) {
           deleteAccount(email);
           loadAccountDropdown();
         }
@@ -472,4 +472,24 @@ export function getOTPSecretInput() {
  */
 export function cleanupAccountManagement() {
   stopOTPTimer();
+}
+
+/**
+ * Refresh current account state (e.g., after OTP secret cleared from settings)
+ * Re-checks OTP secret availability and updates auto-fill accordingly
+ */
+export async function refreshAccountState() {
+  const email = document.getElementById('email').value.trim();
+  if (!email) return;
+
+  const checkbox = document.getElementById('autoFillOTP');
+  if (!checkbox.checked) return;
+
+  const hasSecret = await hasOTPSecret(email);
+  if (!hasSecret) {
+    // OTP secret was cleared, reset auto-fill
+    checkbox.checked = false;
+    await handleAutoFillOTPChange();
+    console.log('[AccountManagement] OTP auto-fill disabled: secret was cleared');
+  }
 }

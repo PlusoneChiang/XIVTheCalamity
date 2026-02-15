@@ -186,7 +186,8 @@ function populateForm(config) {
   
   // General settings
   if (config.launcher) {
-    document.getElementById('language').value = i18n.locale || 'zh-TW';
+    document.getElementById('language').value = config.launcher.language || 'zh-TW';
+    i18n.setLocale(config.launcher.language || 'zh-TW');
     document.getElementById('debugLogging').checked = config.launcher.developmentMode || false;
   }
   
@@ -237,6 +238,7 @@ function collectFormData() {
   const formData = {
     launcher: {
       developmentMode: document.getElementById('debugLogging').checked,
+      language: document.getElementById('language').value,
       // Preserve showDalamudTab from current config (set via Konami code)
       showDalamudTab: currentConfig?.launcher?.showDalamudTab || false
     },
@@ -293,10 +295,10 @@ async function saveConfig() {
     // 記錄變更前的設定（用於比較）
     const oldGamePath = currentConfig?.game?.gamePath || '';
     const newGamePath = formData.game?.gamePath || '';
-    
-    // Save language separately
-    const newLocale = document.getElementById('language').value;
-    if (newLocale !== i18n.locale) {
+    const oldLocale = currentConfig?.launcher?.language || 'zh-TW';
+    const newLocale = formData.launcher.language;
+    const localeChanged = oldLocale !== newLocale;
+    if (localeChanged) {
       i18n.setLocale(newLocale);
     }
     
@@ -345,14 +347,13 @@ async function saveConfig() {
     const newDalamudEnabled = formData.dalamud?.enabled || false;
     const dalamudEnabledChanged = oldDalamudEnabled !== newDalamudEnabled;
     
-    if (gamePathChanged || dalamudEnabledChanged) {
-      console.log('[Settings] Notifying login page of config change');
-      window.electronAPI.events.send('config-changed', {
-        gamePathChanged,
-        dalamudEnabledChanged: dalamudEnabledChanged ? newDalamudEnabled : undefined,
-        newGamePath
-      });
-    }
+    // 通知登入頁重新讀取設定
+    console.log('[Settings] Notifying login page of config change');
+    window.electronAPI.events.send('config-changed', {
+      gamePathChanged,
+      dalamudEnabledChanged: dalamudEnabledChanged ? newDalamudEnabled : undefined,
+      newGamePath
+    });
     
     // Hide overlay and close window
     hideLoadingOverlay();
@@ -377,10 +378,10 @@ async function applyConfig() {
     // 記錄變更前的設定（用於比較）
     const oldGamePath = currentConfig?.game?.gamePath || '';
     const newGamePath = formData.game?.gamePath || '';
-    
-    // Save language separately
-    const newLocale = document.getElementById('language').value;
-    if (newLocale !== i18n.locale) {
+    const oldLocale = currentConfig?.launcher?.language || 'zh-TW';
+    const newLocale = formData.launcher.language;
+    const localeChanged = oldLocale !== newLocale;
+    if (localeChanged) {
       i18n.setLocale(newLocale);
     }
     
@@ -429,14 +430,13 @@ async function applyConfig() {
     const newDalamudEnabled = formData.dalamud?.enabled || false;
     const dalamudEnabledChanged = oldDalamudEnabled !== newDalamudEnabled;
     
-    if (gamePathChanged || dalamudEnabledChanged) {
-      console.log('[Settings] Notifying login page of config change');
-      window.electronAPI.events.send('config-changed', {
-        gamePathChanged,
-        dalamudEnabledChanged: dalamudEnabledChanged ? newDalamudEnabled : undefined,
-        newGamePath
-      });
-    }
+    // 通知登入頁重新讀取設定
+    console.log('[Settings] Notifying login page of config change');
+    window.electronAPI.events.send('config-changed', {
+      gamePathChanged,
+      dalamudEnabledChanged: dalamudEnabledChanged ? newDalamudEnabled : undefined,
+      newGamePath
+    });
     
     // Update currentConfig for subsequent applies
     currentConfig = formData;
@@ -526,6 +526,8 @@ function initGeneralTab() {
       
       if (success) {
         alert(i18n.t('settings.general.clear_otp_success', { email }));
+        // 通知登入頁刷新帳號狀態
+        window.electronAPI.events.send('config-changed', {});
       } else {
         alert(i18n.t('settings.general.clear_otp_not_found', { email }));
       }

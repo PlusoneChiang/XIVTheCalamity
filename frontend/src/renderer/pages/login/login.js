@@ -5,7 +5,7 @@
 
 // Import utilities
 import { toHex } from '../../utils/encoding.js';
-import { initAccountManagement, handleAutoFillOTPChange, getOTPSecretInput, cleanupAccountManagement, clearAutoFilledState, isAllAutoFilled } from './accountManagement.js';
+import { initAccountManagement, handleAutoFillOTPChange, getOTPSecretInput, cleanupAccountManagement, clearAutoFilledState, isAllAutoFilled, refreshAccountState } from './accountManagement.js';
 import { savePassword, saveOTPSecret, saveAutoFillOTP, hasOTPSecret } from '../../utils/accountStorage.js';
 import i18n from '../../i18n/index.js';
 import { startBackgroundUpdate, startLoginUpdate, cancelBackgroundUpdate, setAppVersionText, isUpdating, handleConfigChanged, setLoggedIn, setOnUpdateComplete } from './updateManager.js';
@@ -20,9 +20,27 @@ const SITE_KEY = "6Ld6VmorAAAAANQdQeqkaOeScR42qHC7Hyalq00r";
 let currentState = 'idle';
 let appVersionText = 'XIV The Calamity';  // Will be updated by loadVersion()
 
+/**
+ * 更新按鈕的 i18n 文字，保持內部 <span data-i18n> 結構完整，
+ * 使 i18n.updateElements() 在語系切換時能自動更新。
+ */
+function setButtonI18n(button, i18nKey) {
+  if (!button) return;
+  let span = button.querySelector('span[data-i18n]');
+  if (!span) {
+    button.textContent = '';
+    span = document.createElement('span');
+    button.appendChild(span);
+  }
+  span.setAttribute('data-i18n', i18nKey);
+  span.textContent = i18n.t(i18nKey);
+}
+
 // Session & remain countdown timers
 let sessionTimerId = null;
 let remainTimerId = null;
+let remainExpireTime = null;
+let sessionObtainedAt = null;
 
 /**
  * Initialize the login page
@@ -37,6 +55,21 @@ async function init() {
     return;
   }
   console.log('[Login] electronAPI is available');
+  
+  // Load config for language and dev mode
+  try {
+    const configResp = await window.electronAPI.backend.call('/api/config');
+    const rawData = configResp?.data;
+    const config = rawData?.success ? rawData.data : rawData;
+    if (config?.launcher?.language) {
+      i18n.setLocale(config.launcher.language);
+    }
+    if (config?.launcher?.developmentMode) {
+      document.body.classList.add('dev-mode');
+    }
+  } catch (e) {
+    console.error('[Login] Failed to load config:', e);
+  }
   
   // Load version
   loadVersion();
@@ -83,15 +116,42 @@ async function init() {
   
   // 監聽設定變更事件
   if (window.electronAPI.events) {
-    window.electronAPI.events.on('config-changed', (data) => {
+    window.electronAPI.events.on('config-changed', async (data) => {
       console.log('[Login] Received config-changed event:', data);
       handleConfigChanged(data);
       // 處理 Dalamud 設定變更
       if (data.dalamudEnabledChanged !== undefined) {
         handleDalamudConfigChanged(data);
       }
+      // 重新讀取設定檔以更新頁面
+      try {
+        const configResp = await window.electronAPI.backend.call('/api/config');
+        const rawData = configResp?.data;
+        const config = rawData?.success ? rawData.data : rawData;
+        if (config?.launcher?.language) {
+          i18n.setLocale(config.launcher.language);
+        }
+        if (config?.launcher?.developmentMode) {
+          document.body.classList.add('dev-mode');
+        } else {
+          document.body.classList.remove('dev-mode');
+        }
+        updateTitleBarDevMode();
+      } catch (e) {
+        console.error('[Login] Failed to reload config after change:', e);
+      }
+      // 重新檢查帳號狀態（OTP 金鑰可能已被清除）
+      await refreshAccountState();
     });
   }
+  
+  // 語系變更時，重新渲染 JS 動態生成的文字
+  window.addEventListener('locale-changed', () => {
+    // 重新渲染訂閱資訊面板
+    if (window._lastSubscriptionType != null && window._lastRemainSeconds != null) {
+      updateSubscriptionInfo(window._lastSubscriptionType, window._lastRemainSeconds);
+    }
+  });
   
   // Check for launcher updates first (blocking)
   // Subsequent steps wait until the check completes and the user responds
@@ -465,7 +525,7 @@ async function handleLaunchGame() {
   
   const launchButton = document.getElementById('launchButton');
   launchButton.disabled = true;
-  launchButton.textContent = i18n.t('login.launching');
+  setButtonI18n(launchButton, 'login.launching');
   
   try {
     // Launch game via IPC
@@ -484,13 +544,13 @@ async function handleLaunchGame() {
       console.error('[Login] Failed to launch game:', getErrorMessage(error, i18n));
       showError(i18n.t('login.launch_failed', { message: getErrorMessage(error, i18n) }));
       launchButton.disabled = false;
-      launchButton.textContent = i18n.t('button.launch');
+      setButtonI18n(launchButton, 'button.launch');
       return;
     }
     
     // handleApiResponse unwrapped the data, if we got here it's successful
     console.log('[Login] Game launched successfully, PID:', data.processId);
-    launchButton.textContent = i18n.t('login.game_running');
+    setButtonI18n(launchButton, 'login.game_running');
     showTitleMessage(i18n.t('login.game_launched'));
     
     // Wait for game exit
@@ -499,7 +559,7 @@ async function handleLaunchGame() {
     console.error('[Login] Launch error:', error);
     showError(i18n.t('login.launch_error'));
     launchButton.disabled = false;
-    launchButton.textContent = i18n.t('button.launch');
+    setButtonI18n(launchButton, 'button.launch');
   }
 }
 
@@ -536,7 +596,7 @@ async function waitForGameExit() {
   } finally {
     // Re-enable launch button
     launchButton.disabled = false;
-    launchButton.textContent = i18n.t('button.launch');
+    setButtonI18n(launchButton, 'button.launch');
   }
 }
 
@@ -598,7 +658,7 @@ function setLoginState(state, sessionId = null, subscriptionType = null, remain 
       if (launchButton) {
         // 初始禁用，等待方案B更新檢查完成
         launchButton.disabled = true;
-        launchButton.textContent = i18n.t('login.checking_updates');
+        setButtonI18n(launchButton, 'login.checking_updates');
       }
       
       // Update subscription info
@@ -622,7 +682,7 @@ function setLoginState(state, sessionId = null, subscriptionType = null, remain 
         console.log('[Login] No update in progress, enabling launch button');
         if (launchButton) {
           launchButton.disabled = false;
-          launchButton.textContent = i18n.t('button.launch');
+          setButtonI18n(launchButton, 'button.launch');
         }
       }
       break;
@@ -633,16 +693,20 @@ function setLoginState(state, sessionId = null, subscriptionType = null, remain 
  * Update subscription information display with live countdowns
  */
 function updateSubscriptionInfo(subscriptionType, remainSeconds) {
-  const subTypeText = subscriptionType === 1 ? i18n.t('login.sub_crystal') : 
-                      subscriptionType === 2 ? i18n.t('login.sub_credit') : 
-                      i18n.t('login.sub_unknown');
+  // 保存狀態供語言切換時重新渲染
+  window._lastSubscriptionType = subscriptionType;
+  window._lastRemainSeconds = remainSeconds;
+  
+  const subTypeKey = subscriptionType === 1 ? 'login.sub_crystal' : 
+                     subscriptionType === 2 ? 'login.sub_credit' : 
+                     'login.sub_unknown';
   
   const sessionInfo = document.getElementById('sessionInfo');
   sessionInfo.innerHTML = `
     <div style="text-align: left; line-height: 1.8;">
-      <div>${i18n.t('login.sub_type')}<strong>${subTypeText}</strong></div>
-      <div>${i18n.t('login.remain_time')}<strong id="remainCountdown"></strong></div>
-      <div>${i18n.t('login.session_time')}<strong id="sessionCountdown"></strong></div>
+      <div><span data-i18n="login.sub_type">${i18n.t('login.sub_type')}</span><br><strong style="padding-left: 1em;" data-i18n="${subTypeKey}">${i18n.t(subTypeKey)}</strong></div>
+      <div><span data-i18n="login.remain_time">${i18n.t('login.remain_time')}</span><br><strong id="remainCountdown" style="padding-left: 1em;"></strong></div>
+      <div><span data-i18n="login.session_time">${i18n.t('login.session_time')}</span><br><strong id="sessionCountdown" style="padding-left: 1em;"></strong></div>
     </div>
     <div id="sessionWarning" style="display: none;"></div>
   `;
@@ -680,13 +744,16 @@ function formatCountdown(totalSeconds) {
 function startRemainCountdown(remainSeconds) {
   clearCountdownTimers('remain');
   
-  const expireTime = Date.now() + remainSeconds * 1000;
+  // 只在首次設定 expireTime，語言切換重新渲染時沿用已有的
+  if (!remainExpireTime) {
+    remainExpireTime = Date.now() + remainSeconds * 1000;
+  }
   
   function updateRemain() {
     const el = document.getElementById('remainCountdown');
     if (!el) { clearCountdownTimers('remain'); return; }
     
-    const remaining = Math.max(0, Math.floor((expireTime - Date.now()) / 1000));
+    const remaining = Math.max(0, Math.floor((remainExpireTime - Date.now()) / 1000));
     el.textContent = formatCountdown(remaining);
   }
   
@@ -703,8 +770,11 @@ const SESSION_TTL_SECONDS = 3 * 60 * 60; // 3 hours
 function startSessionCountdown() {
   clearCountdownTimers('session');
   
-  const sessionObtainedAt = Date.now();
-  localStorage.setItem('sessionObtainedAt', sessionObtainedAt.toString());
+  // 只在首次設定 sessionObtainedAt，語言切換重新渲染時沿用已有的
+  if (!sessionObtainedAt) {
+    sessionObtainedAt = Date.now();
+    localStorage.setItem('sessionObtainedAt', sessionObtainedAt.toString());
+  }
   let warned = false;
   
   function updateSession() {
@@ -736,9 +806,11 @@ function startSessionCountdown() {
 function clearCountdownTimers(type) {
   if (type === 'remain' || type === 'all') {
     if (remainTimerId) { clearInterval(remainTimerId); remainTimerId = null; }
+    if (type === 'all') remainExpireTime = null;
   }
   if (type === 'session' || type === 'all') {
     if (sessionTimerId) { clearInterval(sessionTimerId); sessionTimerId = null; }
+    if (type === 'all') sessionObtainedAt = null;
   }
 }
 
@@ -808,7 +880,7 @@ function startEnvironmentInitialization() {
     const settingsBtn = document.getElementById('settingsBtn');
     if (launchButton) {
       launchButton.disabled = false;
-      launchButton.textContent = i18n.t('button.launch');
+      setButtonI18n(launchButton, 'button.launch');
     }
     if (settingsBtn) {
       settingsBtn.disabled = false;
@@ -821,7 +893,7 @@ function startEnvironmentInitialization() {
       const btn = document.getElementById('launchButton');
       if (btn) {
         btn.disabled = false;
-        btn.textContent = i18n.t('button.launch');
+        setButtonI18n(btn, 'button.launch');
       }
     });
     
@@ -880,7 +952,7 @@ function startEnvironmentInitialization() {
   
   // Keep launch button and settings button disabled
   launchButton.disabled = true;
-  launchButton.textContent = i18n.t('login.preparing');
+  setButtonI18n(launchButton, 'login.preparing');
   settingsBtn.disabled = true;
   
   // Switch to progress mode
@@ -963,7 +1035,7 @@ function startEnvironmentInitialization() {
         isEnvironmentInitialized = true;
         isInitializing = false;
         launchButton.disabled = false;
-        launchButton.textContent = i18n.t('button.launch');
+        setButtonI18n(launchButton, 'button.launch');
         settingsBtn.disabled = false;
         
         console.log('[ENV-INIT] ========== Initialization COMPLETE ==========');
@@ -980,7 +1052,7 @@ function startEnvironmentInitialization() {
           const btn = document.getElementById('launchButton');
           if (btn) {
             btn.disabled = false;
-            btn.textContent = i18n.t('button.launch');
+            setButtonI18n(btn, 'button.launch');
           }
         });
         
@@ -1043,7 +1115,7 @@ function startEnvironmentInitialization() {
           
           isInitializing = false;
           launchButton.disabled = true;
-          launchButton.textContent = i18n.t('login.env_init_failed');
+          setButtonI18n(launchButton, 'login.env_init_failed');
           settingsBtn.disabled = false;  // Allow user to check settings even on error
           
           console.log('[ENV-INIT] ========== Initialization FAILED ==========');
@@ -1080,7 +1152,7 @@ function startEnvironmentInitialization() {
           isInitializing = false;
           // Keep button disabled on error
           launchButton.disabled = true;
-          launchButton.textContent = i18n.t('login.backend_failed');
+          setButtonI18n(launchButton, 'login.backend_failed');
           settingsBtn.disabled = false;  // Allow user to check settings even on connection error
           
           console.log('[ENV-INIT] ========== Connection FAILED ==========');
@@ -1118,11 +1190,8 @@ function showTitleMessage(message) {
 async function loadVersion() {
   try {
     const versionData = await window.electronAPI.getVersion();
-    const titleBarText = document.getElementById('titleBarText');
-    appVersionText = `${versionData.appName} v${versionData.version}`;  // Store for later use
-    if (titleBarText) {
-      titleBarText.textContent = appVersionText;
-    }
+    appVersionText = `${versionData.appName} v${versionData.version}`;
+    updateTitleBarDevMode();
     console.log('[Login] Version loaded:', appVersionText);
     
     // Share version text with updateManager
@@ -1132,6 +1201,22 @@ async function loadVersion() {
     appVersionText = 'XIV The Calamity';  // Fallback
     setAppVersionText(appVersionText);
   }
+}
+
+/**
+ * Update title bar text with dev mode indicator
+ */
+function updateTitleBarDevMode() {
+  const titleBarText = document.getElementById('titleBarText');
+  if (!titleBarText) return;
+  // Strip existing dev mode suffix
+  const baseText = appVersionText.replace(/ \(dev mode\)$/, '');
+  appVersionText = baseText;
+  if (document.body.classList.contains('dev-mode')) {
+    appVersionText += ' (dev mode)';
+  }
+  titleBarText.textContent = appVersionText;
+  setAppVersionText(appVersionText);
 }
 
 /**

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, globalShortcut } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
@@ -19,9 +19,38 @@ const isWindows = process.platform === 'win32';
 // Note: If you need to run in Steam Game Mode, add --no-sandbox flag manually:
 // ./XIVTheCalamity.AppImage --no-sandbox
 
-// Hide menu on Linux/Windows (macOS keeps native menu bar)
-if (!isMacOS) {
+// 自訂應用程式選單（不包含 DevTools，由 globalShortcut 動態控制）
+if (isMacOS) {
+  const template = [
+    { role: 'appMenu' },
+    { role: 'editMenu' },
+    { role: 'windowMenu' }
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+} else {
   Menu.setApplicationMenu(null);
+}
+
+/**
+ * Register/unregister DevTools shortcut based on debug mode
+ */
+function updateDevToolsShortcut() {
+  // macOS: Cmd+Option+I, Others: Ctrl+Shift+I
+  const shortcut = isMacOS ? 'CommandOrControl+Alt+I' : 'CommandOrControl+Shift+I';
+  globalShortcut.unregister(shortcut);
+  globalShortcut.unregister('F12');
+  if (isDebugModeEnabled) {
+    globalShortcut.register(shortcut, () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.toggleDevTools();
+      }
+    });
+    globalShortcut.register('F12', () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.toggleDevTools();
+      }
+    });
+  }
 }
 
 // Load version info from package.json
@@ -163,7 +192,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       cache: true,  // Always enable cache
-      devTools: isDebugModeEnabled
+      devTools: true
     }
   };
 
@@ -203,8 +232,12 @@ function createWindow() {
   });
   
   
+  // DevTools 開啟時檢查（後備保護）
   mainWindow.webContents.on('devtools-opened', () => {
-    // Allow DevTools to be manually opened if needed (Cmd+Shift+I or right-click > Inspect)
+    if (!isDebugModeEnabled) {
+      safeLog('[Main] DevTools blocked: developmentMode is disabled');
+      mainWindow.webContents.closeDevTools();
+    }
   });
 
   // Close settings window when main window closes
@@ -654,6 +687,7 @@ app.whenReady().then(async () => {
   // Initialize debug mode from config
   isDebugModeEnabled = isDevelopmentMode();
   log.info('[Main] Debug mode:', isDebugModeEnabled ? 'enabled' : 'disabled');
+  updateDevToolsShortcut();
   
   // Adjust log level based on development mode
   if (!isDebugModeEnabled) {
@@ -683,6 +717,7 @@ app.on('window-all-closed', function () {
 });
 
 app.on('before-quit', () => {
+  globalShortcut.unregisterAll();
   stopBackend();
 });
 
@@ -1023,6 +1058,20 @@ ipcMain.handle('dialog:show-message-box', async (event, options) => {
  */
 ipcMain.on('app:broadcast-event', (event, eventName, data) => {
   safeLog(`[IPC] Broadcasting event: ${eventName}`);
+  
+  // 設定變更時更新 main process 的 devMode 狀態
+  if (eventName === 'config-changed') {
+    const newDevMode = isDevelopmentMode();
+    if (newDevMode !== isDebugModeEnabled) {
+      isDebugModeEnabled = newDevMode;
+      safeLog(`[Main] Debug mode updated: ${isDebugModeEnabled ? 'enabled' : 'disabled'}`);
+      updateDevToolsShortcut();
+      // 關閉 DevTools（如果 dev mode 被關閉且 DevTools 正在開啟）
+      if (!isDebugModeEnabled && mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents.isDevToolsOpened()) {
+        mainWindow.webContents.closeDevTools();
+      }
+    }
+  }
   
   // 發送到所有視窗
   const { BrowserWindow } = require('electron');
