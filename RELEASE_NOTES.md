@@ -1,5 +1,15 @@
 # Release Notes
 
+## v1.6.9
+
+#### 🇹🇼 zh-TW
+### 🐛 修復
+- SteamOS的DXVK錯誤
+
+#### 🇺🇸 English
+### 🐛 Bug Fixes
+- Fixed DXVK error on SteamOS
+
 ## v1.6.8
 
 #### 🇹🇼 zh-TW
