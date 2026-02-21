@@ -13,6 +13,7 @@ namespace XIVTheCalamity.Platform.Linux.Wine;
 /// </summary>
 public class WineXIVEnvironmentService(
     WineXIVDownloadService downloadService,
+    DxvkDownloadService dxvkDownloadService,
     ConfigService configService,
     ILogger<WineXIVEnvironmentService>? logger = null
 ) : IEnvironmentService
@@ -25,6 +26,21 @@ public class WineXIVEnvironmentService(
     private string Wine => Path.Combine(WineBin, "wine64");
     private string WineServer => Path.Combine(WineBin, "wineserver");
     private string WinePrefix => _platformPaths.GetWinePrefixPath();
+    
+    /// <summary>
+    /// Detect the Wine lib directory name (lib64 on Fedora/RHEL, lib on Arch/Ubuntu)
+    /// </summary>
+    private string WineLibDirName
+    {
+        get
+        {
+            if (Directory.Exists(Path.Combine(WineRoot, "lib64", "wine")))
+                return "lib64";
+            if (Directory.Exists(Path.Combine(WineRoot, "lib", "wine")))
+                return "lib";
+            return "lib64"; // fallback
+        }
+    }
     
     public async IAsyncEnumerable<EnvironmentProgressEvent> InitializeAsync(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -108,16 +124,44 @@ public class WineXIVEnvironmentService(
         
         await EnsurePrefixAsync(cancellationToken);
         
-        // Step 4: Install required DLLs (85-100%)
+        // Step 4: Download DXVK if needed (85-92%)
         yield return new EnvironmentProgressEvent
         {
-            Stage = "install_dlls",
-            MessageKey = "progress.installing_dlls",
+            Stage = "download_dxvk",
+            MessageKey = "progress.checking_dxvk",
             CompletedItems = 85,
             TotalItems = 100
         };
         
-        await InstallRequiredDllsAsync();
+        await foreach (var dxvkProgress in dxvkDownloadService.EnsureDxvkAsync(cancellationToken))
+        {
+            if (dxvkProgress.HasError)
+            {
+                logger?.LogWarning("[WINE-XIV] DXVK download failed: {Error}", dxvkProgress.ErrorMessage);
+                // Non-fatal: game can fall back to WineD3D
+                break;
+            }
+            
+            var mappedPercentage = 85 + (int)(dxvkProgress.Percentage * 0.07);
+            yield return new EnvironmentProgressEvent
+            {
+                Stage = dxvkProgress.Stage,
+                MessageKey = dxvkProgress.MessageKey,
+                CompletedItems = mappedPercentage,
+                TotalItems = 100
+            };
+        }
+        
+        // Step 5: Install DXVK DLLs to wineprefix (92-100%)
+        yield return new EnvironmentProgressEvent
+        {
+            Stage = "install_dlls",
+            MessageKey = "progress.installing_dlls",
+            CompletedItems = 92,
+            TotalItems = 100
+        };
+        
+        InstallDxvkToPrefix();
         
         // Complete
         yield return new EnvironmentProgressEvent
@@ -169,51 +213,11 @@ public class WineXIVEnvironmentService(
         }
     }
     
-    private async Task InstallRequiredDllsAsync()
+    private void InstallDxvkToPrefix()
     {
-        // Wine-XIV includes DXVK internally, but we need to copy to system32 for Dalamud
-        var system32Path = Path.Combine(WinePrefix, "drive_c", "windows", "system32");
-        Directory.CreateDirectory(system32Path);
-        
-        var wineLibPath = Path.Combine(WineRoot, "lib64", "wine");
-        var wineDxvkPath = Path.Combine(wineLibPath, "x86_64-windows");
-        
-        // DXVK DLLs
-        var dxvkDlls = new[] { "d3d11.dll", "dxgi.dll", "d3d10core.dll", "d3d9.dll" };
-        
         logger?.LogInformation("[WINE-XIV] Installing DXVK DLLs to wineprefix");
-        
-        foreach (var dll in dxvkDlls)
-        {
-            var sourcePath = Path.Combine(wineDxvkPath, dll);
-            var destPath = Path.Combine(system32Path, dll);
-            
-            if (File.Exists(sourcePath))
-            {
-                // Delete existing file if it exists
-                if (File.Exists(destPath))
-                {
-                    try
-                    {
-                        File.Delete(destPath);
-                    }
-                    catch (Exception ex)
-                    {
-                        logger?.LogWarning("[WINE-XIV] Could not delete existing {Dll}: {Error}", dll, ex.Message);
-                    }
-                }
-                
-                File.Copy(sourcePath, destPath, overwrite: false);
-                logger?.LogDebug("[WINE-XIV] Installed {Dll}", dll);
-            }
-            else
-            {
-                logger?.LogWarning("[WINE-XIV] DLL not found: {Path}", sourcePath);
-            }
-        }
-        
-        logger?.LogInformation("[WINE-XIV] DLLs installed successfully");
-        await Task.CompletedTask;
+        dxvkDownloadService.InstallToPrefix(WinePrefix);
+        logger?.LogInformation("[WINE-XIV] DXVK DLLs installed successfully");
     }
     
     public string GetEmulatorDirectory()
@@ -227,7 +231,7 @@ public class WineXIVEnvironmentService(
         var config = configService.LoadConfigAsync().GetAwaiter().GetResult();
         var wineXIVConfig = config.WineXIV ?? new WineXIVConfig();
         
-        var wineLibPath = Path.Combine(WineRoot, "lib64", "wine");
+        var wineLibPath = Path.Combine(WineRoot, WineLibDirName, "wine");
         var wineDllPath = Path.Combine(wineLibPath, "x86_64-windows");
         
         var env = new Dictionary<string, string>
@@ -237,7 +241,7 @@ public class WineXIVEnvironmentService(
             
             // Wine library paths
             ["WINEDLLPATH"] = wineDllPath,
-            ["LD_LIBRARY_PATH"] = $"{Path.Combine(WineRoot, "lib64")}:{wineLibPath}/x86_64-unix",
+            ["LD_LIBRARY_PATH"] = $"{Path.Combine(WineRoot, WineLibDirName)}:{wineLibPath}/x86_64-unix",
             
             // DLL overrides - CRITICAL: Keep d3d11,dxgi,d3d10core,d3d9=n,b for FFXIV
             // Different from XIVLauncher.Core to ensure DXGI fallback works

@@ -69,6 +69,7 @@ try
         builder.Services.AddSingleton<XIVTheCalamity.Platform.IEnvironmentService, 
             XIVTheCalamity.Platform.Linux.Wine.WineXIVEnvironmentService>();
         builder.Services.AddSingleton<XIVTheCalamity.Platform.Linux.Wine.WineXIVDownloadService>();
+        builder.Services.AddSingleton<XIVTheCalamity.Platform.Linux.Wine.DxvkDownloadService>();
         // Add Wine services for Linux (using macOS implementation as it's cross-platform)
         builder.Services.AddSingleton<WinePrefixService>();
         builder.Services.AddSingleton<WineConfigService>();

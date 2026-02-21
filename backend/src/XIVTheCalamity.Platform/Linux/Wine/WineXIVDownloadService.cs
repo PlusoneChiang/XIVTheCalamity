@@ -22,7 +22,7 @@ public class WineXIVDownloadService(
     
     // Fixed Wine-XIV version
     private const string WineXIVVersion = "10.8.r0.g47f77594";
-    private const string GithubRepo = "goatcorp/wine-xiv-git";
+    private const string GithubRepo = "PlusoneChiang/wine-xiv-git";
     private const string DownloadUrlTemplate = $"https://github.com/{GithubRepo}/releases/download/{WineXIVVersion}/wine-xiv-staging-fsync-git-{{0}}-{WineXIVVersion}.tar.xz";
     
     // Supported distros
