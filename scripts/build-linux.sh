@@ -78,39 +78,14 @@ else
   exit 1
 fi
 
-# ================== Update package.json ==================
+# ================== Read Version ==================
 echo ""
-echo "📝 Updating package.json configuration..."
 
 cd "$FRONTEND_DIR"
 
 # Read version from package.json
 VERSION=$(node -e "console.log(require('./package.json').version)")
 echo "   📦 Current version: $VERSION"
-
-node -e "
-const fs = require('fs');
-const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-
-// Update extraResources
-pkg.build.extraResources = [
-  {
-    from: '../Release/temp-backend-linux/XIVTheCalamity.Api.NativeAOT',
-    to: 'backend/XIVTheCalamity.Api.NativeAOT'
-  }
-];
-
-// Ensure Linux target configuration exists
-if (!pkg.build.linux) {
-  pkg.build.linux = {
-    target: ['AppImage'],
-    category: 'Game'
-  };
-}
-
-fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-console.log('   ✅ package.json updated');
-"
 
 # ================== Install Frontend Dependencies ==================
 echo ""
@@ -129,7 +104,7 @@ echo "📦 Building AppImage (version $VERSION)..."
 echo "   (This may take 5-10 minutes...)"
 echo ""
 
-# Use npx electron-builder directly instead of npm run build:linux
+# Use npx electron-builder (linux extraResources is already configured in package.json)
 npx electron-builder --linux --x64
 
 # Expected filename pattern

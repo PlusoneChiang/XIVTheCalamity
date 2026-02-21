@@ -53,6 +53,10 @@ const translations = {
     'progress.init_wine_prefix': '初始化 Wine Prefix',
     'progress.prefix_initialized': 'Wine Prefix 已就緒',
     'progress.installing_dlls': '安裝 DXVK 動態庫',
+    'progress.checking_dxvk': '檢查 DXVK',
+    'progress.downloading_dxvk': '下載 DXVK',
+    'progress.extracting_dxvk': '解壓縮 DXVK',
+    'progress.dxvk_ready': 'DXVK 已就緒',
     'progress.environment_ready': '環境已就緒',
     'progress.complete': '環境初始化完成',
     'progress.skip_windows': 'Windows 平台無需初始化',
@@ -75,6 +79,7 @@ const translations = {
     
     // Error Messages
     'error.wine_download_failed': 'Wine 下載失敗',
+    'error.dxvk_download_failed': 'DXVK 下載失敗',
     'error.init_failed': '初始化失敗',
     'error.download_failed': '下載失敗',
     
@@ -457,6 +462,10 @@ const translations = {
     'progress.init_wine_prefix': 'Initializing Wine Prefix',
     'progress.prefix_initialized': 'Wine Prefix is ready',
     'progress.installing_dlls': 'Installing DXVK libraries',
+    'progress.checking_dxvk': 'Checking DXVK',
+    'progress.downloading_dxvk': 'Downloading DXVK',
+    'progress.extracting_dxvk': 'Extracting DXVK',
+    'progress.dxvk_ready': 'DXVK is ready',
     'progress.environment_ready': 'Environment is ready',
     'progress.complete': 'Environment initialization complete',
     'progress.skip_windows': 'Windows platform requires no initialization',
@@ -479,6 +488,7 @@ const translations = {
     
     // Error Messages
     'error.wine_download_failed': 'Wine download failed',
+    'error.dxvk_download_failed': 'DXVK download failed',
     'error.init_failed': 'Initialization failed',
     'error.download_failed': 'Download failed',
     

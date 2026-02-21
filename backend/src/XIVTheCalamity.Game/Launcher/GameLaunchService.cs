@@ -179,6 +179,15 @@ public class GameLaunchService
                     baseEnvironment["DALAMUD_RUNTIME"] = wineDalamudPath;
                     baseEnvironment["DOTNET_ROOT"] = wineDalamudPath;  // Also set DOTNET_ROOT
                     
+                    // Disable DXVK when Dalamud is enabled on Linux
+                    // Dalamud's Reloaded.Hooks uses FASMX64.dll which crashes under DXVK's modified memory layout
+                    // Force Wine's built-in D3D11 until Dalamud is updated with VTable-based hooking
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                    {
+                        baseEnvironment["WINEDLLOVERRIDES"] = "d3d11=b;dxgi=b";
+                        _logger.LogInformation("[GAME] DXVK disabled for Dalamud compatibility (using Wine built-in D3D11)");
+                    }
+                    
                     // CRITICAL: Enable .NET 7+ on Apple Silicon (for Dalamud only)
                     // This MUST be set only when Dalamud is enabled, not globally
                     // Setting it globally causes Wine processes to crash with exit code 136
