@@ -141,8 +141,8 @@ function parseReleaseNotes(releaseNotes, locale) {
   }
   
   if (!localeBlock) {
-    // Fallback: strip all h4 locale headings and show everything
-    localeBlock = changelog.replace(/<h4>.*?<\/h4>/gi, '').trim();
+    // No locale heading found: no release notes written, show nothing
+    return '';
   }
   
   if (!localeBlock) return '';
