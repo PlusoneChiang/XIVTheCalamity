@@ -11,6 +11,7 @@ import { showTitleBarProgress, hideTitleBarProgress } from './login.js';
 let updateState = 'idle'; // idle | checking | available | downloading | downloaded | error
 let pendingVersion = null;
 let resolveUpdatePromise = null;
+let initialCheckDone = false;
 
 /**
  * Check for launcher updates (blocking).
@@ -40,16 +41,26 @@ export async function initAppUpdater() {
     window.electronAPI.updater.onAvailable((data) => {
       updateState = 'available';
       pendingVersion = data.version;
+      pendingReleaseNotes = data.releaseNotes || null;
       console.log('[APP-UPDATE] Update available:', data.version);
       hideTitleBarProgress();
-      showUpdateDialog(data.version, data.releaseNotes);
+      if (initialCheckDone) {
+        // Background periodic check: show non-intrusive reminder
+        showReminder('available');
+      } else {
+        // Initial startup check: show full blocking dialog
+        showUpdateDialog(data.version, data.releaseNotes);
+      }
     });
 
     window.electronAPI.updater.onNotAvailable(() => {
       updateState = 'idle';
       console.log('[APP-UPDATE] App is up to date');
       hideTitleBarProgress();
-      resolve();
+      if (!initialCheckDone) {
+        initialCheckDone = true;
+        resolve();
+      }
     });
 
     window.electronAPI.updater.onProgress((data) => {
@@ -73,7 +84,10 @@ export async function initAppUpdater() {
       console.error('[APP-UPDATE] Update error:', data.message);
       hideTitleBarProgress();
       removeDialog();
-      resolve();
+      if (!initialCheckDone) {
+        initialCheckDone = true;
+        resolve();
+      }
     });
 
     console.log('[APP-UPDATE] Listeners ready, triggering update check');
@@ -81,10 +95,12 @@ export async function initAppUpdater() {
       console.log('[APP-UPDATE] Check result:', result);
       if (result?.skipped) {
         console.log('[APP-UPDATE] Update check skipped (dev mode)');
+        initialCheckDone = true;
         resolve();
       }
     }).catch((err) => {
       console.error('[APP-UPDATE] Check failed:', err);
+      initialCheckDone = true;
       resolve();
     });
   });
@@ -188,6 +204,7 @@ function showUpdateDialog(version, releaseNotes) {
   document.getElementById('appUpdateLaterBtn').addEventListener('click', () => {
     removeDialog();
     showReminder('available');
+    initialCheckDone = true;
     if (resolveUpdatePromise) {
       resolveUpdatePromise();
       resolveUpdatePromise = null;

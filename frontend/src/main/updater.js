@@ -44,6 +44,7 @@ if (isPackaged) {
     });
 
     autoUpdater.on('download-progress', (progress) => {
+      isDownloading = true;
       sendToRenderer('app-update:download-progress', {
         percent: progress.percent,
         bytesPerSecond: progress.bytesPerSecond,
@@ -53,6 +54,7 @@ if (isPackaged) {
     });
 
     autoUpdater.on('update-downloaded', (info) => {
+      isDownloading = false;
       log.info('[Updater] Update downloaded:', info.version);
       sendToRenderer('app-update:downloaded', {
         version: info.version
@@ -60,6 +62,7 @@ if (isPackaged) {
     });
 
     autoUpdater.on('error', (error) => {
+      isDownloading = false;
       log.error('[Updater] Error:', error.message);
       sendToRenderer('app-update:error', {
         message: error.message
@@ -87,6 +90,25 @@ ipcMain.handle('app:check-updates', async () => {
     return { success: false, error: error.message };
   }
 });
+
+// Periodic update check (every hour)
+const UPDATE_CHECK_INTERVAL = 60 * 60 * 1000;
+let periodicCheckTimer = null;
+let isDownloading = false;
+
+function startPeriodicUpdateCheck() {
+  if (!autoUpdater || periodicCheckTimer) return;
+  periodicCheckTimer = setInterval(async () => {
+    if (isDownloading) return;
+    try {
+      log.info('[Updater] Periodic update check...');
+      await autoUpdater.checkForUpdates();
+    } catch (error) {
+      log.error('[Updater] Periodic check failed:', error.message);
+    }
+  }, UPDATE_CHECK_INTERVAL);
+  log.info('[Updater] Periodic update check scheduled (every 1 hour)');
+}
 
 ipcMain.handle('app:download-update', async () => {
   if (!autoUpdater) {
@@ -132,6 +154,7 @@ ipcMain.handle('app:install-update', () => {
  */
 function initUpdater(window) {
   mainWindow = window;
+  startPeriodicUpdateCheck();
 }
 
 module.exports = { initUpdater };

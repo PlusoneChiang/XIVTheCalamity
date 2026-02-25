@@ -676,8 +676,18 @@ function setLoginState(state, sessionId = null, subscriptionType = null, remain 
       
       if (gameUpdateInProgress || dalamudUpdateInProgress) {
         console.log('[Login] Update is still in progress (game:', gameUpdateInProgress, ', dalamud:', dalamudUpdateInProgress, ')');
-        // 更新完成後按鈕會在 Dalamud 完成後自動啟用（因為環境初始化時已設置回調）
-        // 這裡不需要額外的回調設置
+        // 設置安全計時器：定期檢查更新狀態，避免 callback 遺漏導致按鈕永遠卡住
+        const safetyCheckInterval = setInterval(() => {
+          if (!isUpdating() && !isDalamudUpdating()) {
+            clearInterval(safetyCheckInterval);
+            const btn = document.getElementById('launchButton');
+            if (btn && btn.disabled) {
+              console.log('[Login] Safety check: updates completed, enabling launch button');
+              btn.disabled = false;
+              setButtonI18n(btn, 'button.launch');
+            }
+          }
+        }, 1000);
       } else {
         console.log('[Login] No update in progress, enabling launch button');
         if (launchButton) {
