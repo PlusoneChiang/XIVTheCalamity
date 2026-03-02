@@ -408,9 +408,16 @@ function combineJavaScriptModules(jsFiles) {
 }
 
 /**
- * Embed mask image as base64 data URL in CSS
+ * Embed mask image as base64 data URL in CSS.
+ * Set MASK_OVERLAY_ENABLED to true to enable decorative mask overlay (e.g., holiday themes).
  */
+const MASK_OVERLAY_ENABLED = false;
+
 function embedImageInCSS(css) {
+  if (!MASK_OVERLAY_ENABLED) {
+    // Replace mask.png URL with 'none' to disable mask effect
+    return css.replace(/url\(['"]?.*?resources\/mask\.png['"]?\)/g, 'none');
+  }
   const maskPath = path.join(__dirname, '../../resources/mask.png');
   const maskBase64 = fs.readFileSync(maskPath).toString('base64');
   const dataUrl = `data:image/png;base64,${maskBase64}`;
