@@ -1,5 +1,29 @@
 # Release Notes
 
+## v1.6.10
+
+#### 🇹🇼 zh-TW
+### 🐛 修復
+- 登入後啟動按鈕可能卡住的問題
+- 無更新內容時顯示資訊不正確問題
+
+### ✨ 新功能
+- 每小時背景檢查程式更新
+
+### 🎨 介面調整
+- 關閉節慶遮罩，調整主體配色
+
+#### 🇺🇸 English
+### 🐛 Bug Fixes
+- Fixed launch button getting stuck after login
+- Fixed incorrect info displayed when no update notes available
+
+### ✨ New Features
+- Background update check every hour
+
+### 🎨 UI Changes
+- Disabled holiday mask overlay, adjusted main color scheme
+
 ## v1.6.9
 
 #### 🇹🇼 zh-TW
