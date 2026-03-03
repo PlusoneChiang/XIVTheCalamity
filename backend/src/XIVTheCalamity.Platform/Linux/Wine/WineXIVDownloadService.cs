@@ -95,18 +95,20 @@ public class WineXIVDownloadService(
         
         var archivePath = Path.Combine(tempDir, "wine-xiv.tar.xz");
         
-        yield return new DownloadProgressEvent
-        {
-            Stage = "downloading",
-            MessageKey = "progress.downloading_wine",
-            CurrentFile = "wine-xiv.tar.xz",
-            Percentage = 10
-        };
-        
-        // Download file and forward all progress events
+        // Download file and forward all progress events (map raw 0-100% to 5-70%)
         await foreach (var progress in DownloadFileAsync(downloadUrl, archivePath, cancellationToken))
         {
-            yield return progress;
+            var mappedPct = 5 + (int)(progress.Percentage * 0.65);
+            yield return new DownloadProgressEvent
+            {
+                Stage = progress.Stage,
+                MessageKey = progress.MessageKey,
+                BytesDownloaded = progress.BytesDownloaded,
+                TotalBytes = progress.TotalBytes,
+                Percentage = mappedPct,
+                CurrentFile = progress.CurrentFile,
+                DownloadSpeedBytesPerSec = progress.DownloadSpeedBytesPerSec
+            };
         }
         
         // Step 3: Extract archive
@@ -227,7 +229,7 @@ public class WineXIVDownloadService(
                 var bytesDownloadedSinceLastReport = totalRead - lastReportedBytes;
                 var downloadSpeed = elapsedSeconds > 0 ? bytesDownloadedSinceLastReport / elapsedSeconds : 0;
                 
-                var percentage = (int)(10 + (totalRead * 60.0 / totalBytes));
+                var percentage = (int)(totalRead * 100.0 / totalBytes);
                 
                 yield return new DownloadProgressEvent
                 {
@@ -257,7 +259,7 @@ public class WineXIVDownloadService(
                 MessageKey = "progress.downloading_wine",
                 BytesDownloaded = totalRead,
                 TotalBytes = totalBytes,
-                Percentage = 70,
+                Percentage = 100,
                 CurrentFile = fileName,
                 DownloadSpeedBytesPerSec = avgSpeed
             };

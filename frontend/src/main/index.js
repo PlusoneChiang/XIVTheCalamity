@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, globalShortcut, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
@@ -1049,7 +1049,6 @@ ipcMain.handle('window:close', async () => {
  * 顯示訊息對話框
  */
 ipcMain.handle('dialog:show-message-box', async (event, options) => {
-  const { BrowserWindow } = require('electron');
   const focusedWindow = BrowserWindow.getFocusedWindow() || mainWindow;
   
   return await dialog.showMessageBox(focusedWindow, {

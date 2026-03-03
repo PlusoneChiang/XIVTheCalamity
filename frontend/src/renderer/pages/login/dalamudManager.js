@@ -13,20 +13,10 @@ let dalamudEventSource = null;
 let onDalamudCompleteCallback = null;
 
 /**
- * 設定 Dalamud 更新完成回調
+ * 設定 Dalamud 更新完成回調（保留向下相容，pipeline 模式下不再需要）
  */
 export function setOnDalamudComplete(callback) {
-  onDalamudCompleteCallback = callback;
-}
-
-/**
- * 觸發 Dalamud 更新完成回調
- */
-function triggerOnDalamudComplete() {
-  if (onDalamudCompleteCallback) {
-    console.log('[DALAMUD] Triggering dalamud complete callback');
-    onDalamudCompleteCallback();
-  }
+  // No-op: sequential pipeline handles ordering now
 }
 
 /**
@@ -190,7 +180,7 @@ function startDalamudUpdateWithSSE() {
           closeDalamudSSE();
           hideTitleBarProgress();
           isDalamudChecking = false;
-          triggerOnDalamudComplete();
+          
           resolve(true);
         }, 1500);
       } catch (err) {

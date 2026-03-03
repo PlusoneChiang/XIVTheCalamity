@@ -11,24 +11,24 @@ import { handleApiResponse, getErrorMessage } from '../../utils/apiError.js';
 let isUpdateChecking = false;
 let updateCheckCancelled = false;
 let progressEventSource = null;
-let onUpdateCompleteCallback = null;
+let updateResolve = null;
 
 /**
- * 設定更新完成回調（用於觸發 Dalamud 更新）
+ * 設定更新完成回調（保留向下相容，但 pipeline 模式下不再需要）
  */
 export function setOnUpdateComplete(callback) {
-  onUpdateCompleteCallback = callback;
+  // No-op: sequential pipeline handles ordering now
 }
 
 /**
- * 觸發更新完成回調
+ * 完成更新，resolve Promise
  */
-function triggerOnUpdateComplete() {
-  if (onUpdateCompleteCallback) {
-    console.log('[UPDATE] Triggering update complete callback');
-    setTimeout(() => {
-      onUpdateCompleteCallback();
-    }, 500);
+function completeUpdate() {
+  isUpdateChecking = false;
+  if (updateResolve) {
+    const r = updateResolve;
+    updateResolve = null;
+    r();
   }
 }
 
@@ -77,7 +77,6 @@ export async function startUpdate() {
     } catch (error) {
       console.error('[UPDATE] Failed to load config:', getErrorMessage(error, i18n));
       isUpdateChecking = false;
-      triggerOnUpdateComplete();
       return;
     }
     
@@ -85,7 +84,6 @@ export async function startUpdate() {
     if (!gamePath) {
       console.log('[UPDATE] No game path configured, skipping update check');
       isUpdateChecking = false;
-      triggerOnUpdateComplete();
       return;
     }
     
@@ -98,7 +96,6 @@ export async function startUpdate() {
         console.log('[UPDATE] Game path invalid:', gamePath, 'Reason:', validation.reason);
         hideTitleBarProgress();
         isUpdateChecking = false;
-        triggerOnUpdateComplete();
         return;
       }
     } catch (pathError) {
@@ -111,13 +108,16 @@ export async function startUpdate() {
     showTitleBarProgress(0, 'login.checking_updates');
     
     // 使用新的 SSE endpoint 進行更新（單一連接）
-    startUpdateWithSSE(gamePath);
+    // Return a Promise that resolves when the SSE stream completes
+    return new Promise((resolve) => {
+      updateResolve = resolve;
+      startUpdateWithSSE(gamePath);
+    });
     
   } catch (error) {
     console.error('[UPDATE] Update check error:', error);
     hideTitleBarProgress();
     isUpdateChecking = false;
-    triggerOnUpdateComplete();
   }
 }
 
@@ -163,7 +163,7 @@ function startUpdateWithSSE(gamePath) {
         stopProgressMonitoring();
         hideTitleBarProgress();
         isUpdateChecking = false;
-        triggerOnUpdateComplete();
+        completeUpdate();
       }, 2000);
     } catch (error) {
       console.error('[UPDATE] Failed to parse complete event:', error);
@@ -180,7 +180,7 @@ function startUpdateWithSSE(gamePath) {
       stopProgressMonitoring();
       hideTitleBarProgress();
       isUpdateChecking = false;
-      triggerOnUpdateComplete();
+      completeUpdate();
     } catch (error) {
       console.error('[UPDATE] Failed to parse cancelled event:', error);
     }
@@ -213,7 +213,7 @@ function startUpdateWithSSE(gamePath) {
       stopProgressMonitoring();
       hideTitleBarProgress();
       isUpdateChecking = false;
-      triggerOnUpdateComplete();
+      completeUpdate();
     }
   });
   
@@ -329,7 +329,7 @@ function handleUpdateCheckComplete(result) {
     stopProgressMonitoring();
     hideTitleBarProgress();
     isUpdateChecking = false;
-    triggerOnUpdateComplete();
+    completeUpdate();
     return;
   }
   
@@ -348,7 +348,7 @@ function handleUpdateCheckComplete(result) {
       stopProgressMonitoring();
       hideTitleBarProgress();
       isUpdateChecking = false;
-      triggerOnUpdateComplete();
+      completeUpdate();
     }, 2000);
     return;
   }
@@ -361,7 +361,7 @@ function handleUpdateCheckComplete(result) {
     stopProgressMonitoring();
     hideTitleBarProgress();
     isUpdateChecking = false;
-    triggerOnUpdateComplete();
+    completeUpdate();
   }, 2000);
 }
 

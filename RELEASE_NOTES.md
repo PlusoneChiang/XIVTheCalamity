@@ -1,5 +1,19 @@
 # Release Notes
 
+## v1.6.11
+
+#### 🇹🇼 zh-TW
+### 🐛 修復
+- 修正 macOS/Linux Wine 下載進度條不正確的問題
+- 修正初始化檢查同時執行導致進度混亂的問題
+- 環境未就緒時禁止啟動遊戲
+
+#### 🇺🇸 English
+### 🐛 Bug Fixes
+- Fixed incorrect Wine download progress on macOS/Linux
+- Fixed initialization checks running concurrently causing progress issues
+- Blocked game launch until environment setup is complete
+
 ## v1.6.10
 
 #### 🇹🇼 zh-TW

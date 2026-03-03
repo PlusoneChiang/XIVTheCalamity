@@ -8,8 +8,8 @@ import { toHex } from '../../utils/encoding.js';
 import { initAccountManagement, handleAutoFillOTPChange, getOTPSecretInput, cleanupAccountManagement, clearAutoFilledState, isAllAutoFilled, refreshAccountState } from './accountManagement.js';
 import { savePassword, saveOTPSecret, saveAutoFillOTP, hasOTPSecret } from '../../utils/accountStorage.js';
 import i18n from '../../i18n/index.js';
-import { startBackgroundUpdate, startLoginUpdate, cancelBackgroundUpdate, setAppVersionText, isUpdating, handleConfigChanged, setLoggedIn, setOnUpdateComplete } from './updateManager.js';
-import { startDalamudUpdate, cancelDalamudUpdate, handleDalamudConfigChanged, isDalamudUpdating, setOnDalamudComplete } from './dalamudManager.js';
+import { startBackgroundUpdate, startLoginUpdate, cancelBackgroundUpdate, setAppVersionText, isUpdating, handleConfigChanged, setLoggedIn } from './updateManager.js';
+import { startDalamudUpdate, cancelDalamudUpdate, handleDalamudConfigChanged, isDalamudUpdating } from './dalamudManager.js';
 import { initAppUpdater } from './appUpdater.js';
 import { handleApiResponse, getErrorMessage } from '../../utils/apiError.js';
 
@@ -153,20 +153,40 @@ async function init() {
     }
   });
   
-  // Check for launcher updates first (blocking)
-  // Subsequent steps wait until the check completes and the user responds
+  // === Sequential initialization pipeline ===
+  // Each step must complete before the next starts
+  
+  // Step 1: Check for launcher updates (blocking)
   try {
     await initAppUpdater();
   } catch (err) {
     console.error('[Login] Failed to check app updates:', err);
   }
   
-  // Check game directory setup before environment initialization
-  checkGameDirectorySetup();
+  // Step 2: Check game directory setup (blocking - waits for dialog if needed)
+  await checkGameDirectorySetup();
   
-  // Start environment initialization (Wine)
+  // Step 3: Environment initialization (Wine download + prefix)
   console.log('[Login] Starting environment initialization...');
-  startEnvironmentInitialization();
+  await startEnvironmentInitialization();
+  
+  // Step 4: Game version check
+  console.log('[Login] Starting game update check...');
+  try {
+    await startBackgroundUpdate();
+  } catch (err) {
+    console.error('[Login] Game update check failed:', err);
+  }
+  
+  // Step 5: Dalamud check
+  console.log('[Login] Starting Dalamud update check...');
+  try {
+    await startDalamudUpdate();
+  } catch (err) {
+    console.error('[Login] Dalamud update check failed:', err);
+  }
+  
+  console.log('[Login] All initialization checks complete');
   
   // Cleanup on page unload
   window.addEventListener('beforeunload', () => {
@@ -521,6 +541,11 @@ async function handleLaunchGame() {
     return;
   }
   
+  if (!isEnvironmentInitialized) {
+    showError(i18n.t('login.env_not_ready'));
+    return;
+  }
+  
   console.log('[Login] Launching game with session:', sessionId);
   
   const launchButton = document.getElementById('launchButton');
@@ -673,23 +698,24 @@ function setLoginState(state, sessionId = null, subscriptionType = null, remain 
       // 更新會在背景持續進行，不需要重新啟動
       const gameUpdateInProgress = isUpdating();
       const dalamudUpdateInProgress = isDalamudUpdating();
+      const envReady = isEnvironmentInitialized;
       
-      if (gameUpdateInProgress || dalamudUpdateInProgress) {
-        console.log('[Login] Update is still in progress (game:', gameUpdateInProgress, ', dalamud:', dalamudUpdateInProgress, ')');
-        // 設置安全計時器：定期檢查更新狀態，避免 callback 遺漏導致按鈕永遠卡住
+      if (!envReady || gameUpdateInProgress || dalamudUpdateInProgress) {
+        console.log('[Login] Not ready (env:', envReady, ', gameUpdate:', gameUpdateInProgress, ', dalamudUpdate:', dalamudUpdateInProgress, ')');
+        // 設置安全計時器：定期檢查所有狀態，避免 callback 遺漏導致按鈕永遠卡住
         const safetyCheckInterval = setInterval(() => {
-          if (!isUpdating() && !isDalamudUpdating()) {
+          if (isEnvironmentInitialized && !isUpdating() && !isDalamudUpdating()) {
             clearInterval(safetyCheckInterval);
             const btn = document.getElementById('launchButton');
             if (btn && btn.disabled) {
-              console.log('[Login] Safety check: updates completed, enabling launch button');
+              console.log('[Login] Safety check: all ready, enabling launch button');
               btn.disabled = false;
               setButtonI18n(btn, 'button.launch');
             }
           }
         }, 1000);
       } else {
-        console.log('[Login] No update in progress, enabling launch button');
+        console.log('[Login] All ready, enabling launch button');
         if (launchButton) {
           launchButton.disabled = false;
           setButtonI18n(launchButton, 'button.launch');
@@ -874,71 +900,34 @@ let isEnvironmentInitialized = false;
 let isInitializing = false;
 
 function startEnvironmentInitialization() {
-  console.log('[ENV-INIT] ========== startEnvironmentInitialization() called ==========');
-  console.log('[ENV-INIT] isInitializing:', isInitializing);
-  console.log('[ENV-INIT] isEnvironmentInitialized:', isEnvironmentInitialized);
-  
-  // Check platform first
-  const platform = window.electronAPI?.getPlatform ? window.electronAPI.getPlatform() : 'unknown';
-  console.log('[ENV-INIT] Platform:', platform);
-  
-  // Windows doesn't need Wine initialization
-  if (platform === 'win32') {
-    console.log('[ENV-INIT] Windows platform detected, skipping Wine initialization');
-    isEnvironmentInitialized = true;
-    const launchButton = document.getElementById('launchButton');
-    const settingsBtn = document.getElementById('settingsBtn');
-    if (launchButton) {
-      launchButton.disabled = false;
-      setButtonI18n(launchButton, 'button.launch');
-    }
-    if (settingsBtn) {
-      settingsBtn.disabled = false;
-    }
-    console.log('[ENV-INIT] ========== Initialization skipped (Windows) ==========');
+  return new Promise((resolve) => {
+    console.log('[ENV-INIT] ========== startEnvironmentInitialization() called ==========');
+    console.log('[ENV-INIT] isInitializing:', isInitializing);
+    console.log('[ENV-INIT] isEnvironmentInitialized:', isEnvironmentInitialized);
     
-    // Set Dalamud update complete callback (same as Mac/Linux)
-    setOnDalamudComplete(() => {
-      console.log('[ENV-INIT] Dalamud update complete, ensuring launch button is enabled');
-      const btn = document.getElementById('launchButton');
-      if (btn) {
-        btn.disabled = false;
-        setButtonI18n(btn, 'button.launch');
+    // Check platform first
+    const platform = window.electronAPI?.getPlatform ? window.electronAPI.getPlatform() : 'unknown';
+    console.log('[ENV-INIT] Platform:', platform);
+    
+    // Windows doesn't need Wine initialization
+    if (platform === 'win32') {
+      console.log('[ENV-INIT] Windows platform detected, skipping Wine initialization');
+      isEnvironmentInitialized = true;
+      const launchButton = document.getElementById('launchButton');
+      const settingsBtn = document.getElementById('settingsBtn');
+      if (settingsBtn) {
+        settingsBtn.disabled = false;
       }
-    });
+      console.log('[ENV-INIT] ========== Initialization skipped (Windows) ==========');
+      resolve();
+      return;
+    }
     
-    // Set game update complete callback: trigger Dalamud update after game update
-    setOnUpdateComplete(() => {
-      console.log('[ENV-INIT] Game update complete, starting Dalamud update check...');
-      startDalamudUpdate().then(() => {
-        console.log('[ENV-INIT] Dalamud update complete');
-      }).catch(err => {
-        console.error('[ENV-INIT] Failed to start Dalamud update:', err);
-      });
-    });
-    
-    // Start game update check for Windows (same as non-Windows after env init)
-    console.log('[ENV-INIT] Starting game update check for Windows...');
-    setTimeout(() => {
-      startBackgroundUpdate().catch(err => {
-        console.error('[ENV-INIT] Failed to start update check:', err);
-        // Even if game update fails, try Dalamud update
-        console.log('[ENV-INIT] Trying Dalamud update anyway...');
-        startDalamudUpdate().then(() => {
-          console.log('[ENV-INIT] Dalamud update complete (after game update failure)');
-        }).catch(dalamudErr => {
-          console.error('[ENV-INIT] Failed to start Dalamud update:', dalamudErr);
-        });
-      });
-    }, 1000); // Wait 1 second before starting update check
-    
-    return;
-  }
-  
-  if (isInitializing || isEnvironmentInitialized) {
-    console.log('[ENV-INIT] Skipping: Environment already initialized or initializing');
-    return;
-  }
+    if (isInitializing || isEnvironmentInitialized) {
+      console.log('[ENV-INIT] Skipping: Environment already initialized or initializing');
+      resolve();
+      return;
+    }
   
   isInitializing = true;
   console.log('[ENV-INIT] Starting environment initialization...');
@@ -1044,8 +1033,6 @@ function startEnvironmentInitialization() {
         // Environment initialization complete
         isEnvironmentInitialized = true;
         isInitializing = false;
-        launchButton.disabled = false;
-        setButtonI18n(launchButton, 'button.launch');
         settingsBtn.disabled = false;
         
         console.log('[ENV-INIT] ========== Initialization COMPLETE ==========');
@@ -1056,42 +1043,11 @@ function startEnvironmentInitialization() {
           console.log('[ENV-INIT] EventSource closed after completion');
         }, 500);
         
-        // 設置 Dalamud 更新完成回調：確保啟動按鈕狀態正確
-        setOnDalamudComplete(() => {
-          console.log('[ENV-INIT] Dalamud update complete, ensuring launch button is enabled');
-          const btn = document.getElementById('launchButton');
-          if (btn) {
-            btn.disabled = false;
-            setButtonI18n(btn, 'button.launch');
-          }
-        });
-        
-        // 設置更新完成回調：遊戲更新完成後觸發 Dalamud 更新
-        setOnUpdateComplete(() => {
-          console.log('[ENV-INIT] Game update complete, starting Dalamud update check...');
-          startDalamudUpdate().then(() => {
-            console.log('[ENV-INIT] Dalamud update complete');
-          }).catch(err => {
-            console.error('[ENV-INIT] Failed to start Dalamud update:', err);
-          });
-        });
-        
-        // Start game update check (背景更新) after environment is ready
-        console.log('[ENV-INIT] Starting game update check (背景更新)...');
-        setTimeout(() => {
-          startBackgroundUpdate().catch(err => {
-            console.error('[ENV-INIT] Failed to start update check:', err);
-            // 即使遊戲更新失敗，也嘗試 Dalamud 更新
-            console.log('[ENV-INIT] Trying Dalamud update anyway...');
-            startDalamudUpdate().then(() => {
-              console.log('[ENV-INIT] Dalamud update complete (after game update failure)');
-            }).catch(dalamudErr => {
-              console.error('[ENV-INIT] Failed to start Dalamud update:', dalamudErr);
-            });
-          });
-        }, 1000); // Wait 1 second before starting update check
+        // Resolve Promise — pipeline continues to next step
+        resolve();
       } catch (err) {
         console.error('[ENV-INIT] Failed to parse complete event:', err, 'Raw data:', event.data);
+        resolve();
       }
     });
   
@@ -1130,8 +1086,10 @@ function startEnvironmentInitialization() {
           
           console.log('[ENV-INIT] ========== Initialization FAILED ==========');
           eventSource.close();
+          resolve();
         } catch (err) {
           console.error('[ENV-INIT] Failed to parse error event:', err, 'Raw data:', event.data);
+          resolve();
         }
       } else {
         console.error('[ENV-INIT] Error event without data');
@@ -1167,6 +1125,7 @@ function startEnvironmentInitialization() {
           
           console.log('[ENV-INIT] ========== Connection FAILED ==========');
           eventSource.close();
+          resolve();
         } else {
           // Connection closed normally after completion
           console.log('[ENV-INIT] EventSource closed (normal after completion or already initialized)');
@@ -1177,7 +1136,9 @@ function startEnvironmentInitialization() {
     console.error('[ENV-INIT] !! EXCEPTION creating EventSource:', err);
     showError(i18n.t('login.connection_failed'));
     isInitializing = false;
+    resolve();
   }
+  });
 }
 
 /**
@@ -1245,7 +1206,7 @@ async function checkGameDirectorySetup() {
       config = await handleApiResponse(response);
     } catch (error) {
       console.error('[GameSetup] Failed to load config:', getErrorMessage(error, i18n));
-      showGameSetupDialog();
+      await showGameSetupDialog();
       return;
     }
     
@@ -1253,7 +1214,7 @@ async function checkGameDirectorySetup() {
     
     if (!config || !config.game || !config.game.gamePath) {
       console.log('[GameSetup] Game path is empty, showing setup dialog');
-      showGameSetupDialog();
+      await showGameSetupDialog();
       return;
     }
     
@@ -1265,113 +1226,112 @@ async function checkGameDirectorySetup() {
     
     if (!validation.valid) {
       console.warn('[GameSetup] Game directory is invalid:', validation.reason);
-      showGameSetupDialog();
+      await showGameSetupDialog();
       return;
     }
     
     console.log('[GameSetup] Game directory is valid');
   } catch (error) {
     console.error('[GameSetup] Failed to check game directory:', error);
-    showGameSetupDialog();
+    await showGameSetupDialog();
   }
 }
 
 /**
  * Show game setup dialog
+ * Returns a Promise that resolves when the user completes setup
  */
 function showGameSetupDialog() {
-  const dialog = document.getElementById('gameSetupDialog');
-  const existingBtn = document.getElementById('existingGameButton');
-  const installBtn = document.getElementById('installGameButton');
-  
-  dialog.style.display = 'flex';
-  
-  // Existing game - select directory
-  existingBtn.onclick = async () => {
-    try {
-      const result = await window.electronAPI.selectDirectory({
-        title: i18n.t('login.game_setup.select_existing'),
-        buttonLabel: i18n.t('button.select')
-      });
-      
-      if (result.canceled) {
-        return;
-      }
-      
-      if (!result.success) {
-        alert(i18n.t('login.game_setup.error_select'));
-        return;
-      }
-      
-      // Validate selected directory
-      const validation = await window.electronAPI.validateGameDirectory(result.path);
-      console.log('[GameSetup] Validation result:', validation);
-      
-      if (!validation.valid) {
-        // Translate the validation reason
-        let translatedReason = validation.reason;
-        if (validation.reason === 'Directory does not exist') {
-          translatedReason = i18n.t('login.game_setup.validation.not_exist');
-        } else if (validation.reason === 'Missing required subdirectories (game, boot)') {
-          translatedReason = i18n.t('login.game_setup.validation.missing_subdirs');
+  return new Promise((resolve) => {
+    const dialog = document.getElementById('gameSetupDialog');
+    const existingBtn = document.getElementById('existingGameButton');
+    const installBtn = document.getElementById('installGameButton');
+    
+    dialog.style.display = 'flex';
+    
+    // Existing game - select directory
+    existingBtn.onclick = async () => {
+      try {
+        const result = await window.electronAPI.selectDirectory({
+          title: i18n.t('login.game_setup.select_existing'),
+          buttonLabel: i18n.t('button.select')
+        });
+        
+        if (result.canceled) {
+          return;
         }
         
-        alert(i18n.t('login.game_setup.error_invalid', { reason: translatedReason }));
-        return;
+        if (!result.success) {
+          alert(i18n.t('login.game_setup.error_select'));
+          return;
+        }
+        
+        // Validate selected directory
+        const validation = await window.electronAPI.validateGameDirectory(result.path);
+        console.log('[GameSetup] Validation result:', validation);
+        
+        if (!validation.valid) {
+          // Translate the validation reason
+          let translatedReason = validation.reason;
+          if (validation.reason === 'Directory does not exist') {
+            translatedReason = i18n.t('login.game_setup.validation.not_exist');
+          } else if (validation.reason === 'Missing required subdirectories (game, boot)') {
+            translatedReason = i18n.t('login.game_setup.validation.missing_subdirs');
+          }
+          
+          alert(i18n.t('login.game_setup.error_invalid', { reason: translatedReason }));
+          return;
+        }
+        
+        // Save to config
+        await saveGamePath(result.path);
+        dialog.style.display = 'none';
+        console.log('[GameSetup] Path saved, continuing pipeline');
+        resolve();
+        
+      } catch (error) {
+        console.error('[GameSetup] Failed to select existing game:', error);
+        alert(i18n.t('login.game_setup.error_general'));
       }
-      
-      // Save to config
-      await saveGamePath(result.path);
-      dialog.style.display = 'none';
-      
-      // Trigger update check after path is set
-      console.log('[GameSetup] Path saved, triggering update check');
-      startBackgroundUpdate();
-      
-    } catch (error) {
-      console.error('[GameSetup] Failed to select existing game:', error);
-      alert(i18n.t('login.game_setup.error_general'));
-    }
-  };
-  
-  // Install new game - create directory
-  installBtn.onclick = async () => {
-    try {
-      const result = await window.electronAPI.selectDirectory({
-        title: i18n.t('login.game_setup.select_install'),
-        buttonLabel: i18n.t('button.create')
-      });
-      
-      if (result.canceled) {
-        return;
-      }
-      
-      if (!result.success) {
-        alert(i18n.t('login.game_setup.error_select'));
-        return;
-      }
-      
-      // Create game directory structure
-      const createResult = await window.electronAPI.createDirectory(result.path);
-      
-      if (!createResult.success) {
-        alert(i18n.t('login.game_setup.error_create'));
-        return;
-      }
-      
-      // Save to config
-      await saveGamePath(createResult.path);
-      dialog.style.display = 'none';
-      
-      // Trigger update check after path is set
-      console.log('[GameSetup] Path saved, triggering update check');
-      startBackgroundUpdate();
+    };
+    
+    // Install new game - create directory
+    installBtn.onclick = async () => {
+      try {
+        const result = await window.electronAPI.selectDirectory({
+          title: i18n.t('login.game_setup.select_install'),
+          buttonLabel: i18n.t('button.create')
+        });
+        
+        if (result.canceled) {
+          return;
+        }
+        
+        if (!result.success) {
+          alert(i18n.t('login.game_setup.error_select'));
+          return;
+        }
+        
+        // Create game directory structure
+        const createResult = await window.electronAPI.createDirectory(result.path);
+        
+        if (!createResult.success) {
+          alert(i18n.t('login.game_setup.error_create'));
+          return;
+        }
+        
+        // Save to config
+        await saveGamePath(createResult.path);
+        dialog.style.display = 'none';
+        console.log('[GameSetup] Path saved, continuing pipeline');
+        resolve();
       
     } catch (error) {
       console.error('[GameSetup] Failed to create game directory:', error);
       alert(i18n.t('login.game_setup.error_general'));
     }
   };
+  });
 }
 
 /**

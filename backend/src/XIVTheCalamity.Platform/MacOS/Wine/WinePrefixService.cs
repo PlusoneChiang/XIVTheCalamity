@@ -223,71 +223,132 @@ public class WinePrefixService
         
         _logger?.LogInformation("[WINE-INIT] Not fully initialized, proceeding with initialization");
 
-        // Collect all progress events first to avoid yield in try-catch
-        var events = new List<WineInitProgress>();
-        WineInitProgress? finalEvent = null;
+        // Yield each progress event BEFORE doing the work so frontend gets real-time updates.
+        // Since C# doesn't allow yield in try-catch, each step wraps its work
+        // and captures errors, then yields error event if needed.
+
+        // 1. Check Prefix
+        yield return new WineInitProgress
+        {
+            Stage = WineInitStage.Checking,
+            MessageKey = "progress.checking"
+        };
+        _logger?.LogDebug("[WINE-INIT] Stage 1: Checking Wine Prefix at {Path}", _paths.WinePrefix);
+
+        // 2. Create Prefix
+        if (!Directory.Exists(_paths.PrefixDriveC))
+        {
+            yield return new WineInitProgress
+            {
+                Stage = WineInitStage.CreatingPrefix,
+                MessageKey = "progress.creating_prefix"
+            };
+            _logger?.LogInformation("[WINE-INIT] Stage 2: Creating Wine Prefix");
+            
+            string? prefixError = null;
+            try { await EnsurePrefixAsync(cancellationToken); }
+            catch (Exception ex) { prefixError = ex.Message; }
+            
+            if (prefixError != null)
+            {
+                _logger?.LogError("[WINE-INIT] Failed to create prefix: {Error}", prefixError);
+                yield return new WineInitProgress
+                {
+                    HasError = true,
+                    ErrorMessageKey = "error.init_failed",
+                    ErrorParams = new Dictionary<string, object> { { "message", prefixError } }
+                };
+                yield break;
+            }
+        }
+
+        // 3. Install fonts
+        var fontPath = Path.Combine(_paths.PrefixFonts, _paths.FontFile);
+        if (!File.Exists(fontPath))
+        {
+            yield return new WineInitProgress
+            {
+                Stage = WineInitStage.InstallingFonts,
+                MessageKey = "progress.installing_fonts"
+            };
+            _logger?.LogInformation("[WINE-INIT] Stage 3: Installing fonts");
+            
+            string? fontError = null;
+            try { await InstallFontIfNeededAsync(cancellationToken); }
+            catch (Exception ex) { fontError = ex.Message; }
+            
+            if (fontError != null)
+            {
+                _logger?.LogError("[WINE-INIT] Failed to install fonts: {Error}", fontError);
+                yield return new WineInitProgress
+                {
+                    HasError = true,
+                    ErrorMessageKey = "error.init_failed",
+                    ErrorParams = new Dictionary<string, object> { { "message", fontError } }
+                };
+                yield break;
+            }
+        }
+
+        // 4. Set locale
+        yield return new WineInitProgress
+        {
+            Stage = WineInitStage.SettingLocale,
+            MessageKey = "progress.setting_locale"
+        };
+        _logger?.LogInformation("[WINE-INIT] Stage 4: Setting locale to zh-TW");
         
+        string? localeError = null;
+        try { await SetLocaleToZhTWAsync(cancellationToken); }
+        catch (Exception ex) { localeError = ex.Message; }
+        
+        if (localeError != null)
+        {
+            _logger?.LogError("[WINE-INIT] Failed to set locale: {Error}", localeError);
+            yield return new WineInitProgress
+            {
+                HasError = true,
+                ErrorMessageKey = "error.init_failed",
+                ErrorParams = new Dictionary<string, object> { { "message", localeError } }
+            };
+            yield break;
+        }
+
+        // 5. Configure MediaFoundation
+        yield return new WineInitProgress
+        {
+            Stage = WineInitStage.ConfiguringMedia,
+            MessageKey = "progress.configuring_media"
+        };
+        _logger?.LogInformation("[WINE-INIT] Stage 5: Configuring MediaFoundation");
+        
+        string? mediaError = null;
+        try { await ConfigureMediaFoundationAsync(cancellationToken); }
+        catch (Exception ex) { mediaError = ex.Message; }
+        
+        if (mediaError != null)
+        {
+            _logger?.LogError("[WINE-INIT] Failed to configure media: {Error}", mediaError);
+            yield return new WineInitProgress
+            {
+                HasError = true,
+                ErrorMessageKey = "error.init_failed",
+                ErrorParams = new Dictionary<string, object> { { "message", mediaError } }
+            };
+            yield break;
+        }
+
+        // 6. Install graphics backend
+        yield return new WineInitProgress
+        {
+            Stage = WineInitStage.ConfiguringMedia,
+            MessageKey = "progress.installing_graphics"
+        };
+        _logger?.LogInformation("[WINE-INIT] Stage 6: Installing graphics backend");
+        
+        string? graphicsError = null;
         try
         {
-            // 1. Check Prefix
-            events.Add(new WineInitProgress
-            {
-                Stage = WineInitStage.Checking,
-                MessageKey = "progress.checking"
-            });
-            _logger?.LogDebug("[WINE-INIT] Stage 1: Checking Wine Prefix at {Path}", _paths.WinePrefix);
-
-            // 2. Create Prefix
-            if (!Directory.Exists(_paths.PrefixDriveC))
-            {
-                events.Add(new WineInitProgress
-                {
-                    Stage = WineInitStage.CreatingPrefix,
-                    MessageKey = "progress.creating_prefix"
-                });
-                _logger?.LogInformation("[WINE-INIT] Stage 2: Creating Wine Prefix");
-                await EnsurePrefixAsync(cancellationToken);
-            }
-
-            // 3. Install fonts
-            var fontPath = Path.Combine(_paths.PrefixFonts, _paths.FontFile);
-            if (!File.Exists(fontPath))
-            {
-                events.Add(new WineInitProgress
-                {
-                    Stage = WineInitStage.InstallingFonts,
-                    MessageKey = "progress.installing_fonts"
-                });
-                _logger?.LogInformation("[WINE-INIT] Stage 3: Installing fonts");
-                await InstallFontIfNeededAsync(cancellationToken);
-            }
-
-            // 4. Set locale
-            events.Add(new WineInitProgress
-            {
-                Stage = WineInitStage.SettingLocale,
-                MessageKey = "progress.setting_locale"
-            });
-            _logger?.LogInformation("[WINE-INIT] Stage 4: Setting locale to zh-TW");
-            await SetLocaleToZhTWAsync(cancellationToken);
-
-            // 5. Configure MediaFoundation
-            events.Add(new WineInitProgress
-            {
-                Stage = WineInitStage.ConfiguringMedia,
-                MessageKey = "progress.configuring_media"
-            });
-            _logger?.LogInformation("[WINE-INIT] Stage 5: Configuring MediaFoundation");
-            await ConfigureMediaFoundationAsync(cancellationToken);
-
-            // 6. Install graphics backend
-            events.Add(new WineInitProgress
-            {
-                Stage = WineInitStage.ConfiguringMedia,
-                MessageKey = "progress.installing_graphics"
-            });
-            _logger?.LogInformation("[WINE-INIT] Stage 6: Installing graphics backend");
-            
             var defaultConfig = new WineConfig
             {
                 DxmtEnabled = true,
@@ -298,42 +359,29 @@ public class WinePrefixService
                 RightCommandIsCtrl = false
             };
             await ApplyGraphicsSettingsAsync(defaultConfig, cancellationToken);
-
-            // 7. Complete
-            finalEvent = new WineInitProgress
-            {
-                Stage = WineInitStage.Complete,
-                MessageKey = "progress.complete",
-                IsComplete = true
-            };
-
-            _logger?.LogInformation("[WINE-INIT] ========== Completed Successfully ==========");
         }
-        catch (Exception ex)
+        catch (Exception ex) { graphicsError = ex.Message; }
+        
+        if (graphicsError != null)
         {
-            _logger?.LogError(ex, "[WINE-INIT] ========== FAILED ==========");
-
-            finalEvent = new WineInitProgress
+            _logger?.LogError("[WINE-INIT] Failed to install graphics: {Error}", graphicsError);
+            yield return new WineInitProgress
             {
                 HasError = true,
                 ErrorMessageKey = "error.init_failed",
-                ErrorParams = new Dictionary<string, object>
-                {
-                    { "message", ex.Message }
-                }
+                ErrorParams = new Dictionary<string, object> { { "message", graphicsError } }
             };
+            yield break;
         }
-        
-        // Yield all collected events
-        foreach (var evt in events)
+
+        // 7. Complete
+        _logger?.LogInformation("[WINE-INIT] ========== Completed Successfully ==========");
+        yield return new WineInitProgress
         {
-            yield return evt;
-        }
-        
-        if (finalEvent != null)
-        {
-            yield return finalEvent;
-        }
+            Stage = WineInitStage.Complete,
+            MessageKey = "progress.complete",
+            IsComplete = true
+        };
     }
 
     /// <summary>

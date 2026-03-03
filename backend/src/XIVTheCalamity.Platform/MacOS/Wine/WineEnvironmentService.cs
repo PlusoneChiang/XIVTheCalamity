@@ -35,7 +35,11 @@ public class WineEnvironmentService(
         };
         
         // Step 1: Check if Wine is installed, download if needed
-        if (!downloadService.IsInstalled())
+        // If download needed: download=5-65%, prefix init=70-100%
+        // If already installed: prefix init=10-100%
+        var needsDownload = !downloadService.IsInstalled();
+        
+        if (needsDownload)
         {
             logger?.LogInformation("[WINE-ENV] Wine not found, starting download");
             
@@ -44,8 +48,8 @@ public class WineEnvironmentService(
             
             await foreach (var downloadProgress in downloadService.DownloadAsync(cancellationToken))
             {
-                // Map download progress (5-70%) to environment progress
-                var mappedPercentage = 5 + (int)(downloadProgress.Percentage * 0.65);
+                // Map download progress (0-100%) to environment progress (5-65%)
+                var mappedPercentage = 5 + (int)(downloadProgress.Percentage * 0.6);
                 
                 yield return new EnvironmentProgressEvent
                 {
@@ -82,27 +86,28 @@ public class WineEnvironmentService(
             logger?.LogInformation("[WINE-ENV] Wine downloaded successfully to: {Path}", _paths.WineRoot);
         }
         
-        yield return new EnvironmentProgressEvent
-        {
-            Stage = "checking",
-            MessageKey = "progress.checking_wine",
-            Percentage = 10
-        };
+        // Step 2: Initialize Wine prefix
+        // Prefix stages map to different ranges depending on whether download occurred
+        var prefixStart = needsDownload ? 70 : 10;
+        var prefixRange = needsDownload ? 30 : 90; // remaining percentage for prefix init
         
-        // Step 2: Initialize Wine prefix (existing logic)
         await foreach (var wineProgress in _prefixService.InitializePrefixAsyncEnumerable(cancellationToken))
         {
-            // Convert WineInitProgress to EnvironmentProgressEvent
-            var percent = wineProgress.Stage switch
+            // Map prefix stage (0-100) to remaining percentage range
+            var stagePercent = wineProgress.Stage switch
             {
-                WineInitStage.Checking => 10,
-                WineInitStage.CreatingPrefix => 30,
-                WineInitStage.ConfiguringMedia => 50,
-                WineInitStage.InstallingFonts => 70,
-                WineInitStage.SettingLocale => 90,
+                WineInitStage.Checking => 0,
+                WineInitStage.CreatingPrefix => 15,
+                WineInitStage.InstallingFonts => 40,
+                WineInitStage.SettingLocale => 60,
+                WineInitStage.ConfiguringMedia => 80,
                 WineInitStage.Complete => 100,
                 _ => 0
             };
+            
+            var percent = wineProgress.IsComplete 
+                ? 100 
+                : prefixStart + (int)(stagePercent * prefixRange / 100.0);
             
             yield return new EnvironmentProgressEvent
             {

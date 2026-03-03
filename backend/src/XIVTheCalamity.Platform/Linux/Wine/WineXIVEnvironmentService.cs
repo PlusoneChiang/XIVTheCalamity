@@ -59,18 +59,11 @@ public class WineXIVEnvironmentService(
         var wineStatus = await downloadService.GetStatusAsync();
         logger?.LogInformation("[WINE-XIV] Wine status: Installed={IsInstalled}", wineStatus.IsInstalled);
         
-        // Step 2: Download Wine if not installed (10-70%)
-        if (!wineStatus.IsInstalled)
+        // Step 2: Download Wine if not installed (5-65%)
+        var needsDownload = !wineStatus.IsInstalled;
+        if (needsDownload)
         {
             logger?.LogInformation("[WINE-XIV] Wine not found, starting download");
-            
-            yield return new EnvironmentProgressEvent
-            {
-                Stage = "download_wine",
-                MessageKey = "progress.downloading_wine",
-                CompletedItems = 10,
-                TotalItems = 100
-            };
             
             // Forward all download progress events
             var downloadFailed = false;
@@ -78,9 +71,8 @@ public class WineXIVEnvironmentService(
             
             await foreach (var downloadProgress in downloadService.DownloadAsync(cancellationToken))
             {
-                // Convert Wine download progress to environment progress
-                // Map 10-70% range to download progress
-                var mappedPercentage = 10 + (int)(downloadProgress.Percentage * 0.6);
+                // Map download progress (0-100%) to environment progress (5-65%)
+                var mappedPercentage = 5 + (int)(downloadProgress.Percentage * 0.6);
                 
                 yield return new EnvironmentProgressEvent
                 {
@@ -113,23 +105,38 @@ public class WineXIVEnvironmentService(
             logger?.LogInformation("[WINE-XIV] Wine downloaded successfully");
         }
         
-        // Step 3: Initialize Wine prefix (70-85%)
+        // Step 3: Initialize Wine prefix
+        // Dynamic range: if download occurred, prefix gets 70-85%; otherwise 10-70%
+        var prefixStart = needsDownload ? 70 : 10;
+        var prefixEnd = needsDownload ? 85 : 70;
+        
         yield return new EnvironmentProgressEvent
         {
             Stage = "init_prefix",
             MessageKey = "progress.init_wine_prefix",
-            CompletedItems = 70,
+            CompletedItems = prefixStart,
             TotalItems = 100
         };
         
         await EnsurePrefixAsync(cancellationToken);
         
-        // Step 4: Download DXVK if needed (85-92%)
+        yield return new EnvironmentProgressEvent
+        {
+            Stage = "init_prefix",
+            MessageKey = "progress.init_wine_prefix",
+            CompletedItems = prefixEnd,
+            TotalItems = 100
+        };
+        
+        // Step 4: Download DXVK if needed
+        var dxvkStart = needsDownload ? 85 : 75;
+        var dxvkRange = needsDownload ? 7 : 15;
+        
         yield return new EnvironmentProgressEvent
         {
             Stage = "download_dxvk",
             MessageKey = "progress.checking_dxvk",
-            CompletedItems = 85,
+            CompletedItems = dxvkStart,
             TotalItems = 100
         };
         
@@ -142,7 +149,7 @@ public class WineXIVEnvironmentService(
                 break;
             }
             
-            var mappedPercentage = 85 + (int)(dxvkProgress.Percentage * 0.07);
+            var mappedPercentage = dxvkStart + (int)(dxvkProgress.Percentage * dxvkRange / 100.0);
             yield return new EnvironmentProgressEvent
             {
                 Stage = dxvkProgress.Stage,
@@ -152,12 +159,13 @@ public class WineXIVEnvironmentService(
             };
         }
         
-        // Step 5: Install DXVK DLLs to wineprefix (92-100%)
+        // Step 5: Install DXVK DLLs to wineprefix
+        var dllsStart = dxvkStart + dxvkRange;
         yield return new EnvironmentProgressEvent
         {
             Stage = "install_dlls",
             MessageKey = "progress.installing_dlls",
-            CompletedItems = 92,
+            CompletedItems = dllsStart,
             TotalItems = 100
         };
         
