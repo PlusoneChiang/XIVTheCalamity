@@ -123,8 +123,8 @@ public class WinePathService
         GstPlugin = Path.Combine(GstLib, "gstreamer-1.0");
         GstRegistry = Path.Combine(WinePrefix, "gstreamer-registry.bin");
         
-        FontFile = "NotoSansTC-Regular.ttf";
-        FontName = "Noto Sans TC";
+        FontFile = "SarasaMonoTC-Regular.ttf";
+        FontName = "Sarasa Mono TC";
     }
 
     /// <summary>

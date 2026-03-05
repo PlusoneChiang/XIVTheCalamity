@@ -732,7 +732,7 @@ public class WinePrefixService
     // ========================================
 
     /// <summary>
-    /// Install Noto Sans TC font if not already installed
+    /// Install Sarasa Mono TC font if not already installed
     /// Based on XoM Wine.swift installFontIfNeeded()
     /// </summary>
     public async Task InstallFontIfNeededAsync(CancellationToken cancellationToken = default)

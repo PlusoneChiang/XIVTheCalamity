@@ -21,7 +21,7 @@ public enum WineInitStage
     ConfiguringMedia,
     
     /// <summary>
-    /// Installing fonts (Noto Sans TC)
+    /// Installing fonts (Sarasa Mono TC)
     /// </summary>
     InstallingFonts,
     
