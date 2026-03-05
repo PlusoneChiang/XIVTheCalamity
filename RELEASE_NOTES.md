@@ -1,5 +1,25 @@
 # Release Notes
 
+## v1.6.12
+
+#### 🇹🇼 zh-TW
+### 🐛 修復
+- 修正 Patch 安裝順序錯誤可能導致遊戲損壞的問題
+- 新增 Patch 下載後 SHA1 雜湊驗證，失敗自動重試
+- 新增安裝完成後版本檔案備份 (.ver → .bck)
+
+### 🔧 調整
+- Mac的wine字體改為更紗黑體，確保CJK字元相容性。
+
+#### 🇺🇸 English
+### 🐛 Bug Fixes
+- Fixed patch install order causing potential game corruption
+- Added SHA1 hash verification after patch download with auto-retry
+- Added version file backup (.ver → .bck) after patching
+
+### 🔧 Changes
+- Switched Mac Wine font to Sarasa Gothic for better CJK character compatibility.
+
 ## v1.6.11
 
 #### 🇹🇼 zh-TW
