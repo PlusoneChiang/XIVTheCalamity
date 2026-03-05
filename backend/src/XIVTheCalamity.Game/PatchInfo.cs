@@ -42,9 +42,19 @@ public class PatchInfo
     public long Size { get; set; }
 
     /// <summary>
-    /// File hash value
+    /// Hash type (e.g. "sha1")
     /// </summary>
-    public string Hash { get; set; } = string.Empty;
+    public string HashType { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Hash block size for block-based verification
+    /// </summary>
+    public long HashBlockSize { get; set; }
+
+    /// <summary>
+    /// Hash values (one per block)
+    /// </summary>
+    public string[] Hashes { get; set; } = Array.Empty<string>();
 
     /// <summary>
     /// Version number

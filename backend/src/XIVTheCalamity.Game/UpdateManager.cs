@@ -207,7 +207,8 @@ public class UpdateManager
 
     /// <summary>
     /// Download, install, and cleanup patches with parallel downloads and sequential installation
-    /// Flow: Parallel downloads (4 threads) → Queue → Sequential install → Delete
+    /// Flow: Parallel downloads (4 threads) → Ordered buffer → Sequential install → Delete
+    /// CRITICAL: Patches are installed in original order (ZiPatch is differential)
     /// </summary>
     private async IAsyncEnumerable<PatchProgressEvent> DownloadInstallAndCleanupPatchesAsync(
         string gamePath,
@@ -215,26 +216,28 @@ public class UpdateManager
         string downloadPath,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Processing {Count} patches (parallel download → queue → sequential install → delete)...", patches.Count);
+        _logger.LogInformation("Processing {Count} patches (parallel download → ordered install → delete)...", patches.Count);
         
         var totalBytes = patches.Sum(p => p.Size);
         var completedPatches = 0;
         var maxConcurrentDownloads = 4;
+        var maxHashRetries = 3;
         
-        // Channel for downloaded patches waiting to be installed (FIFO queue)
-        var installQueue = Channel.CreateUnbounded<PatchInfo>(new UnboundedChannelOptions
+        // Ordered buffer: each slot corresponds to original patch index
+        // Downloads complete out of order; install task awaits them in order
+        var downloadSlots = new TaskCompletionSource<PatchInfo>[patches.Count];
+        for (var i = 0; i < patches.Count; i++)
         {
-            SingleReader = true, // Only one installer thread
-            SingleWriter = false // Multiple downloader threads
-        });
+            downloadSlots[i] = new TaskCompletionSource<PatchInfo>(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
         
         // Channel for download progress updates
         var progressChannel = Channel.CreateUnbounded<DownloadProgressUpdate>();
         
-        // Progress tracking (use volatile int for thread-safe access)
+        // Progress tracking
         var downloadProgress = new Dictionary<string, long>();
         var downloadedCount = 0;
-        var installedCount = 0; // Updated by install task, read by progress reporter
+        var installedCount = 0;
         var downloadingCount = 0;
         var lastSpeedUpdate = DateTime.UtcNow;
         var lastTotalBytes = 0L;
@@ -245,38 +248,48 @@ public class UpdateManager
             downloadProgress[patch.FileName] = 0;
         }
         
-        // Task 1: Download patches in parallel (4 concurrent) - no explicit locks needed
+        // Task 1: Download patches in parallel (4 concurrent), with hash verification
         var downloadTask = Task.Run(async () =>
         {
             await Parallel.ForEachAsync(
-                patches,
+                Enumerable.Range(0, patches.Count),
                 new ParallelOptions 
                 { 
                     MaxDegreeOfParallelism = maxConcurrentDownloads,
                     CancellationToken = cancellationToken
                 },
-                async (patch, ct) =>
+                async (index, ct) =>
                 {
-                    await DownloadPatchForInstallAsync(patch, downloadPath, installQueue.Writer, 
-                        progressChannel.Writer, ct);
+                    var patch = patches[index];
+                    try
+                    {
+                        await DownloadAndVerifyPatchAsync(patch, downloadPath, progressChannel.Writer,
+                            maxHashRetries, ct);
+                        downloadSlots[index].SetResult(patch);
+                    }
+                    catch (Exception ex)
+                    {
+                        downloadSlots[index].SetException(ex);
+                        throw;
+                    }
                 });
             
-            installQueue.Writer.Complete();
             progressChannel.Writer.Complete();
             _logger.LogInformation("All downloads completed");
         }, cancellationToken);
         
-        // Task 2: Install patches sequentially from queue
+        // Task 2: Install patches sequentially in ORIGINAL ORDER
         var installTask = Task.Run(async () =>
         {
-            await foreach (var patch in installQueue.Reader.ReadAllAsync(cancellationToken))
+            for (var i = 0; i < patches.Count; i++)
             {
+                var patch = await downloadSlots[i].Task;
+                
                 try
                 {
                     _logger.LogInformation("Installing ({Installed}/{Total}): {FileName}", 
                         installedCount + 1, patches.Count, patch.FileName);
                     
-                    // Install patch
                     await Task.Run(() =>
                     {
                         _patchInstallService.InstallPatch(patch.LocalPath!, gamePath, patch.Repository);
@@ -308,6 +321,9 @@ public class UpdateManager
                     throw;
                 }
             }
+            
+            // Backup .ver → .bck after all patches installed
+            _patchInstallService.BackupVersionFiles(gamePath);
             
             _logger.LogInformation("All installations completed");
         }, cancellationToken);
@@ -466,112 +482,136 @@ public class UpdateManager
     }
     
     /// <summary>
-    /// Download a single patch and add to install queue with progress reporting
+    /// Download a single patch with hash verification and retry
     /// </summary>
-    private async Task DownloadPatchForInstallAsync(
+    private async Task DownloadAndVerifyPatchAsync(
         PatchInfo patch,
         string downloadPath,
-        ChannelWriter<PatchInfo> installQueue,
         ChannelWriter<DownloadProgressUpdate> progressWriter,
+        int maxRetries,
         CancellationToken cancellationToken)
     {
         var filePath = Path.Combine(downloadPath, patch.Repository.ToString(), patch.FileName);
         patch.LocalPath = filePath;
 
-        // Ensure subdirectory exists
         var fileDirectory = Path.GetDirectoryName(filePath);
         if (fileDirectory != null && !Directory.Exists(fileDirectory))
         {
             Directory.CreateDirectory(fileDirectory);
         }
 
-        // If file exists and size is correct, skip download
+        // If file exists and passes hash check, skip download
         if (File.Exists(filePath))
         {
             var fileInfo = new FileInfo(filePath);
             if (fileInfo.Length == patch.Size)
             {
-                _logger.LogInformation("Patch already exists, skipping download: {File}", patch.FileName);
-                
-                // Report as completed immediately (with full bytes)
-                await progressWriter.WriteAsync(new DownloadProgressUpdate
+                var hashResult = _patchInstallService.VerifyPatchHash(patch, filePath);
+                if (hashResult == HashCheckResult.Pass)
                 {
-                    Type = DownloadUpdateType.Completed,
-                    FileName = patch.FileName,
-                    BytesDownloaded = patch.Size,
-                    TotalBytes = patch.Size
-                }, cancellationToken);
+                    _logger.LogInformation("Patch already exists and verified: {File}", patch.FileName);
+                    
+                    await progressWriter.WriteAsync(new DownloadProgressUpdate
+                    {
+                        Type = DownloadUpdateType.Completed,
+                        FileName = patch.FileName,
+                        BytesDownloaded = patch.Size,
+                        TotalBytes = patch.Size
+                    }, cancellationToken);
+                    
+                    return;
+                }
                 
-                await installQueue.WriteAsync(patch, cancellationToken);
-                return;
+                _logger.LogWarning("Existing patch failed hash check ({Result}), re-downloading: {File}",
+                    hashResult, patch.FileName);
             }
         }
 
-        _logger.LogInformation("Downloading: {File} ({Size} MB)", 
-            patch.FileName, patch.Size / 1024.0 / 1024.0);
-
-        // Report download started (only for actual downloads)
-        await progressWriter.WriteAsync(new DownloadProgressUpdate
+        // Download with retry on hash failure
+        for (var attempt = 1; attempt <= maxRetries; attempt++)
         {
-            Type = DownloadUpdateType.Started,
-            FileName = patch.FileName,
-            TotalBytes = patch.Size
-        }, cancellationToken);
+            _logger.LogInformation("Downloading ({Attempt}/{MaxRetries}): {File} ({Size} MB)", 
+                attempt, maxRetries, patch.FileName, patch.Size / 1024.0 / 1024.0);
 
-        // Download file with progress reporting
-        using var response = await _httpClient.GetAsync(
-            patch.Url, 
-            HttpCompletionOption.ResponseHeadersRead, 
-            cancellationToken);
-
-        response.EnsureSuccessStatusCode();
-
-        using var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        using var fileStream = new FileStream(
-            filePath, 
-            FileMode.Create, 
-            FileAccess.Write, 
-            FileShare.None,
-            bufferSize: 81920);
-
-        var buffer = new byte[81920];
-        long totalBytesRead = 0;
-        int bytesRead;
-        var progressStopwatch = System.Diagnostics.Stopwatch.StartNew();
-
-        while ((bytesRead = await contentStream.ReadAsync(buffer, cancellationToken)) > 0)
-        {
-            await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken);
-            totalBytesRead += bytesRead;
-
-            // Report progress every 200ms
-            if (progressStopwatch.ElapsedMilliseconds >= 200)
+            await progressWriter.WriteAsync(new DownloadProgressUpdate
             {
+                Type = DownloadUpdateType.Started,
+                FileName = patch.FileName,
+                TotalBytes = patch.Size
+            }, cancellationToken);
+
+            using var response = await _httpClient.GetAsync(
+                patch.Url, 
+                HttpCompletionOption.ResponseHeadersRead, 
+                cancellationToken);
+
+            response.EnsureSuccessStatusCode();
+
+            using var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var fileStream = new FileStream(
+                filePath, 
+                FileMode.Create, 
+                FileAccess.Write, 
+                FileShare.None,
+                bufferSize: 81920);
+
+            var buffer = new byte[81920];
+            long totalBytesRead = 0;
+            int bytesRead;
+            var progressStopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+            while ((bytesRead = await contentStream.ReadAsync(buffer, cancellationToken)) > 0)
+            {
+                await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken);
+                totalBytesRead += bytesRead;
+
+                if (progressStopwatch.ElapsedMilliseconds >= 200)
+                {
+                    await progressWriter.WriteAsync(new DownloadProgressUpdate
+                    {
+                        Type = DownloadUpdateType.Progress,
+                        FileName = patch.FileName,
+                        BytesDownloaded = totalBytesRead,
+                        TotalBytes = patch.Size
+                    }, cancellationToken);
+                    
+                    progressStopwatch.Restart();
+                }
+            }
+            
+            // Close file stream before hash verification
+            fileStream.Close();
+            
+            // Verify hash
+            var result = _patchInstallService.VerifyPatchHash(patch, filePath);
+            if (result == HashCheckResult.Pass)
+            {
+                _logger.LogInformation("Downloaded and verified: {File}", patch.FileName);
+                
                 await progressWriter.WriteAsync(new DownloadProgressUpdate
                 {
-                    Type = DownloadUpdateType.Progress,
+                    Type = DownloadUpdateType.Completed,
                     FileName = patch.FileName,
                     BytesDownloaded = totalBytesRead,
                     TotalBytes = patch.Size
                 }, cancellationToken);
                 
-                progressStopwatch.Restart();
+                return;
+            }
+
+            _logger.LogWarning("Hash verification failed ({Result}) for {File}, attempt {Attempt}/{MaxRetries}",
+                result, patch.FileName, attempt, maxRetries);
+            
+            if (attempt < maxRetries)
+            {
+                // Delete corrupt file before retry
+                try { File.Delete(filePath); } catch { /* ignore */ }
+                await Task.Delay(1000 * attempt, cancellationToken);
             }
         }
         
-        _logger.LogInformation("Downloaded: {File}", patch.FileName);
-        
-        // Report download completed
-        await progressWriter.WriteAsync(new DownloadProgressUpdate
-        {
-            Type = DownloadUpdateType.Completed,
-            FileName = patch.FileName,
-            BytesDownloaded = totalBytesRead,
-            TotalBytes = patch.Size
-        }, cancellationToken);
-        
-        // Add to install queue (will be installed in order)
-        await installQueue.WriteAsync(patch, cancellationToken);
+        throw new InvalidOperationException(
+            $"Patch {patch.FileName} failed hash verification after {maxRetries} attempts");
     }
 }
 

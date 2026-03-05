@@ -72,7 +72,7 @@ public class PatchListParser
                     Size = long.Parse(fields[0]),
                     Version = fields[4],
                     Repository = ParseRepository(fields[5]),
-                    Hash = fields[7],
+                    Hashes = fields[7].Split(','),
                     Url = fields[8],
                     FileName = Path.GetFileName(fields[8])
                 };
@@ -149,13 +149,18 @@ public class PatchListParser
                 }
                 
                 var hash = fields.Length == 9 ? fields[7] : "";
+                var hashType = fields.Length == 9 ? fields[5] : "";
+                var hashBlockSize = fields.Length == 9 && long.TryParse(fields[6], out var bs) ? bs : 0L;
+                var hashes = !string.IsNullOrEmpty(hash) ? hash.Split(',') : Array.Empty<string>();
 
                 var patch = new PatchInfo
                 {
                     Size = long.Parse(fields[0]),
                     Version = fields[4],
                     Repository = repository,
-                    Hash = hash,
+                    HashType = hashType,
+                    HashBlockSize = hashBlockSize,
+                    Hashes = hashes,
                     Url = url,
                     FileName = Path.GetFileName(url)
                 };

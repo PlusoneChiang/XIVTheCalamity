@@ -1,9 +1,20 @@
+using System.Security.Cryptography;
 using Microsoft.Extensions.Logging;
 using XIVTheCalamity.Game.Models;
 using XIVTheCalamity.Game.Patching.ZiPatch;
 using XIVTheCalamity.Game.Patching.ZiPatch.Util;
 
 namespace XIVTheCalamity.Game.Services;
+
+public enum HashCheckResult
+{
+    Pass,
+    BadHash,
+    BadLength,
+    CannotParse,
+    CrcMismatch,
+    UnknownHashType
+}
 
 /// <summary>
 /// Patch install service - applies downloaded patches to game files
@@ -16,6 +27,102 @@ public class PatchInstallService
     public PatchInstallService(ILogger<PatchInstallService> logger)
     {
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Verify patch file integrity after download
+    /// Reference: XIVLauncher.Common.Game.Patch.PatchManager.CheckPatchValidity
+    /// </summary>
+    public HashCheckResult VerifyPatchHash(PatchInfo patch, string filePath)
+    {
+        var fileInfo = new FileInfo(filePath);
+        if (!fileInfo.Exists)
+            return HashCheckResult.BadLength;
+
+        if (patch.HashType != "sha1")
+        {
+            // Boot patches: validate ZiPatch CRC32 checksums
+            if (patch.Repository == GameRepository.Boot)
+            {
+                try
+                {
+                    using var fileStream = fileInfo.OpenRead();
+                    using var patchFile = new ZiPatchFile(fileStream, true);
+                    foreach (var chunk in patchFile.GetChunks())
+                    {
+                        if (!chunk.IsChecksumValid)
+                        {
+                            _logger.LogError("Boot patch {Patch} has invalid checksum in {ChunkType} chunk",
+                                patch.FileName, chunk.ChunkType);
+                            return HashCheckResult.CrcMismatch;
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    _logger.LogError(e, "Could not parse boot patch {Patch}", patch.FileName);
+                    return HashCheckResult.CannotParse;
+                }
+                return HashCheckResult.Pass;
+            }
+
+            // No hash info available — skip verification
+            if (string.IsNullOrEmpty(patch.HashType))
+            {
+                _logger.LogDebug("No hash info for {Patch}, skipping verification", patch.FileName);
+                return HashCheckResult.Pass;
+            }
+
+            _logger.LogWarning("Unknown HashType: {HashType} for {Patch}", patch.HashType, patch.FileName);
+            return HashCheckResult.UnknownHashType;
+        }
+
+        // SHA1 block verification
+        using var stream = fileInfo.OpenRead();
+
+        if (stream.Length != patch.Size)
+        {
+            _logger.LogError("Patch {Patch} size mismatch: expected {Expected}, got {Actual}",
+                patch.FileName, patch.Size, stream.Length);
+            return HashCheckResult.BadLength;
+        }
+
+        if (patch.Hashes.Length == 0 || patch.HashBlockSize <= 0)
+        {
+            _logger.LogDebug("No hash blocks for {Patch}, skipping block verification", patch.FileName);
+            return HashCheckResult.Pass;
+        }
+
+        var parts = (int)Math.Ceiling((double)patch.Size / patch.HashBlockSize);
+        var block = new byte[patch.HashBlockSize];
+
+        for (var i = 0; i < parts; i++)
+        {
+            var read = stream.Read(block, 0, (int)patch.HashBlockSize);
+
+            byte[] dataToHash;
+            if (read < patch.HashBlockSize)
+            {
+                dataToHash = new byte[read];
+                Array.Copy(block, 0, dataToHash, 0, read);
+            }
+            else
+            {
+                dataToHash = block;
+            }
+
+            var hash = SHA1.HashData(dataToHash);
+            var hashStr = Convert.ToHexString(hash).ToLowerInvariant();
+
+            if (i < patch.Hashes.Length && hashStr != patch.Hashes[i])
+            {
+                _logger.LogError("Patch {Patch} block {Block} hash mismatch: expected {Expected}, got {Actual}",
+                    patch.FileName, i, patch.Hashes[i], hashStr);
+                return HashCheckResult.BadHash;
+            }
+        }
+
+        return HashCheckResult.Pass;
     }
 
     /// <summary>
@@ -138,5 +245,39 @@ public class PatchInstallService
             GameRepository.Ex5 => Path.Combine(gamePath, "game", "sqpack", "ex5", "ex5.ver"),
             _ => Path.Combine(gamePath, "game", "ffxivgame.ver")
         };
+    }
+
+    /// <summary>
+    /// Backup all .ver files to .bck after patching completes
+    /// Reference: XIVLauncher.Common.Patching.RemotePatchInstaller.VerToBck
+    /// </summary>
+    public void BackupVersionFiles(string gamePath)
+    {
+        var repositories = new[]
+        {
+            GameRepository.Boot, GameRepository.Game,
+            GameRepository.Ex1, GameRepository.Ex2, GameRepository.Ex3,
+            GameRepository.Ex4, GameRepository.Ex5
+        };
+
+        foreach (var repo in repositories)
+        {
+            var verPath = GetVersionFilePath(gamePath, repo);
+            if (!File.Exists(verPath))
+                continue;
+
+            var bckPath = Path.ChangeExtension(verPath, ".bck");
+            try
+            {
+                File.Copy(verPath, bckPath, overwrite: true);
+                _logger.LogDebug("Backed up version file: {Ver} -> {Bck}", verPath, bckPath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to backup version file: {Ver}", verPath);
+            }
+        }
+
+        _logger.LogInformation("Version file backup (.ver -> .bck) completed");
     }
 }
