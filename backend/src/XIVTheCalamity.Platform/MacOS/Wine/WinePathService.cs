@@ -38,8 +38,10 @@ public class WinePathService
     public string GstPlugin { get; }
     public string GstRegistry { get; }
     
-    public string FontFile { get; }
-    public string FontName { get; }
+    /// <summary>
+    /// Font entries to install (primary TC + fallback SC)
+    /// </summary>
+    public (string File, string Name)[] Fonts { get; }
 
     private WinePathService()
     {
@@ -123,8 +125,11 @@ public class WinePathService
         GstPlugin = Path.Combine(GstLib, "gstreamer-1.0");
         GstRegistry = Path.Combine(WinePrefix, "gstreamer-registry.bin");
         
-        FontFile = "SarasaMonoTC-Regular.ttf";
-        FontName = "Sarasa Mono TC";
+        Fonts = new[]
+        {
+            ("NotoSansTC-Regular.ttf", "Noto Sans TC"),
+            ("NotoSansSC-Regular.ttf", "Noto Sans SC"),
+        };
     }
 
     /// <summary>

@@ -144,12 +144,15 @@ public class WinePrefixService
                 return false;
             }
 
-            // Check if font is installed
-            var fontPath = Path.Combine(_paths.PrefixFonts, _paths.FontFile);
-            if (!File.Exists(fontPath))
+            // Check if fonts are installed
+            foreach (var font in _paths.Fonts)
             {
-                _logger?.LogDebug("Prefix not fully initialized: font not installed");
-                return false;
+                var fontPath = Path.Combine(_paths.PrefixFonts, font.File);
+                if (!File.Exists(fontPath))
+                {
+                    _logger?.LogDebug("Prefix not fully initialized: font not installed: {Font}", font.File);
+                    return false;
+                }
             }
 
             // Check if registry is configured
@@ -263,8 +266,9 @@ public class WinePrefixService
         }
 
         // 3. Install fonts
-        var fontPath = Path.Combine(_paths.PrefixFonts, _paths.FontFile);
-        if (!File.Exists(fontPath))
+        var allFontsInstalled = _paths.Fonts.All(f => 
+            File.Exists(Path.Combine(_paths.PrefixFonts, f.File)));
+        if (!allFontsInstalled)
         {
             yield return new WineInitProgress
             {
@@ -732,84 +736,67 @@ public class WinePrefixService
     // ========================================
 
     /// <summary>
-    /// Install Sarasa Mono TC font if not already installed
+    /// Install CJK fonts (TC + SC) if not already installed
     /// Based on XoM Wine.swift installFontIfNeeded()
     /// </summary>
     public async Task InstallFontIfNeededAsync(CancellationToken cancellationToken = default)
     {
-        var fontFile = _paths.FontFile;
-        var targetFontPath = Path.Combine(_paths.PrefixFonts, fontFile);
-
         try
         {
-            if (File.Exists(targetFontPath))
-            {
-                _logger?.LogInformation("[Wine Fonts] Font already installed: {FontFile}", fontFile);
-                
-                // 即使字體已安裝，也要配置註冊表（使用快速批處理模式）
-                await BeginBatchAsync(cancellationToken);
-                
-                // 在 Wine 註冊表中註冊字體
-                await AddRegAsync(
-                    @"HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\Fonts",
-                    $"{_paths.FontName} (TrueType)",
-                    fontFile,
-                    cancellationToken);
-
-                // 設定字體替換和連結
-                await ConfigureFontSubstitutionAndLinkingAsync(cancellationToken);
-                
-                await CommitBatchAsync(cancellationToken);
-                _logger?.LogInformation("[Wine Fonts] Font configuration updated in batch mode");
-                return;
-            }
-
-            // 取得字體來源路徑
-            var fontSourcePath = GetFontSourcePath();
-
-            // 確認來源檔案存在
-            if (!File.Exists(fontSourcePath))
-            {
-                throw new FileNotFoundException($"Font source file not found: {fontSourcePath}");
-            }
-
-            _logger?.LogInformation("[Wine Fonts] Font source found: {FontSourcePath}", fontSourcePath);
-
             // 確保目錄存在
             Directory.CreateDirectory(_paths.PrefixFonts);
 
-            // 複製字體檔案
-            File.Copy(fontSourcePath, targetFontPath, overwrite: true);
-            _logger?.LogInformation("[Wine Fonts] Font copied to: {TargetFontPath}", targetFontPath);
-
-            // 設定檔案權限為 644 (rw-r--r--)
-            if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
+            // 安裝每個字體檔案
+            foreach (var font in _paths.Fonts)
             {
-                File.SetUnixFileMode(targetFontPath, 
-                    UnixFileMode.UserRead | UnixFileMode.UserWrite | 
-                    UnixFileMode.GroupRead | UnixFileMode.OtherRead);
+                var targetFontPath = Path.Combine(_paths.PrefixFonts, font.File);
+
+                if (!File.Exists(targetFontPath))
+                {
+                    var fontSourcePath = GetFontSourcePath(font.File);
+                    if (!File.Exists(fontSourcePath))
+                    {
+                        throw new FileNotFoundException($"Font source file not found: {fontSourcePath}");
+                    }
+
+                    File.Copy(fontSourcePath, targetFontPath, overwrite: true);
+                    _logger?.LogInformation("[Wine Fonts] Font copied: {FontFile}", font.File);
+
+                    if (OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
+                    {
+                        File.SetUnixFileMode(targetFontPath,
+                            UnixFileMode.UserRead | UnixFileMode.UserWrite |
+                            UnixFileMode.GroupRead | UnixFileMode.OtherRead);
+                    }
+                }
+                else
+                {
+                    _logger?.LogInformation("[Wine Fonts] Font already installed: {FontFile}", font.File);
+                }
             }
 
-            // 使用批處理模式配置所有註冊表項（極速）
+            // 使用批處理模式配置所有註冊表項
             await BeginBatchAsync(cancellationToken);
-            
-            // 在 Wine 註冊表中註冊字體
-            await AddRegAsync(
-                @"HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\Fonts",
-                $"{_paths.FontName} (TrueType)",
-                fontFile,
-                cancellationToken);
+
+            // 註冊所有字體
+            foreach (var font in _paths.Fonts)
+            {
+                await AddRegAsync(
+                    @"HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\Fonts",
+                    $"{font.Name} (TrueType)",
+                    font.File,
+                    cancellationToken);
+            }
 
             // 設定字體替換和連結
             await ConfigureFontSubstitutionAndLinkingAsync(cancellationToken);
-            
-            await CommitBatchAsync(cancellationToken);
 
-            _logger?.LogInformation("[Wine Fonts] Font installed successfully: {FontFile}", fontFile);
+            await CommitBatchAsync(cancellationToken);
+            _logger?.LogInformation("[Wine Fonts] All fonts installed and configured");
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "[Wine Fonts] Failed to install font");
+            _logger?.LogError(ex, "[Wine Fonts] Failed to install fonts");
             throw;
         }
     }
@@ -817,19 +804,16 @@ public class WinePrefixService
     /// <summary>
     /// 取得字體來源路徑
     /// </summary>
-    private string GetFontSourcePath()
+    private string GetFontSourcePath(string fontFile)
     {
         var appDir = AppContext.BaseDirectory;
-        _logger?.LogDebug("[Wine Fonts] Looking for font from base directory: {AppDir}", appDir);
+        _logger?.LogDebug("[Wine Fonts] Looking for font {Font} from base directory: {AppDir}", fontFile, appDir);
         
         // 方案 1：開發環境 - shared/resources/fonts/
-        // AppContext.BaseDirectory: .../XIVTheCalamity.Api/bin/Debug/net9.0/
-        // 往上找到專案根目錄的 shared/resources/fonts/
         var currentDir = new DirectoryInfo(appDir);
         while (currentDir is not null && currentDir.Parent is not null)
         {
-            var sharedPath = Path.Combine(currentDir.FullName, "shared", "resources", "fonts", _paths.FontFile);
-            _logger?.LogDebug("[Wine Fonts] Checking: {SharedPath}", sharedPath);
+            var sharedPath = Path.Combine(currentDir.FullName, "shared", "resources", "fonts", fontFile);
             if (File.Exists(sharedPath))
             {
                 _logger?.LogInformation("[Wine Fonts] Found in development: {SharedPath}", sharedPath);
@@ -839,10 +823,8 @@ public class WinePrefixService
         }
 
         // 方案 2：打包後的 macOS app bundle
-        // XIVTheCalamity.app/Contents/Resources/resources/fonts/
-        var bundleResourcesPath = Path.Combine(appDir, "..", "..", "Resources", "resources", "fonts", _paths.FontFile);
+        var bundleResourcesPath = Path.Combine(appDir, "..", "..", "Resources", "resources", "fonts", fontFile);
         bundleResourcesPath = Path.GetFullPath(bundleResourcesPath);
-        _logger?.LogDebug("[Wine Fonts] Checking bundle path: {BundleResourcesPath}", bundleResourcesPath);
         if (File.Exists(bundleResourcesPath))
         {
             _logger?.LogInformation("[Wine Fonts] Found in bundle: {BundleResourcesPath}", bundleResourcesPath);
@@ -850,16 +832,14 @@ public class WinePrefixService
         }
 
         // 方案 3：發布後的 Linux/通用部署
-        // 與可執行文件同級的 resources/fonts/
-        var deployedPath = Path.Combine(appDir, "resources", "fonts", _paths.FontFile);
-        _logger?.LogDebug("[Wine Fonts] Checking deployed path: {DeployedPath}", deployedPath);
+        var deployedPath = Path.Combine(appDir, "resources", "fonts", fontFile);
         if (File.Exists(deployedPath))
         {
             _logger?.LogInformation("[Wine Fonts] Found in deployed: {DeployedPath}", deployedPath);
             return Path.GetFullPath(deployedPath);
         }
 
-        var errorMsg = $"Font file not found: {_paths.FontFile}\n" +
+        var errorMsg = $"Font file not found: {fontFile}\n" +
                       $"Base directory: {appDir}\n" +
                       $"Please ensure font file exists in shared/resources/fonts/";
         _logger?.LogError("[Wine Fonts] ERROR: {ErrorMsg}", errorMsg);
@@ -872,14 +852,12 @@ public class WinePrefixService
     /// </summary>
     private async Task ConfigureFontSubstitutionAndLinkingAsync(CancellationToken cancellationToken = default)
     {
-        var fontName = _paths.FontName;
-        var fontFile = _paths.FontFile;
+        // Primary font (TC) for replacements
+        var primaryFont = _paths.Fonts[0];
 
         try
         {
-            // Note: This method runs in batch mode, all operations are in-memory (fast)
-            
-            // 1. Wine font replacements
+            // 1. Wine font replacements — use primary font (TC)
             _logger?.LogDebug("[Wine Fonts] Configuring font replacements");
             const string wineReplacementKey = @"HKEY_CURRENT_USER\Software\Wine\Fonts\Replacements";
 
@@ -891,13 +869,14 @@ public class WinePrefixService
 
             foreach (var replacement in replacements)
             {
-                await AddRegAsync(wineReplacementKey, replacement, fontName, cancellationToken);
+                await AddRegAsync(wineReplacementKey, replacement, primaryFont.Name, cancellationToken);
             }
 
-            // 2. Font linking
+            // 2. Font linking — chain all fonts as fallback (TC first, then SC)
             _logger?.LogDebug("[Wine Fonts] Configuring font linking");
             const string linkKey = @"HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\FontLink\SystemLink";
-            var fallbackValue = $"{fontFile},{fontName}";
+            var fallbackValue = string.Join("\n",
+                _paths.Fonts.Select(f => $"{f.File},{f.Name}"));
 
             var linkFonts = new[]
             {
