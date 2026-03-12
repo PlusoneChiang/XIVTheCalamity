@@ -439,26 +439,8 @@ public class GameLaunchService
             };
         }
         
-        // Capture output for debugging
-        _ = Task.Run(() =>
-        {
-            while (!_gameProcess.StandardOutput.EndOfStream)
-            {
-                var line = _gameProcess.StandardOutput.ReadLine();
-                if (!string.IsNullOrWhiteSpace(line))
-                    _logger.LogDebug("[GAME-OUT] {Line}", line);
-            }
-        });
-        
-        _ = Task.Run(() =>
-        {
-            while (!_gameProcess.StandardError.EndOfStream)
-            {
-                var line = _gameProcess.StandardError.ReadLine();
-                if (!string.IsNullOrWhiteSpace(line))
-                    _logger.LogError("[GAME-ERR] {Line}", line);
-            }
-        });
+        // Capture output for debugging - write to both log file and logger
+        _ = WriteGameLogAsync(_gameProcess);
         
         _logger.LogInformation("[GAME] Game started with PID: {Pid}", _gameProcess.Id);
         
@@ -476,7 +458,6 @@ public class GameLaunchService
         try
         {
             var logDir = GetLogDirectory();
-            // Consolidate logs for same day
             var dateStamp = DateTime.Now.ToString("yyyyMMdd");
             var logPath = Path.Combine(logDir, $"game-{dateStamp}.log");
             
@@ -496,6 +477,7 @@ public class GameLaunchService
                     {
                         await logFile.WriteLineAsync($"[OUT] {line}");
                         await logFile.FlushAsync();
+                        _logger.LogDebug("[GAME-OUT] {Line}", line);
                     }
                 }
             });
@@ -509,6 +491,7 @@ public class GameLaunchService
                     {
                         await logFile.WriteLineAsync($"[ERR] {line}");
                         await logFile.FlushAsync();
+                        _logger.LogWarning("[GAME-ERR] {Line}", line);
                     }
                 }
             });
@@ -517,7 +500,14 @@ public class GameLaunchService
             
             await logFile.WriteLineAsync();
             await logFile.WriteLineAsync($"=== Ended: {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===");
-            await logFile.WriteLineAsync($"=== Exit Code: {process.ExitCode} ===");
+            try
+            {
+                await logFile.WriteLineAsync($"=== Exit Code: {process.ExitCode} ===");
+            }
+            catch (InvalidOperationException)
+            {
+                await logFile.WriteLineAsync("=== Exit Code: unknown (process still running) ===");
+            }
         }
         catch (Exception ex)
         {

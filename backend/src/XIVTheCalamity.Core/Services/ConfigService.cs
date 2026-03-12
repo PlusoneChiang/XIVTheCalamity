@@ -253,6 +253,16 @@ public class ConfigService
             {
                 throw new ArgumentException("MaxFramerate must be between 30 and 240");
             }
+            
+            // Validate IME candidate position
+            if (config.Wine.ImeCandidatePositionX < 0 || config.Wine.ImeCandidatePositionX > 100)
+            {
+                throw new ArgumentException("ImeCandidatePositionX must be between 0 and 100");
+            }
+            if (config.Wine.ImeCandidatePositionY < 0 || config.Wine.ImeCandidatePositionY > 100)
+            {
+                throw new ArgumentException("ImeCandidatePositionY must be between 0 and 100");
+            }
         }
 
         // Validate injectDelay (milliseconds)

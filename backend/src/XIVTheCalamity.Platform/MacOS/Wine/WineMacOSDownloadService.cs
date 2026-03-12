@@ -18,20 +18,87 @@ public class WineMacOSDownloadService(
     
     private string WineRoot => Path.Combine(_platformPaths.AppDataDirectory, "wine");
     private string WinePath => Path.Combine(WineRoot, "bin", "wine64");
+    private string VersionFilePath => Path.Combine(WineRoot, ".wine-version");
     
-    private const string WineVersion = "v2026.01.24";
+    private const string WineVersion = "v2026.03.13";
     private const string GithubRepo = "PlusoneChiang/winecx";
     private const string ArchiveName = $"wine-macos-x86_64-{WineVersion}.tar.xz";
     private const string DownloadUrl = $"https://github.com/{GithubRepo}/releases/download/{WineVersion}/{ArchiveName}";
     
     /// <summary>
-    /// Check if Wine is installed in appData
+    /// Check if Wine is installed and version matches.
+    /// Returns false if binary is missing OR version file doesn't match expected version.
     /// </summary>
     public bool IsInstalled()
     {
-        var installed = Directory.Exists(WineRoot) && File.Exists(WinePath);
-        logger?.LogDebug("[WINE-DL] Wine installed: {Installed}, path: {Path}", installed, WineRoot);
-        return installed;
+        var binaryExists = Directory.Exists(WineRoot) && File.Exists(WinePath);
+        if (!binaryExists)
+        {
+            logger?.LogDebug("[WINE-DL] Wine not installed, path: {Path}", WineRoot);
+            return false;
+        }
+        
+        var versionMatch = IsVersionCurrent();
+        if (!versionMatch)
+        {
+            logger?.LogInformation("[WINE-DL] Wine version mismatch, update required. Expected: {Expected}, installed: {Installed}",
+                WineVersion, GetInstalledVersion() ?? "(no version file)");
+            return false;
+        }
+        
+        logger?.LogDebug("[WINE-DL] Wine installed and up-to-date: {Version}", WineVersion);
+        return true;
+    }
+    
+    /// <summary>
+    /// Check if installed Wine version matches expected version
+    /// </summary>
+    private bool IsVersionCurrent()
+    {
+        if (!File.Exists(VersionFilePath))
+            return false;
+        
+        try
+        {
+            var installedVersion = File.ReadAllText(VersionFilePath).Trim();
+            return installedVersion == WineVersion;
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "[WINE-DL] Failed to read version file");
+            return false;
+        }
+    }
+    
+    /// <summary>
+    /// Get currently installed Wine version from version file
+    /// </summary>
+    private string? GetInstalledVersion()
+    {
+        try
+        {
+            return File.Exists(VersionFilePath) ? File.ReadAllText(VersionFilePath).Trim() : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+    
+    /// <summary>
+    /// Write version file after successful installation
+    /// </summary>
+    private void WriteVersionFile()
+    {
+        try
+        {
+            File.WriteAllText(VersionFilePath, WineVersion);
+            logger?.LogInformation("[WINE-DL] Version file written: {Version}", WineVersion);
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "[WINE-DL] Failed to write version file");
+        }
     }
     
     /// <summary>
@@ -133,11 +200,18 @@ public class WineMacOSDownloadService(
             yield break;
         }
         
-        // Remove old installation
+        // Remove old installation and wineprefix (prefix must be recreated for new Wine version)
         if (Directory.Exists(WineRoot))
         {
             logger?.LogInformation("[WINE-DL] Removing old installation: {Path}", WineRoot);
             Directory.Delete(WineRoot, true);
+        }
+        
+        var winePrefixPath = _platformPaths.GetWinePrefixPath();
+        if (Directory.Exists(winePrefixPath))
+        {
+            logger?.LogInformation("[WINE-DL] Removing old wineprefix for version upgrade: {Path}", winePrefixPath);
+            Directory.Delete(winePrefixPath, true);
         }
         
         Directory.Move(extractedDir, WineRoot);
@@ -168,6 +242,9 @@ public class WineMacOSDownloadService(
             };
             yield break;
         }
+        
+        // Write version file for future version checks
+        WriteVersionFile();
         
         logger?.LogInformation("[WINE-DL] Wine {Version} installed successfully at {Path}", WineVersion, WineRoot);
         

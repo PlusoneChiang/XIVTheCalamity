@@ -1,5 +1,33 @@
 # Release Notes
 
+## v1.6.13
+
+#### 🇹🇼 zh-TW
+### 🐛 修復
+- 修正 macOS Wine 環境下無法使用 Ctrl+V 貼上的問題
+- 修正 macOS Wine 環境下輸入法按鍵卡住的問題
+- 修正 Wine 版本升級時未自動重建 wineprefix 的問題
+
+### ✨ 新功能
+- 新增 Wine 輸入法候選字視窗自訂座標設定
+- Wine 更新至 v2026.03.13，改善 CJK 輸入法相容性
+
+### 🎨 介面調整
+- 春季櫻花粉主題 🌸
+
+#### 🇺🇸 English
+### 🐛 Bug Fixes
+- Fixed Ctrl+V paste not working in macOS Wine environment
+- Fixed IME key input getting stuck in macOS Wine environment
+- Fixed wineprefix not being rebuilt on Wine version upgrade
+
+### ✨ New Features
+- Added custom position settings for Wine IME candidate window
+- Updated Wine to v2026.03.13 with improved CJK IME compatibility
+
+### 🎨 UI Changes
+- Spring sakura pink theme 🌸
+
 ## v1.6.12
 
 #### 🇹🇼 zh-TW

@@ -239,10 +239,10 @@ html {
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-    background: rgba(64, 64, 64, 0.4);
+    background: rgba(255, 183, 197, 0.6);
     backdrop-filter: blur(40px);
     -webkit-backdrop-filter: blur(40px);
-    color: #ffffff;
+    color: #3a1a2a;
     overflow: hidden;
     height: 100vh;
     width: 100vw;
@@ -269,7 +269,7 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(255, 183, 197, 0.35);
     backdrop-filter: blur(40px);
     -webkit-backdrop-filter: blur(40px);
     z-index: 0;
@@ -326,12 +326,12 @@ body {
     width: 340px;
     height: 630px;
     padding: 2rem;
-    background: rgba(191, 191, 191, 0.15);
+    background: rgba(255, 220, 230, 0.35);
     border-radius: 16px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 8px 32px rgba(139, 34, 82, 0.15);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(139, 34, 82, 0.12);
 }
 
 /* Form Styles */
@@ -351,7 +351,7 @@ body {
 .form-group label {
     font-size: 0.9rem;
     font-weight: 500;
-    color: rgba(255, 255, 255, 0.9);
+    color: rgba(58, 26, 42, 0.85);
 }
 
 .form-group input[type="email"],
@@ -359,22 +359,22 @@ body {
 .form-group input[type="text"] {
     padding: 0.75rem 1rem;
     font-size: 1rem;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(139, 34, 82, 0.2);
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.1);
-    color: #ffffff;
+    background: rgba(255, 255, 255, 0.5);
+    color: #3a1a2a;
     transition: all 0.3s ease;
 }
 
 .form-group input:focus {
     outline: none;
-    border-color: #4a9eff;
-    background: rgba(255, 255, 255, 0.15);
-    box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.1);
+    border-color: #8b2252;
+    background: rgba(255, 220, 230, 0.25);
+    box-shadow: 0 0 0 3px rgba(139, 34, 82, 0.15);
 }
 
 .form-group input::placeholder {
-    color: rgba(255, 255, 255, 0.4);
+    color: rgba(58, 26, 42, 0.35);
 }
 
 /* Input with Button */
@@ -399,7 +399,7 @@ body {
     right: 0.5rem;
     background: transparent;
     border: none;
-    color: rgba(255, 255, 255, 0.6);
+    color: rgba(58, 26, 42, 0.5);
     cursor: pointer;
     padding: 0.5rem;
     display: flex;
@@ -409,7 +409,7 @@ body {
 }
 
 .input-addon-btn:hover {
-    color: rgba(255, 255, 255, 0.9);
+    color: rgba(58, 26, 42, 0.8);
 }
 
 .input-addon-btn:active {
@@ -465,7 +465,7 @@ body {
 .dropdown-empty {
     padding: 1rem;
     text-align: center;
-    color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.6);
     font-size: 0.9rem;
 }
 
@@ -493,7 +493,7 @@ body {
 
 .timer-bg {
     fill: none;
-    stroke: rgba(255, 255, 255, 0.2);
+    stroke: rgba(139, 34, 82, 0.2);
     stroke-width: 2.5;
 }
 
@@ -510,7 +510,7 @@ body {
 .timer-text {
     font-size: 11px;
     font-weight: bold;
-    fill: #ffffff;
+    fill: #3a1a2a;
     text-anchor: middle;
     dominant-baseline: middle;
     transform: rotate(90deg) scaleX(-1);
@@ -531,7 +531,7 @@ body {
 
 .otp-secret-group .help-text {
     font-size: 0.8rem;
-    color: rgba(255, 255, 255, 0.6);
+    color: rgba(58, 26, 42, 0.5);
     margin-top: 0.25rem;
 }
 
@@ -555,16 +555,16 @@ body {
     padding: 0.5rem 1rem;
     font-size: 0.875rem;
     font-weight: 600;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(139, 34, 82, 0.2);
     border-radius: 6px;
-    background: rgba(255, 255, 255, 0.1);
-    color: #ffffff;
+    background: rgba(139, 34, 82, 0.08);
+    color: #6b2252;
     cursor: pointer;
     transition: all 0.2s ease;
 }
 
 .otp-secret-group .input-with-button .btn-inline:hover {
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(139, 34, 82, 0.15);
     transform: translateY(-50%);
 }
 
@@ -614,13 +614,13 @@ body {
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    background: linear-gradient(135deg, #E84393 0%, #D63384 100%);
     color: #ffffff;
 }
 
 .btn-primary:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(220, 38, 38, 0.4);
+    box-shadow: 0 8px 20px rgba(232, 67, 147, 0.4);
 }
 
 .btn-primary:disabled {
@@ -629,13 +629,13 @@ body {
 }
 
 .btn-secondary {
-    background: rgba(255, 255, 255, 0.1);
-    color: #ffffff;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(139, 34, 82, 0.08);
+    color: #6b2252;
+    border: 1px solid rgba(139, 34, 82, 0.2);
 }
 
 .btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(139, 34, 82, 0.15);
 }
 
 .btn-small {
@@ -658,8 +658,8 @@ body {
     width: 60px;
     height: 60px;
     margin: 0 auto 1.5rem;
-    border: 4px solid rgba(255, 255, 255, 0.1);
-    border-top-color: #667eea;
+    border: 4px solid rgba(139, 34, 82, 0.15);
+    border-top-color: #E84393;
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
@@ -670,7 +670,7 @@ body {
 
 .loading-text {
     font-size: 1.1rem;
-    color: rgba(255, 255, 255, 0.8);
+    color: rgba(58, 26, 42, 0.7);
 }
 
 /* Success State */
@@ -711,7 +711,7 @@ body {
 
 .session-info {
     font-size: 0.9rem;
-    color: rgba(255, 255, 255, 0.6);
+    color: rgba(58, 26, 42, 0.6);
     margin-bottom: 2rem;
     word-break: break-all;
 }
@@ -941,13 +941,13 @@ body {
 }
 
 .app-update-btn-primary {
-    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    background: linear-gradient(135deg, #E84393 0%, #D63384 100%);
     color: white;
 }
 
 .app-update-btn-primary:hover {
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
+    box-shadow: 0 4px 12px rgba(232, 67, 147, 0.4);
 }
 
 .app-update-btn-primary.app-update-btn-green {
