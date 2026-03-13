@@ -1,5 +1,23 @@
 # Release Notes
 
+## v1.6.14
+
+#### 🇹🇼 zh-TW
+### 🐛 修復
+- 修正 macOS Wine 環境下輸入法確認文字後，方向鍵失效的問題
+- 修正候選字視窗在未設定自訂座標時，定位異常的問題
+
+### 🔧 調整
+- Wine 更新至 v2026.03.14
+
+#### 🇺🇸 English
+### 🐛 Bug Fixes
+- Fixed arrow keys not working after committing IME text in macOS Wine
+- Fixed candidate window positioning when custom coordinates are not set
+
+### 🔧 Changes
+- Updated Wine to v2026.03.14
+
 ## v1.6.13
 
 #### 🇹🇼 zh-TW

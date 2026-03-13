@@ -1,6 +1,6 @@
 {
   "name": "xivthecalamity",
-  "version": "1.6.13",
+  "version": "1.6.14",
   "description": "Final Fantasy XIV Cross-Platform Launcher",
   "main": "src/main/index.js",
   "scripts": {
