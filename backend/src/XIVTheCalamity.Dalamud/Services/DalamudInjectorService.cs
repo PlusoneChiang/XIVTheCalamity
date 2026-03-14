@@ -64,6 +64,14 @@ public class DalamudInjectorService
             // Prepare environment variables (add DALAMUD_RUNTIME first, as winedbg needs same environment)
             var injectorEnv = new Dictionary<string, string>(environment);
             AddDalamudEnvironment(injectorEnv, winePath);
+
+            // Keep injector/winedbg in the same graphics mode as game launch on Linux.
+            // This avoids running game with WineD3D while injector side still carries DXVK overrides.
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                injectorEnv["WINEDLLOVERRIDES"] = "mshtml=;d3d11,dxgi,d3d10core,d3d9=b";
+                _logger.LogInformation("[DALAMUD-INJECT] Forcing Wine built-in D3D for Linux Dalamud compatibility");
+            }
             
             // Ensure Wine %APPDATA%/XIVLauncherTC symlink points to our Config directory
             // Dalamud hardcodes %APPDATA%/XIVLauncherTC for safe mode, log commands, etc.

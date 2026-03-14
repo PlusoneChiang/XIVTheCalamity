@@ -184,8 +184,8 @@ public class GameLaunchService
                     // Force Wine's built-in D3D11 until Dalamud is updated with VTable-based hooking
                     if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                     {
-                        baseEnvironment["WINEDLLOVERRIDES"] = "d3d11=b;dxgi=b";
-                        _logger.LogInformation("[GAME] DXVK disabled for Dalamud compatibility (using Wine built-in D3D11)");
+                        baseEnvironment["WINEDLLOVERRIDES"] = "mshtml=;d3d11,dxgi,d3d10core,d3d9=b";
+                        _logger.LogInformation("[GAME] DXVK disabled for Dalamud compatibility (forcing Wine built-in D3D)");
                     }
                     
                     // CRITICAL: Enable .NET 7+ on Apple Silicon (for Dalamud only)
