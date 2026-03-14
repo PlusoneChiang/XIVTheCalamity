@@ -427,6 +427,8 @@ public class GameLaunchService
         {
             startInfo.Environment["HOME"] = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         }
+
+        ApplyLinuxXModifiersEnvironment(startInfo);
         
         _gameProcess = Process.Start(startInfo);
         
@@ -451,6 +453,44 @@ public class GameLaunchService
             ProcessId = _gameProcess.Id,
             Process = _gameProcess
         };
+    }
+
+    private void ApplyLinuxXModifiersEnvironment(ProcessStartInfo startInfo)
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            return;
+        }
+
+        var hasFcitx = Process.GetProcessesByName("fcitx5").Length > 0 ||
+                       Process.GetProcessesByName("fcitx5-bin").Length > 0 ||
+                       Process.GetProcessesByName("fcitx").Length > 0;
+        var hasIbus = Process.GetProcessesByName("ibus-daemon").Length > 0;
+
+        string? framework = null;
+        string? source = null;
+        if (hasFcitx)
+        {
+            framework = "fcitx";
+            source = hasIbus ? "process:fcitx+ibus-daemon" : "process:fcitx";
+        }
+        else if (hasIbus)
+        {
+            framework = "ibus";
+            source = "process:ibus-daemon";
+        }
+
+        if (framework == null)
+        {
+            _logger.LogDebug("[GAME] Unable to detect IME framework, keeping existing XMODIFIERS");
+            return;
+        }
+
+        var xModifiers = $"@im={framework}";
+        startInfo.Environment["XMODIFIERS"] = xModifiers;
+        _logger.LogInformation(
+            "[GAME] Auto-detected IME framework: {Framework} (source: {Source}), set XMODIFIERS={XModifiers}",
+            framework, source, xModifiers);
     }
     
     private async Task WriteGameLogAsync(Process process)
