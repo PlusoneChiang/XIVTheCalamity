@@ -451,7 +451,8 @@ public class GameLaunchService
         {
             Success = true,
             ProcessId = _gameProcess.Id,
-            Process = _gameProcess
+            Process = _gameProcess,
+            LaunchEnvironment = new Dictionary<string, string>(environment)
         };
     }
 
@@ -622,4 +623,5 @@ public class GameLaunchResult
     public int? ProcessId { get; set; }
     public string? ErrorMessage { get; set; }
     public System.Diagnostics.Process? Process { get; set; }
+    public Dictionary<string, string>? LaunchEnvironment { get; set; }
 }

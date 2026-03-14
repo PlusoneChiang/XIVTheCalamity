@@ -64,6 +64,7 @@ public static class GameEndpoints
                         _ = InjectDalamudAsync(
                             config.Dalamud,
                             RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? config.WineXIV : config.Wine,
+                            result.LaunchEnvironment,
                             environmentService,
                             dalamudInjector,
                             logger,
@@ -156,6 +157,7 @@ public static class GameEndpoints
                         _ = InjectDalamudAsync(
                             config.Dalamud,
                             RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? config.WineXIV : config.Wine,
+                            result.LaunchEnvironment,
                             environmentService,
                             dalamudInjector,
                             logger,
@@ -202,6 +204,7 @@ public static class GameEndpoints
     private static async Task InjectDalamudAsync(
         XIVTheCalamity.Core.Models.DalamudConfig dalamudConfig,
         object? emulatorConfig,
+        Dictionary<string, string>? launchEnvironment,
         IEnvironmentService environmentService,
         DalamudInjectorService dalamudInjector,
         ILogger<Program> logger,
@@ -236,8 +239,19 @@ public static class GameEndpoints
                     logger.LogWarning("[GAME] Wine/Wine-XIV not available, cannot inject Dalamud");
                     return;
                 }
-                
-                var environment = environmentService.GetEnvironment();
+
+                Dictionary<string, string> environment;
+                if (launchEnvironment is { Count: > 0 })
+                {
+                    environment = new Dictionary<string, string>(launchEnvironment);
+                    logger.LogInformation("[GAME] Using launch environment for Wine Dalamud injection");
+                }
+                else
+                {
+                    environment = environmentService.GetEnvironment();
+                    logger.LogWarning("[GAME] Launch environment unavailable, using fresh environment for Dalamud injection");
+                }
+
                 logger.LogInformation("[GAME] Using Wine Dalamud injection");
                 result = await dalamudInjector.InjectAsync(winePath, environment, options, cancellationToken);
             }
