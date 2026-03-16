@@ -141,6 +141,11 @@ public class WineEnvironmentService(
         return _paths.WineRoot;
     }
 
+    public string GetWineExecutablePath()
+    {
+        return _paths.Wine;
+    }
+
     public Dictionary<string, string> GetEnvironment()
     {
         // Get base environment from paths

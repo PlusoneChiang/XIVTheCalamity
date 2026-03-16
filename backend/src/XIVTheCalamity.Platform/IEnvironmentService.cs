@@ -25,10 +25,17 @@ public interface IEnvironmentService
     /// <summary>
     /// Get emulator root directory
     /// macOS: Wine directory
-    /// Linux: Wine-XIV directory
+    /// Linux: Runtime directory (Wine-XIV/Proton)
     /// Windows: Empty string
     /// </summary>
     string GetEmulatorDirectory();
+
+    /// <summary>
+    /// Get Wine-compatible executable path used to launch Windows programs.
+    /// macOS/Linux: wine64 path from current runtime
+    /// Windows: Empty string
+    /// </summary>
+    string GetWineExecutablePath();
     
     /// <summary>
     /// Get environment variables configuration

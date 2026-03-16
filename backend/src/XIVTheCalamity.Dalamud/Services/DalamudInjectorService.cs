@@ -64,18 +64,25 @@ public class DalamudInjectorService
             // Prepare environment variables (add DALAMUD_RUNTIME first, as winedbg needs same environment)
             var injectorEnv = new Dictionary<string, string>(environment);
             AddDalamudEnvironment(injectorEnv, winePath);
-
-            // Keep injector/winedbg in the same graphics mode as game launch on Linux.
-            // This avoids running game with WineD3D while injector side still carries DXVK overrides.
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
-                injectorEnv["WINEDLLOVERRIDES"] = "mshtml=;d3d11,dxgi,d3d10core,d3d9=b";
-                _logger.LogInformation("[DALAMUD-INJECT] Forcing Wine built-in D3D for Linux Dalamud compatibility");
+                injectorEnv["WINEDLLOVERRIDES"] = "mshtml=;d3d11,dxgi,d3d10core,d3d9=n,b";
+                injectorEnv["PROTON_USE_WINED3D"] = "0";
+                injectorEnv["DALAMUD_FORCE_MINHOOK"] = "true";
+                _logger.LogWarning("[DALAMUD-INJECT] Linux graphics env: WINEDLLOVERRIDES={Overrides}, PROTON_USE_WINED3D={ProtonUseWineD3D}, DALAMUD_FORCE_MINHOOK={ForceMinHook}",
+                    injectorEnv["WINEDLLOVERRIDES"], injectorEnv["PROTON_USE_WINED3D"], injectorEnv["DALAMUD_FORCE_MINHOOK"]);
             }
             
             // Ensure Wine %APPDATA%/XIVLauncherTC symlink points to our Config directory
             // Dalamud hardcodes %APPDATA%/XIVLauncherTC for safe mode, log commands, etc.
             EnsureWineAppDataSymlink(injectorEnv);
+
+            // Linux mitigation: force fresh signature scan each launch.
+            // This avoids reusing stale cached callsite signatures that can crash Reloaded.AsmHook.
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                ClearLinuxCachedSignatures();
+            }
             
             // Wait for game process (using winedbg)
             var gamePid = await WaitForGameProcessAsync(winePath, injectorEnv, cancellationToken);
@@ -337,6 +344,14 @@ public class DalamudInjectorService
         env["COMPlus_EnableAlternateStackCheck"] = "0";  // Disable stack checks that may fail in Wine
         env["COMPlus_gcAllowVeryLargeObjects"] = "1";  // Allow large objects
         
+        // On Linux + Wine/Proton, ICU symbol resolution may fail for bundled runtime.
+        // Use invariant globalization to keep Injector startup stable across distros.
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            env["DOTNET_SYSTEM_GLOBALIZATION_INVARIANT"] = "1";
+            env["DALAMUD_FORCE_MINHOOK"] = "true";
+        }
+        
         // CRITICAL: Prepend system library paths for ICU
         // .NET Runtime needs libicuuc from system libraries
         if (env.ContainsKey("LD_LIBRARY_PATH"))
@@ -429,6 +444,50 @@ public class DalamudInjectorService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "[DALAMUD-INJECT] Failed to create AppData symlink (non-fatal)");
+        }
+    }
+
+    /// <summary>
+    /// Clear cached Dalamud signature files on Linux (except cs.json).
+    /// This is a defensive mitigation for intermittent Reloaded.AsmHook crashes on relaunch.
+    /// </summary>
+    private void ClearLinuxCachedSignatures()
+    {
+        var cacheDir = Path.Combine(_pathService.HooksDevPath, "cachedSigs");
+        if (!Directory.Exists(cacheDir))
+        {
+            _logger.LogDebug("[DALAMUD-INJECT] cachedSigs directory not found: {CacheDir}", cacheDir);
+            return;
+        }
+
+        var deleted = 0;
+        foreach (var file in Directory.EnumerateFiles(cacheDir, "*.json", SearchOption.TopDirectoryOnly))
+        {
+            var fileName = Path.GetFileName(file);
+            if (string.Equals(fileName, "cs.json", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            try
+            {
+                File.Delete(file);
+                deleted++;
+                _logger.LogWarning("[DALAMUD-INJECT] Cleared cached signature file: {File}", file);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[DALAMUD-INJECT] Failed to remove cached signature file: {File}", file);
+            }
+        }
+
+        if (deleted > 0)
+        {
+            _logger.LogWarning("[DALAMUD-INJECT] Cleared {Count} cached signature file(s) in {CacheDir}", deleted, cacheDir);
+        }
+        else
+        {
+            _logger.LogDebug("[DALAMUD-INJECT] No removable cached signature files found in {CacheDir}", cacheDir);
         }
     }
     

@@ -40,6 +40,11 @@ public class WindowsEnvironmentService(
         return string.Empty;
     }
 
+    public string GetWineExecutablePath()
+    {
+        return string.Empty;
+    }
+
     public Dictionary<string, string> GetEnvironment()
     {
         return new Dictionary<string, string>();

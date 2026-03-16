@@ -179,13 +179,31 @@ public class GameLaunchService
                     baseEnvironment["DALAMUD_RUNTIME"] = wineDalamudPath;
                     baseEnvironment["DOTNET_ROOT"] = wineDalamudPath;  // Also set DOTNET_ROOT
                     
-                    // Disable DXVK when Dalamud is enabled on Linux
-                    // Dalamud's Reloaded.Hooks uses FASMX64.dll which crashes under DXVK's modified memory layout
-                    // Force Wine's built-in D3D11 until Dalamud is updated with VTable-based hooking
+                    // Keep launch-time runtime settings aligned with injector environment.
+                    // Dalamud.Boot executes inside the game process and needs these variables.
                     if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                     {
-                        baseEnvironment["WINEDLLOVERRIDES"] = "mshtml=;d3d11,dxgi,d3d10core,d3d9=b";
-                        _logger.LogInformation("[GAME] DXVK disabled for Dalamud compatibility (forcing Wine built-in D3D)");
+                        // Prefer DXVK when Dalamud is enabled on Linux.
+                        baseEnvironment["WINEDLLOVERRIDES"] = "mshtml=;d3d11,dxgi,d3d10core,d3d9=n,b";
+                        baseEnvironment["PROTON_USE_WINED3D"] = "0";
+                        baseEnvironment["DALAMUD_FORCE_MINHOOK"] = "true";
+                        baseEnvironment["DOTNET_EnableWriteXorExecute"] = "0";
+                        baseEnvironment["COMPlus_EnableAlternateStackCheck"] = "0";
+                        baseEnvironment["COMPlus_gcAllowVeryLargeObjects"] = "1";
+                        baseEnvironment["DOTNET_SYSTEM_GLOBALIZATION_INVARIANT"] = "1";
+                        
+                        if (baseEnvironment.TryGetValue("LD_LIBRARY_PATH", out var existingLdLibraryPath))
+                        {
+                            baseEnvironment["LD_LIBRARY_PATH"] = $"/usr/lib64:/usr/lib:{existingLdLibraryPath}";
+                        }
+                        else
+                        {
+                            baseEnvironment["LD_LIBRARY_PATH"] = "/usr/lib64:/usr/lib";
+                        }
+                        
+                        _logger.LogWarning("[GAME] Linux graphics env: WINEDLLOVERRIDES={Overrides}, PROTON_USE_WINED3D={ProtonUseWineD3D}, DALAMUD_FORCE_MINHOOK={ForceMinHook}",
+                            baseEnvironment["WINEDLLOVERRIDES"], baseEnvironment["PROTON_USE_WINED3D"], baseEnvironment["DALAMUD_FORCE_MINHOOK"]);
+                        _logger.LogInformation("[GAME] Applied Linux Dalamud runtime environment overrides");
                     }
                     
                     // CRITICAL: Enable .NET 7+ on Apple Silicon (for Dalamud only)
@@ -333,20 +351,7 @@ public class GameLaunchService
             };
         }
         
-        var emulatorDir = _environmentService.GetEmulatorDirectory();
-        
-        // Get wine executable path based on platform
-        string winePath;
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) || RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-        {
-            // macOS & Linux: use bin/wine64
-            winePath = Path.Combine(emulatorDir, "bin", "wine64");
-        }
-        else
-        {
-            // Fallback (should not reach here for non-Windows)
-            winePath = Path.Combine(emulatorDir, "files", "bin", "wine");
-        }
+        var winePath = _environmentService.GetWineExecutablePath();
         
         if (string.IsNullOrEmpty(winePath) || !File.Exists(winePath))
         {
@@ -384,37 +389,14 @@ public class GameLaunchService
             RedirectStandardError = true
         };
         
-        // CRITICAL: Clear all inherited environment variables first
-        // This prevents system LD_LIBRARY_PATH or other vars from interfering
-        startInfo.Environment.Clear();
-        
-        // Apply our Wine environment variables
+        // Keep inherited environment variables and override with launcher-managed values.
+        // This matches behavior where system GPU/driver-related variables remain available.
         foreach (var (key, value) in environment)
         {
             startInfo.Environment[key] = value;
         }
-        
-        // Add essential system variables back
-        var essentialVars = new[] 
-        { 
-            "PATH", "HOME", 
-            "DISPLAY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR",  // Display server
-            "XAUTHORITY", "XDG_SESSION_TYPE",                   // X11 auth
-            "LANG", "LC_ALL",                                    // Locale
-            "DALAMUD_RUNTIME"                                    // Dalamud .NET Runtime path (Unix path)
-        };
-        
-        foreach (var varName in essentialVars)
-        {
-            if (!startInfo.Environment.ContainsKey(varName))
-            {
-                var value = Environment.GetEnvironmentVariable(varName);
-                if (!string.IsNullOrEmpty(value))
-                {
-                    startInfo.Environment[varName] = value;
-                }
-            }
-        }
+
+        SanitizeLinuxLaunchEnvironment(startInfo);
         
         // Ensure PATH is set
         if (!startInfo.Environment.ContainsKey("PATH"))
@@ -454,6 +436,103 @@ public class GameLaunchService
             Process = _gameProcess,
             LaunchEnvironment = new Dictionary<string, string>(environment)
         };
+    }
+
+    private void SanitizeLinuxLaunchEnvironment(ProcessStartInfo startInfo)
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            return;
+        }
+
+        if (startInfo.Environment.TryGetValue("LD_PRELOAD", out var ldPreload) &&
+            !string.IsNullOrWhiteSpace(ldPreload))
+        {
+            _logger.LogWarning("[GAME] Removing inherited LD_PRELOAD for Wine launch: {LdPreload}", ldPreload);
+            startInfo.Environment.Remove("LD_PRELOAD");
+        }
+
+        var conflictingVars = new[]
+        {
+            "SDL_VIDEODRIVER", "QT_QPA_PLATFORM",
+            "APPDIR", "APPIMAGE", "ARGV0", "GSETTINGS_SCHEMA_DIR", "OWD"
+        };
+
+        foreach (var varName in conflictingVars)
+        {
+            if (startInfo.Environment.Remove(varName))
+            {
+                _logger.LogDebug("[GAME] Removed conflicting env var: {VarName}", varName);
+            }
+        }
+
+        var steamAndOverlayVars = new[]
+        {
+            "SteamAppId", "SteamGameId",
+            "VK_LAYER_PATH", "VK_ADD_LAYER_PATH", "VK_INSTANCE_LAYERS",
+            "DISABLE_VK_LAYER_VALVE_steam_overlay_1",
+            "ENABLE_VKBASALT",
+            "MANGOHUD", "MANGOHUD_DLSYM", "MANGOHUD_CONFIG", "MANGOHUD_CONFIGFILE"
+        };
+        foreach (var varName in steamAndOverlayVars)
+        {
+            if (startInfo.Environment.Remove(varName))
+            {
+                _logger.LogDebug("[GAME] Removed Steam/overlay env var: {VarName}", varName);
+            }
+        }
+
+        RemoveEnvironmentByPrefix(startInfo, "STEAM_");
+        RemoveEnvironmentByPrefix(startInfo, "PRESSURE_VESSEL_");
+        RemoveEnvironmentByPrefix(startInfo, "MANGOHUD");
+
+        SanitizeColonSeparatedEnvironment(startInfo, "PATH");
+        SanitizeColonSeparatedEnvironment(startInfo, "XDG_DATA_DIRS");
+    }
+
+    private void RemoveEnvironmentByPrefix(ProcessStartInfo startInfo, string prefix)
+    {
+        var keysToRemove = new List<string>();
+        foreach (var key in startInfo.Environment.Keys)
+        {
+            if (key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                keysToRemove.Add(key);
+            }
+        }
+
+        foreach (var key in keysToRemove)
+        {
+            startInfo.Environment.Remove(key);
+            _logger.LogDebug("[GAME] Removed env var by prefix {Prefix}: {Key}", prefix, key);
+        }
+    }
+
+    private void SanitizeColonSeparatedEnvironment(ProcessStartInfo startInfo, string variableName)
+    {
+        if (!startInfo.Environment.TryGetValue(variableName, out var value) || string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        var segments = value.Split(':', StringSplitOptions.RemoveEmptyEntries);
+        var sanitizedSegments = new List<string>(segments.Length);
+
+        foreach (var segment in segments)
+        {
+            if (segment.Contains(".mount_") || segment.Contains("/tmp/.mount"))
+            {
+                continue;
+            }
+
+            sanitizedSegments.Add(segment);
+        }
+
+        if (sanitizedSegments.Count != segments.Length)
+        {
+            startInfo.Environment[variableName] = string.Join(":", sanitizedSegments);
+            _logger.LogDebug("[GAME] Sanitized {VariableName} by removing AppImage mount paths", variableName);
+        }
     }
 
     private void ApplyLinuxXModifiersEnvironment(ProcessStartInfo startInfo)

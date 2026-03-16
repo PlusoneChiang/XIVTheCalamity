@@ -232,6 +232,11 @@ public class WineXIVEnvironmentService(
     {
         return WineRoot;
     }
+
+    public string GetWineExecutablePath()
+    {
+        return Wine;
+    }
     
     public Dictionary<string, string> GetEnvironment()
     {

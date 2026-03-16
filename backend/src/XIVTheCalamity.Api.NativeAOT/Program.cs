@@ -67,9 +67,8 @@ try
     else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
     {
         builder.Services.AddSingleton<XIVTheCalamity.Platform.IEnvironmentService, 
-            XIVTheCalamity.Platform.Linux.Wine.WineXIVEnvironmentService>();
-        builder.Services.AddSingleton<XIVTheCalamity.Platform.Linux.Wine.WineXIVDownloadService>();
-        builder.Services.AddSingleton<XIVTheCalamity.Platform.Linux.Wine.DxvkDownloadService>();
+            XIVTheCalamity.Platform.Linux.Proton.ProtonGeEnvironmentService>();
+        builder.Services.AddSingleton<XIVTheCalamity.Platform.Linux.Proton.ProtonGeDownloadService>();
         // Add Wine services for Linux (using macOS implementation as it's cross-platform)
         builder.Services.AddSingleton<WinePrefixService>();
         builder.Services.AddSingleton<WineConfigService>();

@@ -68,7 +68,7 @@ public static class GameEndpoints
                             environmentService,
                             dalamudInjector,
                             logger,
-                            cancellationToken);
+                            CancellationToken.None);
                     }
                     
                     logger.LogInformation("[GAME] Waiting for game exit...");
@@ -161,7 +161,7 @@ public static class GameEndpoints
                             environmentService,
                             dalamudInjector,
                             logger,
-                            cancellationToken);
+                            CancellationToken.None);
                     }
                     
                     return Results.Ok(ApiResponse<GameLaunchResponse>.Ok(
@@ -231,10 +231,9 @@ public static class GameEndpoints
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) || RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
                 // macOS/Linux: Wine-based injection
-                var emulatorDir = environmentService.GetEmulatorDirectory();
-                var winePath = Path.Combine(emulatorDir, "bin", "wine64");
+                var winePath = environmentService.GetWineExecutablePath();
                 
-                if (string.IsNullOrEmpty(emulatorDir) || !File.Exists(winePath))
+                if (string.IsNullOrEmpty(winePath) || !File.Exists(winePath))
                 {
                     logger.LogWarning("[GAME] Wine/Wine-XIV not available, cannot inject Dalamud");
                     return;
