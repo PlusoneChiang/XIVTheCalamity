@@ -21,8 +21,8 @@ public class DalamudUpdater
     private readonly DalamudPathService _pathService;
     private readonly HttpClient _httpClient;
     
-    private const string VersionUrl = "https://plusonechiang.github.io/XIV-on-Mac-in-TC/dalamud_version.json";
-    private const string AssetUrl = "https://plusonechiang.github.io/XIV-on-Mac-in-TC/dalamud_asset.json";
+    private const string VersionUrl = "https://plusonechiang.github.io/Dalamud/version.json";
+    private const string AssetUrl = "https://plusonechiang.github.io/DalamudAssets/asset.json";
     private const string DotnetRuntimeUrl = "https://dotnetcli.azureedge.net/dotnet/Runtime/{0}/dotnet-runtime-{0}-win-x64.zip";
     private const string DesktopRuntimeUrl = "https://dotnetcli.azureedge.net/dotnet/WindowsDesktop/{0}/windowsdesktop-runtime-{0}-win-x64.zip";
     
@@ -168,6 +168,7 @@ public class DalamudUpdater
                 yield return progress;
                 currentProgress = progress;
             }
+            CleanupOldDalamudVersions(versionInfo.AssemblyVersion);
         }
         
         // 3. Download Runtime (if needed)
@@ -188,11 +189,24 @@ public class DalamudUpdater
             }
         }
         
-        // 4. 下載 Assets (如需要)
-        await foreach (var progress in DownloadAssetsAsync(_cts.Token))
+        // 4. 下載 Assets (版本有變時才強制重新下載)
+        var localAssetsVersion = _pathService.GetLocalAssetsVersion();
+        var assetManifest = await GetAssetManifestAsync();
+        var assetsNeedUpdate = assetManifest != null && localAssetsVersion != assetManifest.Version;
+        
+        _logger.LogInformation("Assets version check: Local={LocalVersion}, Remote={RemoteVersion}, NeedsUpdate={NeedsUpdate}",
+            localAssetsVersion, assetManifest?.Version, assetsNeedUpdate);
+        
+        await foreach (var progress in DownloadAssetsAsync(_cts.Token, forceUpdate: assetsNeedUpdate, preloadedManifest: assetManifest))
         {
             yield return progress;
             currentProgress = progress;
+        }
+        
+        // 5. 刪除舊版 Assets 目錄
+        if (assetsNeedUpdate && assetManifest != null)
+        {
+            CleanupOldAssetsVersions(assetManifest.Version);
         }
         
         // 完成
@@ -218,7 +232,7 @@ public class DalamudUpdater
         };
         yield return progress;
         
-        var tempFile = Path.Combine(Path.GetTempPath(), $"dalamud_{versionInfo.AssemblyVersion}.7z");
+        var tempFile = Path.Combine(Path.GetTempPath(), $"dalamud_{versionInfo.AssemblyVersion}.zip");
         var targetDir = _pathService.GetHooksVersionPath(versionInfo.AssemblyVersion);
         
         try
@@ -235,7 +249,7 @@ public class DalamudUpdater
             // 解壓
             progress = ReportProgress(progress, DalamudUpdateStage.ExtractingDalamud, "解壓 Dalamud...");
             yield return progress;
-            await ExtractSevenZipAsync(tempFile, targetDir, ct);
+            await ExtractZipAsync(tempFile, targetDir, ct);
             
             // 保存版本資訊
             var versionJson = JsonSerializer.Serialize(versionInfo, DalamudJsonContext.Default.DalamudVersionInfo);
@@ -325,7 +339,7 @@ public class DalamudUpdater
         }
     }
     
-    private async IAsyncEnumerable<DalamudUpdateProgress> DownloadAssetsAsync([EnumeratorCancellation] CancellationToken ct)
+    private async IAsyncEnumerable<DalamudUpdateProgress> DownloadAssetsAsync([EnumeratorCancellation] CancellationToken ct, bool forceUpdate = false, DalamudAssetManifest? preloadedManifest = null)
     {
         var progress = new DalamudUpdateProgress
         {
@@ -334,7 +348,7 @@ public class DalamudUpdater
         };
         yield return progress;
         
-        var manifest = await GetAssetManifestAsync();
+        var manifest = preloadedManifest ?? await GetAssetManifestAsync();
         if (manifest == null)
         {
             throw new Exception("無法取得 Asset 清單");
@@ -344,14 +358,21 @@ public class DalamudUpdater
         var assetDir = _pathService.GetAssetsVersionPath(manifest.Version);
         Directory.CreateDirectory(assetDir);
         
-        _logger.LogInformation("本地 Assets 版本: {LocalVersion}, 遠端版本: {RemoteVersion}", 
-            localVersion, manifest.Version);
+        _logger.LogInformation("本地 Assets 版本: {LocalVersion}, 遠端版本: {RemoteVersion}, 強制更新: {ForceUpdate}", 
+            localVersion, manifest.Version, forceUpdate);
         
         // 計算需要下載的檔案
         var filesToDownload = new List<DalamudAssetEntry>();
         foreach (var asset in manifest.Assets)
         {
             var localPath = Path.Combine(assetDir, asset.FileName);
+            
+            // 強制更新模式：所有檔案都重新下載
+            if (forceUpdate)
+            {
+                filesToDownload.Add(asset);
+                continue;
+            }
             
             // 文件不存在 或 Hash驗證失敗 → 需要下載
             if (!File.Exists(localPath))
@@ -379,6 +400,17 @@ public class DalamudUpdater
             }
             yield break;
         }
+        
+        // 有整包 Package 且需要更新 → 下載整包解壓，再統一驗證
+        if (!string.IsNullOrEmpty(manifest.Package) && (forceUpdate || localVersion != manifest.Version))
+        {
+            await foreach (var p in DownloadAssetPackageAsync(manifest, assetDir, ct))
+            {
+                yield return p;
+            }
+        }
+        else
+        {
         
         _logger.LogInformation("需要下載 {Count}/{Total} 個 Asset 檔案", 
             filesToDownload.Count, manifest.Assets.Count);
@@ -493,6 +525,8 @@ public class DalamudUpdater
         
         await downloadTask; // Ensure download completes
         
+        } // end else (per-file download)
+        
         // 驗證所有檔案完整性（包含子目錄）
         _logger.LogInformation("驗證 Assets 完整性（包含子目錄）...");
         var failedFiles = new List<string>();
@@ -551,6 +585,44 @@ public class DalamudUpdater
         await UpdateDevLinkAsync(assetDir, _pathService.AssetsDevPath, ct);
         
         _logger.LogInformation("Assets v{Version} 安裝完成", manifest.Version);
+    }
+    
+    /// <summary>下載 Assets 整包 zip 並解壓到版本目錄</summary>
+    private async IAsyncEnumerable<DalamudUpdateProgress> DownloadAssetPackageAsync(
+        DalamudAssetManifest manifest, string assetDir, [EnumeratorCancellation] CancellationToken ct)
+    {
+        var tempFile = Path.Combine(Path.GetTempPath(), $"dalamud_assets_{manifest.Version}.zip");
+        
+        try
+        {
+            _logger.LogInformation("下載 Assets 整包從: {Url}", manifest.Package);
+            
+            await foreach (var p in DownloadFileWithProgressAsync(manifest.Package!, tempFile, ct))
+            {
+                p.Stage = DalamudUpdateStage.DownloadingAssets;
+                yield return p;
+            }
+            
+            var extractProgress = new DalamudUpdateProgress
+            {
+                Stage = DalamudUpdateStage.DownloadingAssets,
+                CurrentFile = "解壓 Assets..."
+            };
+            yield return extractProgress;
+            
+            // 清空目標目錄後解壓
+            if (Directory.Exists(assetDir))
+                Directory.Delete(assetDir, true);
+            Directory.CreateDirectory(assetDir);
+            
+            await ExtractZipAsync(tempFile, assetDir, ct);
+            _logger.LogInformation("Assets 整包解壓完成");
+        }
+        finally
+        {
+            if (File.Exists(tempFile))
+                File.Delete(tempFile);
+        }
     }
     
     /// <summary>下載檔案並追蹤進度 (用於單一大檔案下載)</summary>
@@ -726,6 +798,10 @@ public class DalamudUpdater
     
     private static async Task<bool> VerifyFileHashAsync(string filePath, string expectedHash)
     {
+        // 沒有 hash 資訊時，跳過驗證視為通過
+        if (string.IsNullOrEmpty(expectedHash))
+            return true;
+            
         try
         {
             await using var stream = File.OpenRead(filePath);
@@ -758,7 +834,55 @@ public class DalamudUpdater
         }
         return url;
     }
-    
+
+    private void CleanupOldDalamudVersions(string currentVersion)
+    {
+        try
+        {
+            var hooksPath = _pathService.HooksPath;
+            if (!Directory.Exists(hooksPath))
+                return;
+
+            foreach (var dir in Directory.GetDirectories(hooksPath))
+            {
+                var dirName = Path.GetFileName(dir);
+                if (dirName == "dev" || dirName == currentVersion)
+                    continue;
+
+                _logger.LogInformation("刪除舊版 Dalamud 目錄: {Version}", dirName);
+                Directory.Delete(dir, recursive: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "清理舊版 Dalamud 目錄時發生錯誤（非致命）");
+        }
+    }
+
+    private void CleanupOldAssetsVersions(int currentVersion)
+    {
+        try
+        {
+            var assetsPath = _pathService.AssetsPath;
+            if (!Directory.Exists(assetsPath))
+                return;
+
+            foreach (var dir in Directory.GetDirectories(assetsPath))
+            {
+                var dirName = Path.GetFileName(dir);
+                if (int.TryParse(dirName, out var version) && version != currentVersion)
+                {
+                    _logger.LogInformation("刪除舊版 Assets 目錄: v{Version}", version);
+                    Directory.Delete(dir, recursive: true);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "清理舊版 Assets 目錄時發生錯誤（非致命）");
+        }
+    }
+
     private static DalamudUpdateProgress ReportProgress(DalamudUpdateProgress current, DalamudUpdateStage stage, string? currentFile = null)
     {
         return new DalamudUpdateProgress

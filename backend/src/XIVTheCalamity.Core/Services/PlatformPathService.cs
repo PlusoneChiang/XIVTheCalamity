@@ -71,7 +71,7 @@ public class PlatformPathService
             AppDataDirectory = appSupport;
             UserDataDirectory = appSupport;
             CacheDirectory = Path.Combine(homeDir, "Library", "Caches", "XIVTheCalamity");
-            LogsDirectory = Path.Combine(homeDir, "Library", "Logs", "XIVTheCalamity");
+            LogsDirectory = Path.Combine(appSupport, "logs");
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {

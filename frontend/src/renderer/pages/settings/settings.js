@@ -232,6 +232,7 @@ function populateForm(config) {
     document.getElementById('injectDelay').value = config.dalamud.injectDelay || 5000;
     document.getElementById('safeMode').checked = config.dalamud.safeMode || false;
     document.getElementById('pluginRepoUrl').value = config.dalamud.pluginRepoUrl || '';
+    document.getElementById('entryPointMode').checked = config.dalamud.useEntryPoint || false;
   }
 }
 
@@ -281,7 +282,8 @@ function collectFormData() {
       enabled: document.getElementById('dalamudEnabled').checked,
       injectDelay: parseInt(document.getElementById('injectDelay').value),
       safeMode: document.getElementById('safeMode').checked,
-      pluginRepoUrl: document.getElementById('pluginRepoUrl').value
+      pluginRepoUrl: document.getElementById('pluginRepoUrl').value,
+      useEntryPoint: document.getElementById('entryPointMode').checked
     }
   };
   console.log('[Settings] collectFormData - audioRouting:', formData.wine.audioRouting, 'wineDebug:', formData.wine.wineDebug);
@@ -746,11 +748,10 @@ async function handleTestLaunch() {
  */
 async function loadDalamudVersion() {
   try {
-    const response = await window.electronAPI.backend.call('/api/dalamud/version');
+    const response = await window.electronAPI.backend.call('/api/dalamud/status');
     if (response.ok && response.data) {
-      // Handle new API response format
       const result = response.data.success ? response.data.data : response.data;
-      document.getElementById('dalamudVersion').textContent = result.version || 'Unknown';
+      document.getElementById('dalamudVersion').textContent = result.localVersion || 'Unknown';
     }
   } catch (error) {
     console.error('[Settings] Failed to load Dalamud version:', error);

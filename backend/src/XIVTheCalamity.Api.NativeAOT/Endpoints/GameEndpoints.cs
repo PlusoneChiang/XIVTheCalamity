@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using XIVTheCalamity.Api.NativeAOT.DTOs;
+using XIVTheCalamity.Core.Models;
 using XIVTheCalamity.Core.Services;
 using XIVTheCalamity.Dalamud.Services;
 using XIVTheCalamity.Game.Launcher;
@@ -132,7 +133,60 @@ public static class GameEndpoints
                 {
                     dalamudRuntimePath = dalamudPathService.RuntimePath;
                 }
-                
+
+                // EntryPoint mode: Dalamud.Injector launches the game directly
+                if (config.Dalamud.Enabled && config.Dalamud.UseEntryPoint)
+                {
+                    logger.LogInformation("[GAME] Dalamud EntryPoint mode selected");
+
+                    var (exePath, gameArgs) = gameLaunchService.BuildGameLaunchArgs(
+                        config.Game.GamePath, request.SessionId);
+
+                    var options = new DalamudInjectionOptions
+                    {
+                        NoPlugin = config.Dalamud.SafeMode,
+                        NoThirdPartyPlugin = config.Dalamud.SafeMode
+                    };
+
+                    DalamudInjectionResult entryResult;
+
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        entryResult = await dalamudInjector.LaunchWithEntryPointNativeAsync(
+                            exePath, gameArgs, options, cancellationToken);
+                    }
+                    else
+                    {
+                        var emulatorDir = environmentService.GetEmulatorDirectory();
+                        var winePath = Path.Combine(emulatorDir, "bin", "wine64");
+
+                        if (string.IsNullOrEmpty(emulatorDir) || !File.Exists(winePath))
+                        {
+                            logger.LogError("[GAME] Wine/Wine-XIV not available for EntryPoint launch");
+                            return Results.BadRequest(ApiErrorResponse.Create(
+                                "WINE_NOT_AVAILABLE", "Wine executable not found"));
+                        }
+
+                        var environment = environmentService.GetEnvironment();
+                        entryResult = await dalamudInjector.LaunchWithEntryPointAsync(
+                            winePath, exePath, gameArgs, environment, options, cancellationToken);
+                    }
+
+                    if (!entryResult.Success)
+                    {
+                        logger.LogError("[GAME] EntryPoint launch failed: {Error}", entryResult.ErrorMessage);
+                        return Results.BadRequest(ApiErrorResponse.Create(
+                            "GAME_LAUNCH_FAILED", entryResult.ErrorMessage ?? "EntryPoint launch failed"));
+                    }
+
+                    if (entryResult.GamePid.HasValue)
+                        gameLaunchService.RegisterExternalGameProcess(entryResult.GamePid.Value);
+
+                    logger.LogInformation("[GAME] EntryPoint launch successful, PID: {Pid}", entryResult.GamePid);
+                    return Results.Ok(ApiResponse<GameLaunchResponse>.Ok(
+                        new GameLaunchResponse(entryResult.GamePid ?? 0)));
+                }
+
                 var result = await gameLaunchService.LaunchGameAsync(
                     config.Game.GamePath,
                     request.SessionId,
@@ -202,7 +256,7 @@ public static class GameEndpoints
     }
     
     private static async Task InjectDalamudAsync(
-        XIVTheCalamity.Core.Models.DalamudConfig dalamudConfig,
+        DalamudConfig dalamudConfig,
         object? emulatorConfig,
         Dictionary<string, string>? launchEnvironment,
         IEnvironmentService environmentService,

@@ -23,7 +23,7 @@ public class DalamudInjectorService
     private const int InjectorTimeoutMs = 60000;
     
     // Taiwan server language code
-    private const int ClientLanguageChinese = 4;
+    private const int ClientLanguageChinese = 5;
     
     public DalamudInjectorService(
         ILogger<DalamudInjectorService> logger,
@@ -199,7 +199,140 @@ public class DalamudInjectorService
             };
         }
     }
-    
+
+    /// <summary>
+    /// Launch game with Dalamud loaded at entry point (Wine-based, macOS/Linux).
+    /// Dalamud.Injector starts the game directly using "launch -m entrypoint".
+    /// </summary>
+    public async Task<DalamudInjectionResult> LaunchWithEntryPointAsync(
+        string winePath,
+        string gameExePath,
+        string gameArguments,
+        Dictionary<string, string> environment,
+        DalamudInjectionOptions options,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogInformation("[DALAMUD-INJECT] Starting Dalamud EntryPoint launch (Wine)...");
+
+            if (!File.Exists(_pathService.InjectorPath))
+            {
+                _logger.LogError("[DALAMUD-INJECT] Dalamud.Injector.exe not found at: {Path}", _pathService.InjectorPath);
+                return new DalamudInjectionResult
+                {
+                    Success = false,
+                    ErrorMessage = "Dalamud.Injector.exe not found. Please update Dalamud first."
+                };
+            }
+
+            var injectorEnv = new Dictionary<string, string>(environment);
+            AddDalamudEnvironment(injectorEnv, winePath);
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                injectorEnv["WINEDLLOVERRIDES"] = "mshtml=;d3d11,dxgi,d3d10core,d3d9=b";
+                _logger.LogInformation("[DALAMUD-INJECT] Forcing Wine built-in D3D for Linux Dalamud compatibility");
+            }
+
+            EnsureWineAppDataSymlink(injectorEnv);
+
+            var gameExeWinePath = ConvertToWinePath(gameExePath);
+            var injectorArgs = BuildEntryPointArguments(gameExeWinePath, gameArguments, options);
+            _logger.LogInformation("[DALAMUD-INJECT] EntryPoint arguments: {Args}", injectorArgs);
+
+            // Dalamud.Injector starts the game; we wait for it to exit (--no-wait makes it exit quickly)
+            var result = await ExecuteInjectorAsync(winePath, injectorArgs, injectorEnv, cancellationToken);
+            if (!result.Success)
+                return result;
+
+            // Find the game PID after injector exits
+            var gamePid = await WaitForGameProcessAsync(winePath, injectorEnv, cancellationToken);
+            if (gamePid == null)
+            {
+                _logger.LogError("[DALAMUD-INJECT] Failed to detect game process after EntryPoint launch");
+                return new DalamudInjectionResult
+                {
+                    Success = false,
+                    ErrorMessage = "Failed to detect game process (ffxiv_dx11.exe)"
+                };
+            }
+
+            _logger.LogInformation("[DALAMUD-INJECT] EntryPoint launch succeeded; game PID: {Pid}", gamePid);
+            result.GamePid = gamePid;
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning("[DALAMUD-INJECT] EntryPoint launch cancelled");
+            return new DalamudInjectionResult { Success = false, ErrorMessage = "Cancelled" };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[DALAMUD-INJECT] EntryPoint launch failed");
+            return new DalamudInjectionResult { Success = false, ErrorMessage = ex.Message };
+        }
+    }
+
+    /// <summary>
+    /// Launch game with Dalamud loaded at entry point (native Windows).
+    /// Dalamud.Injector starts the game directly using "launch -m entrypoint".
+    /// </summary>
+    public async Task<DalamudInjectionResult> LaunchWithEntryPointNativeAsync(
+        string gameExePath,
+        string gameArguments,
+        DalamudInjectionOptions options,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogInformation("[DALAMUD-INJECT] Starting Dalamud EntryPoint launch (Windows native)...");
+
+            if (!File.Exists(_pathService.InjectorPath))
+            {
+                _logger.LogError("[DALAMUD-INJECT] Dalamud.Injector.exe not found at: {Path}", _pathService.InjectorPath);
+                return new DalamudInjectionResult
+                {
+                    Success = false,
+                    ErrorMessage = "Dalamud.Injector.exe not found. Please update Dalamud first."
+                };
+            }
+
+            var injectorArgs = BuildEntryPointArgumentsWindows(gameExePath, gameArguments, options);
+            _logger.LogInformation("[DALAMUD-INJECT] EntryPoint arguments: {Args}", injectorArgs);
+            var injectorEnv = BuildInjectorEnvironmentWindows();
+
+            var result = await ExecuteInjectorWindowsAsync(injectorArgs, injectorEnv, cancellationToken);
+            if (!result.Success)
+                return result;
+
+            var gamePid = await WaitForGameProcessWindowsAsync(cancellationToken);
+            if (gamePid == null)
+            {
+                _logger.LogError("[DALAMUD-INJECT] Failed to detect game process after EntryPoint launch");
+                return new DalamudInjectionResult
+                {
+                    Success = false,
+                    ErrorMessage = "Failed to detect game process (ffxiv_dx11.exe)"
+                };
+            }
+
+            _logger.LogInformation("[DALAMUD-INJECT] EntryPoint launch succeeded; game PID: {Pid}", gamePid);
+            result.GamePid = gamePid;
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning("[DALAMUD-INJECT] EntryPoint launch cancelled");
+            return new DalamudInjectionResult { Success = false, ErrorMessage = "Cancelled" };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[DALAMUD-INJECT] EntryPoint launch failed");
+            return new DalamudInjectionResult { Success = false, ErrorMessage = ex.Message };
+        }
+    }
+
     /// <summary>
     /// Wait for game process to appear (using winedbg)
     /// </summary>
@@ -756,6 +889,72 @@ public class DalamudInjectorService
         
         return env;
     }
+
+    /// <summary>
+    /// Build injector arguments for "launch -m entrypoint" (Wine path variant)
+    /// </summary>
+    private string BuildEntryPointArguments(string gameExeWinePath, string gameArguments, DalamudInjectionOptions options)
+    {
+        var sb = new StringBuilder();
+
+        sb.Append($"launch -g \"{gameExeWinePath}\" -m entrypoint --no-wait");
+
+        var workingDir = ConvertToWinePath(_pathService.HooksDevPath);
+        sb.Append($" --dalamud-working-directory=\"{workingDir}\"");
+
+        var configFile = ConvertToWinePath(_pathService.DalamudConfigPath);
+        sb.Append($" --dalamud-configuration-path=\"{configFile}\"");
+
+        var logDir = ConvertToWinePath(_pathService.LogPath);
+        sb.Append($" --logpath=\"{logDir}\"");
+
+        var pluginDir = ConvertToWinePath(_pathService.PluginsPath);
+        sb.Append($" --dalamud-plugin-directory=\"{pluginDir}\"");
+
+        var assetDir = ConvertToWinePath(_pathService.AssetsDevPath);
+        sb.Append($" --dalamud-asset-directory=\"{assetDir}\"");
+
+        sb.Append($" --dalamud-client-language={ClientLanguageChinese}");
+
+        // No initialization delay — Dalamud loads before the game loop starts
+        sb.Append(" --dalamud-delay-initialize=0");
+
+        if (options.NoPlugin)
+            sb.Append(" --no-plugin");
+        if (options.NoThirdPartyPlugin)
+            sb.Append(" --no-3rd-plugin");
+
+        sb.Append($" -- {gameArguments}");
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Build injector arguments for "launch -m entrypoint" (Windows native path variant)
+    /// </summary>
+    private string BuildEntryPointArgumentsWindows(string gameExePath, string gameArguments, DalamudInjectionOptions options)
+    {
+        var sb = new StringBuilder();
+
+        sb.Append($"launch -g \"{gameExePath}\" -m entrypoint --no-wait");
+
+        sb.Append($" --dalamud-working-directory=\"{_pathService.HooksDevPath}\"");
+        sb.Append($" --dalamud-configuration-path=\"{_pathService.DalamudConfigPath}\"");
+        sb.Append($" --logpath=\"{_pathService.LogPath}\"");
+        sb.Append($" --dalamud-plugin-directory=\"{_pathService.PluginsPath}\"");
+        sb.Append($" --dalamud-asset-directory=\"{_pathService.AssetsDevPath}\"");
+        sb.Append($" --dalamud-client-language={ClientLanguageChinese}");
+        sb.Append(" --dalamud-delay-initialize=0");
+
+        if (options.NoPlugin)
+            sb.Append(" --no-plugin");
+        if (options.NoThirdPartyPlugin)
+            sb.Append(" --no-3rd-plugin");
+
+        sb.Append($" -- {gameArguments}");
+
+        return sb.ToString();
+    }
     
     /// <summary>
     /// Execute Dalamud.Injector.exe directly on Windows (no Wine)
@@ -904,4 +1103,9 @@ public class DalamudInjectionResult
     public bool Success { get; set; }
     public int? ExitCode { get; set; }
     public string? ErrorMessage { get; set; }
+
+    /// <summary>
+    /// Game process PID — populated by EntryPoint mode after Dalamud.Injector starts the game.
+    /// </summary>
+    public int? GamePid { get; set; }
 }

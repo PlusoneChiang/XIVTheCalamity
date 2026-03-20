@@ -24,4 +24,9 @@ public class DalamudConfig
     /// Plugin repository URL
     /// </summary>
     public string PluginRepoUrl { get; set; } = "https://kamori.goats.dev/Dalamud/Release/Meta";
+
+    /// <summary>
+    /// Use EntryPoint injection mode (Dalamud.Injector starts the game directly)
+    /// </summary>
+    public bool UseEntryPoint { get; set; } = false;
 }
