@@ -16,8 +16,33 @@ const isMacOS = process.platform === 'darwin';
 const isLinux = process.platform === 'linux';
 const isWindows = process.platform === 'win32';
 
-// Note: If you need to run in Steam Game Mode, add --no-sandbox flag manually:
-// ./XIVTheCalamity.AppImage --no-sandbox
+// Linux sandbox auto-detection:
+// Some distros (Debian-based with userns disabled, Ubuntu 23.10+ with AppArmor restriction)
+// cannot run Electron with the default sandbox and require --no-sandbox.
+// Bazzite / SteamOS desktop mode work fine without this flag, so we detect
+// specific kernel parameters rather than applying it unconditionally.
+if (isLinux && !app.commandLine.hasSwitch('no-sandbox')) {
+  let needsNoSandbox = false;
+
+  // Debian and derivatives: kernel.unprivileged_userns_clone = 0 disables user namespaces
+  try {
+    const v = fs.readFileSync('/proc/sys/kernel/unprivileged_userns_clone', 'utf8').trim();
+    if (v === '0') needsNoSandbox = true;
+  } catch {}
+
+  // Ubuntu 23.10+: AppArmor restricts user namespaces; AppImage has no AppArmor profile
+  if (!needsNoSandbox) {
+    try {
+      const v = fs.readFileSync('/proc/sys/kernel/apparmor_restrict_unprivileged_userns', 'utf8').trim();
+      if (v === '1') needsNoSandbox = true;
+    } catch {}
+  }
+
+  if (needsNoSandbox) {
+    log.info('[Sandbox] Kernel sandbox restriction detected, applying --no-sandbox');
+    app.commandLine.appendSwitch('no-sandbox');
+  }
+}
 
 // 自訂應用程式選單（不包含 DevTools，由 globalShortcut 動態控制）
 if (isMacOS) {

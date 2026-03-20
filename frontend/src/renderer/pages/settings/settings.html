@@ -306,6 +306,10 @@
           <h2 data-i18n="settings.tab.dalamud">Dalamud</h2>
           <div class="form-group">
             <div>
+              <label data-i18n="settings.dalamud.version">Dalamud 版本</label>
+              <div class="readonly-field" id="dalamudVersion">-</div>
+            </div>
+            <div>
               <label>
                 <input type="checkbox" id="dalamudEnabled">
                 <span data-i18n="settings.dalamud.enable">啟用 Dalamud</span>
@@ -313,13 +317,11 @@
               <p class="help-text" data-i18n="settings.dalamud.enable_help">載入遊戲插件框架</p>
             </div>
             <div>
-              <label data-i18n="settings.dalamud.version">Dalamud 版本</label>
-              <div class="readonly-field" id="dalamudVersion">-</div>
-            </div>
-            <div>
-              <label for="injectDelay" data-i18n="settings.dalamud.inject_delay">注入延遲（毫秒）</label>
-              <input type="number" id="injectDelay" value="5000" min="0" max="30000" step="100">
-              <p class="help-text" data-i18n="settings.dalamud.inject_delay_help">遊戲啟動後等待時間</p>
+              <label>
+                <input type="checkbox" id="entryPointMode">
+                <span data-i18n="settings.dalamud.entrypoint_mode">EntryPoint 模式</span>
+              </label>
+              <p class="help-text" data-i18n="settings.dalamud.entrypoint_mode_help">由注入器直接啟動遊戲，無需等待延遲</p>
             </div>
             <div>
               <label>
@@ -327,6 +329,11 @@
                 <span data-i18n="settings.dalamud.safe_mode">安全模式</span>
               </label>
               <p class="help-text" data-i18n="settings.dalamud.safe_mode_help">停用第三方插件</p>
+            </div>
+            <div>
+              <label for="injectDelay" data-i18n="settings.dalamud.inject_delay">注入延遲（毫秒）</label>
+              <input type="number" id="injectDelay" value="5000" min="0" max="30000" step="100">
+              <p class="help-text" data-i18n="settings.dalamud.inject_delay_help">遊戲啟動後等待時間</p>
             </div>
             <div class="full-width">
               <label for="pluginRepoUrl" data-i18n="settings.dalamud.plugin_repo">插件倉庫 URL</label>

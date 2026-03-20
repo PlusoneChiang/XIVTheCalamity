@@ -636,6 +636,53 @@ public class GameLaunchService
     }
     
     /// <summary>
+    /// Build game executable path and launch arguments without starting the game.
+    /// Used by EntryPoint injection mode so Dalamud.Injector can start the game.
+    /// </summary>
+    public (string ExePath, string Arguments) BuildGameLaunchArgs(string gamePath, string sessionId)
+    {
+        var exePath = Path.Combine(gamePath, "game", "ffxiv_dx11.exe");
+
+        var argumentBuilder = new ArgumentBuilder()
+            .Append("DEV.LobbyHost01", "neolobby01.ffxiv.com.tw")
+            .Append("DEV.LobbyPort01", "54994")
+            .Append("DEV.GMServerHost", "frontier.ffxiv.com.tw")
+            .Append("DEV.TestSID", sessionId)
+            .Append("SYS.resetConfig", "0")
+            .Append("DEV.SaveDataBankHost", "config-dl.ffxiv.com.tw");
+
+        var ffxivConfigPath = GetFfxivConfigPath();
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ||
+            RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            argumentBuilder.Append("UserPath", ConvertToWinePath(ffxivConfigPath));
+        }
+        else
+        {
+            argumentBuilder.Append("UserPath", ffxivConfigPath);
+        }
+
+        return (exePath, argumentBuilder.Build());
+    }
+
+    /// <summary>
+    /// Register an externally-started game process (e.g. launched by Dalamud EntryPoint mode).
+    /// Enables IsGameRunning / WaitForExitAsync tracking.
+    /// </summary>
+    public void RegisterExternalGameProcess(int pid)
+    {
+        try
+        {
+            _gameProcess = Process.GetProcessById(pid);
+            _logger.LogInformation("[GAME] Registered external game process PID: {Pid}", pid);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[GAME] Failed to register external game process PID: {Pid}", pid);
+        }
+    }
+
+    /// <summary>
     /// Wait for game to exit and get exit code
     /// </summary>
     public async Task<int?> WaitForExitAsync(CancellationToken cancellationToken = default)
