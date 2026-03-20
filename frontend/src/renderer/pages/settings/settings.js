@@ -232,7 +232,7 @@ function populateForm(config) {
     document.getElementById('injectDelay').value = config.dalamud.injectDelay || 5000;
     document.getElementById('safeMode').checked = config.dalamud.safeMode || false;
     document.getElementById('pluginRepoUrl').value = config.dalamud.pluginRepoUrl || '';
-    document.getElementById('entryPointMode').checked = config.dalamud.useEntryPoint || false;
+    document.getElementById('entryPointMode').checked = config.dalamud.useEntryPoint ?? true;
   }
 }
 

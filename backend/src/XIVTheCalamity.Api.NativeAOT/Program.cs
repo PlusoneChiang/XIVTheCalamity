@@ -69,6 +69,7 @@ try
         builder.Services.AddSingleton<XIVTheCalamity.Platform.IEnvironmentService, 
             XIVTheCalamity.Platform.Linux.Proton.ProtonGeEnvironmentService>();
         builder.Services.AddSingleton<XIVTheCalamity.Platform.Linux.Proton.ProtonGeDownloadService>();
+        builder.Services.AddSingleton<XIVTheCalamity.Platform.Linux.Umu.UmuDownloadService>();
         // Add Wine services for Linux (using macOS implementation as it's cross-platform)
         builder.Services.AddSingleton<WinePrefixService>();
         builder.Services.AddSingleton<WineConfigService>();

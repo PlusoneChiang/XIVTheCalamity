@@ -28,5 +28,5 @@ public class DalamudConfig
     /// <summary>
     /// Use EntryPoint injection mode (Dalamud.Injector starts the game directly)
     /// </summary>
-    public bool UseEntryPoint { get; set; } = false;
+    public bool UseEntryPoint { get; set; } = true;
 }

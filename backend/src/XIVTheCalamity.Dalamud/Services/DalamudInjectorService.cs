@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using XIVTheCalamity.Core.Models;
+using XIVTheCalamity.Platform;
 
 namespace XIVTheCalamity.Dalamud.Services;
 
@@ -36,12 +37,12 @@ public class DalamudInjectorService
     /// <summary>
     /// Inject Dalamud into game process (Wine-based, for macOS/Linux)
     /// </summary>
-    /// <param name="winePath">Wine executable path</param>
+    /// <param name="launcher">Wine launcher command</param>
     /// <param name="environment">Wine environment variables</param>
     /// <param name="options">Injection options</param>
     /// <param name="cancellationToken">Cancellation token</param>
     public async Task<DalamudInjectionResult> InjectAsync(
-        string winePath,
+        WineLauncher launcher,
         Dictionary<string, string> environment,
         DalamudInjectionOptions options,
         CancellationToken cancellationToken = default)
@@ -61,17 +62,9 @@ public class DalamudInjectorService
                 };
             }
             
-            // Prepare environment variables (add DALAMUD_RUNTIME first, as winedbg needs same environment)
+                        // Prepare environment variables (add DALAMUD_RUNTIME first, as winedbg needs same environment)
             var injectorEnv = new Dictionary<string, string>(environment);
-            AddDalamudEnvironment(injectorEnv, winePath);
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                injectorEnv["WINEDLLOVERRIDES"] = "mshtml=;d3d11,dxgi,d3d10core,d3d9=n,b";
-                injectorEnv["PROTON_USE_WINED3D"] = "0";
-                injectorEnv["DALAMUD_FORCE_MINHOOK"] = "true";
-                _logger.LogWarning("[DALAMUD-INJECT] Linux graphics env: WINEDLLOVERRIDES={Overrides}, PROTON_USE_WINED3D={ProtonUseWineD3D}, DALAMUD_FORCE_MINHOOK={ForceMinHook}",
-                    injectorEnv["WINEDLLOVERRIDES"], injectorEnv["PROTON_USE_WINED3D"], injectorEnv["DALAMUD_FORCE_MINHOOK"]);
-            }
+            AddDalamudEnvironment(injectorEnv);
             
             // Ensure Wine %APPDATA%/XIVLauncherTC symlink points to our Config directory
             // Dalamud hardcodes %APPDATA%/XIVLauncherTC for safe mode, log commands, etc.
@@ -85,7 +78,7 @@ public class DalamudInjectorService
             }
             
             // Wait for game process (using winedbg)
-            var gamePid = await WaitForGameProcessAsync(winePath, injectorEnv, cancellationToken);
+            var gamePid = await WaitForGameProcessAsync(launcher, injectorEnv, cancellationToken);
             if (gamePid == null)
             {
                 _logger.LogError("[DALAMUD-INJECT] Failed to detect game process");
@@ -108,7 +101,7 @@ public class DalamudInjectorService
             _logger.LogInformation("[DALAMUD-INJECT] Injector arguments: {Args}", injectorArgs);
             
             // Execute injection
-            var result = await ExecuteInjectorAsync(winePath, injectorArgs, injectorEnv, cancellationToken);
+            var result = await ExecuteInjectorAsync(launcher, injectorArgs, injectorEnv, cancellationToken);
             
             return result;
         }
@@ -212,7 +205,7 @@ public class DalamudInjectorService
     /// Dalamud.Injector starts the game directly using "launch -m entrypoint".
     /// </summary>
     public async Task<DalamudInjectionResult> LaunchWithEntryPointAsync(
-        string winePath,
+        WineLauncher launcher,
         string gameExePath,
         string gameArguments,
         Dictionary<string, string> environment,
@@ -234,13 +227,7 @@ public class DalamudInjectorService
             }
 
             var injectorEnv = new Dictionary<string, string>(environment);
-            AddDalamudEnvironment(injectorEnv, winePath);
-
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                injectorEnv["WINEDLLOVERRIDES"] = "mshtml=;d3d11,dxgi,d3d10core,d3d9=b";
-                _logger.LogInformation("[DALAMUD-INJECT] Forcing Wine built-in D3D for Linux Dalamud compatibility");
-            }
+            AddDalamudEnvironment(injectorEnv);
 
             EnsureWineAppDataSymlink(injectorEnv);
 
@@ -248,26 +235,62 @@ public class DalamudInjectorService
             var injectorArgs = BuildEntryPointArguments(gameExeWinePath, gameArguments, options);
             _logger.LogInformation("[DALAMUD-INJECT] EntryPoint arguments: {Args}", injectorArgs);
 
-            // Dalamud.Injector starts the game; we wait for it to exit (--no-wait makes it exit quickly)
-            var result = await ExecuteInjectorAsync(winePath, injectorArgs, injectorEnv, cancellationToken);
-            if (!result.Success)
-                return result;
+            var injectorPath = _pathService.InjectorPath;
 
-            // Find the game PID after injector exits
-            var gamePid = await WaitForGameProcessAsync(winePath, injectorEnv, cancellationToken);
-            if (gamePid == null)
+            if (!injectorEnv.ContainsKey("WINEDEBUG"))
+                injectorEnv["WINEDEBUG"] = "-all";
+
+            var psi = new ProcessStartInfo
             {
-                _logger.LogError("[DALAMUD-INJECT] Failed to detect game process after EntryPoint launch");
-                return new DalamudInjectionResult
-                {
-                    Success = false,
-                    ErrorMessage = "Failed to detect game process (ffxiv_dx11.exe)"
-                };
-            }
+                FileName = launcher.Executable,
+                Arguments = launcher.BuildArguments($"\"{injectorPath}\" {injectorArgs}"),
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                WorkingDirectory = Path.GetDirectoryName(injectorPath)
+            };
 
-            _logger.LogInformation("[DALAMUD-INJECT] EntryPoint launch succeeded; game PID: {Pid}", gamePid);
-            result.GamePid = gamePid;
-            return result;
+            var conflictingVars = new[] { "LD_PRELOAD", "SDL_VIDEODRIVER", "QT_QPA_PLATFORM", "APPDIR", "APPIMAGE", "ARGV0", "GSETTINGS_SCHEMA_DIR", "OWD" };
+            foreach (var v in conflictingVars) psi.Environment.Remove(v);
+
+            if (psi.Environment.TryGetValue("PATH", out var envPath))
+                psi.Environment["PATH"] = string.Join(":", envPath.Split(':').Where(p => !p.Contains(".mount_") && !p.Contains("/tmp/.mount")));
+
+            if (psi.Environment.TryGetValue("XDG_DATA_DIRS", out var envXdg))
+                psi.Environment["XDG_DATA_DIRS"] = string.Join(":", envXdg.Split(':').Where(d => !d.Contains(".mount_") && !d.Contains("/tmp/.mount")));
+
+            foreach (var (key, value) in injectorEnv)
+                psi.Environment[key] = value;
+
+            _logger.LogInformation("[DALAMUD-INJECT] Executing: {Exe} \"{Injector}\" {Args}",
+                launcher.Executable, injectorPath, injectorArgs);
+
+            // NOTE: no `using` — process stays alive until game exits (no --no-wait)
+            var process = Process.Start(psi);
+            if (process == null)
+                return new DalamudInjectionResult { Success = false, ErrorMessage = "Failed to start injector process" };
+
+            // Drain stdout/stderr to prevent pipe-buffer deadlock
+            _ = Task.Run(async () =>
+            {
+                try { while (!process.StandardOutput.EndOfStream) await process.StandardOutput.ReadLineAsync(); } catch { }
+            });
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    while (!process.StandardError.EndOfStream)
+                    {
+                        var line = await process.StandardError.ReadLineAsync();
+                        if (line != null) _logger.LogWarning("[DALAMUD-INJECT] stderr: {Line}", line);
+                    }
+                }
+                catch { }
+            });
+
+            _logger.LogInformation("[DALAMUD-INJECT] EntryPoint launch started; umu-run PID {Pid} tracks game lifetime", process.Id);
+            return new DalamudInjectionResult { Success = true, InjectorProcess = process };
         }
         catch (OperationCanceledException)
         {
@@ -341,10 +364,191 @@ public class DalamudInjectorService
     }
 
     /// <summary>
-    /// Wait for game process to appear (using winedbg)
+    /// <summary>
+    /// <summary>
+    /// Resolve the Linux game PID from Dalamud.Injector's JSON stdout output.
+    /// Dalamud.Injector writes {"pid": &lt;WinePID&gt;, "handle": ...} to stdout when it starts the game.
+    /// We parse the Wine PID, then use winedbg "info procmap" (same as XIVLauncher) to get the real Linux PID.
+    /// Falls back to /proc cmdline scan if winedbg fails.
+    /// </summary>
+    private async Task<int?> TryGetGamePidFromEntryPointOutputAsync(
+        WineLauncher launcher,
+        Dictionary<string, string> environment,
+        string? injectorStdOut,
+        CancellationToken ct)
+    {
+        // Step 1: parse Wine PID from {"pid": X, "handle": Y}
+        int? winePid = null;
+        if (!string.IsNullOrWhiteSpace(injectorStdOut))
+        {
+            foreach (var line in injectorStdOut.Split('\n'))
+            {
+                var trimmed = line.Trim();
+                if (!trimmed.StartsWith("{\"pid\":", StringComparison.Ordinal))
+                    continue;
+                try
+                {
+                    // Minimal JSON parse: extract numeric value after "pid":
+                    var afterKey = trimmed.AsSpan(trimmed.IndexOf(':') + 1);
+                    var comma = afterKey.IndexOf(',');
+                    var pidStr = (comma >= 0 ? afterKey[..comma] : afterKey).Trim();
+                    if (int.TryParse(pidStr, out var parsed))
+                    {
+                        winePid = parsed;
+                        _logger.LogInformation("[DALAMUD-INJECT] Parsed Wine PID from injector output: {WinePid}", winePid);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "[DALAMUD-INJECT] Failed to parse Wine PID from line: {Line}", trimmed);
+                }
+                break;
+            }
+        }
+
+        // Step 2: winedbg "info procmap" — Wine PID → Linux PID (XIVLauncher approach)
+        if (winePid.HasValue)
+        {
+            var linuxPid = await GetUnixProcessIdAsync(launcher, environment, winePid.Value, ct);
+            if (linuxPid.HasValue)
+                return linuxPid.Value;
+
+            _logger.LogWarning("[DALAMUD-INJECT] winedbg procmap could not resolve Wine PID {WinePid} to Linux PID", winePid.Value);
+        }
+        else
+        {
+            _logger.LogWarning("[DALAMUD-INJECT] No Wine PID found in injector stdout; falling back to /proc scan");
+        }
+
+        // Step 3: fallback — scan /proc for ffxiv_dx11.exe in cmdline
+        return await TryFindGamePidFromProcAsync(ct);
+    }
+
+    /// <summary>
+    /// Convert a Wine process ID to the Linux process ID using winedbg "info procmap".
+    /// Output format per line: " WWWWWWWW UUUUUUUU processname" (hex values)
+    /// Same approach as XIVLauncher's CompatibilityTools.GetUnixProcessId().
+    /// </summary>
+    private async Task<int?> GetUnixProcessIdAsync(
+        WineLauncher launcher,
+        Dictionary<string, string> environment,
+        int winePid,
+        CancellationToken ct)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = launcher.Executable,
+                Arguments = launcher.BuildArguments("winedbg --command \"info procmap\""),
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+            foreach (var (key, value) in environment)
+                psi.Environment[key] = value;
+
+            _logger.LogDebug("[DALAMUD-INJECT] Running: winedbg --command \"info procmap\" to resolve Wine PID {WinePid}", winePid);
+
+            using var process = Process.Start(psi);
+            if (process == null) return null;
+
+            var output = await process.StandardOutput.ReadToEndAsync(ct);
+            await process.WaitForExitAsync(ct);
+
+            if (output.Contains("syntax error"))
+            {
+                _logger.LogWarning("[DALAMUD-INJECT] winedbg info procmap returned syntax error");
+                return null;
+            }
+
+            // Each data line: " WWWWWWWW UUUUUUUU processname"
+            // position 1..8 = Wine PID hex, position 10..17 = Unix PID hex
+            foreach (var line in output.Split('\n').Skip(1))
+            {
+                if (line.Length < 18) continue;
+                if (!int.TryParse(line.Substring(1, 8), System.Globalization.NumberStyles.HexNumber, null, out var linWinePid))
+                    continue;
+                if (linWinePid != winePid) continue;
+                if (!int.TryParse(line.Substring(10, 8), System.Globalization.NumberStyles.HexNumber, null, out var unixPid))
+                    continue;
+                _logger.LogInformation("[DALAMUD-INJECT] Resolved Wine PID {WinePid:X} → Linux PID {UnixPid}", winePid, unixPid);
+                return unixPid;
+            }
+
+            _logger.LogDebug("[DALAMUD-INJECT] Wine PID {WinePid} not found in procmap output", winePid);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[DALAMUD-INJECT] winedbg procmap failed: {Message}", ex.Message);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Fallback: scan /proc/*/cmdline for ffxiv_dx11.exe to find its Linux PID.
+    /// </summary>
+    private async Task<int?> TryFindGamePidFromProcAsync(CancellationToken ct)
+    {
+        if (!OperatingSystem.IsLinux())
+            return null;
+
+        for (int i = 0; i < ProcessDetectionMaxRetries; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var pid = FindGamePidFromProc();
+            if (pid.HasValue)
+            {
+                _logger.LogInformation("[DALAMUD-INJECT] Found ffxiv_dx11.exe via /proc scan, Linux PID: {Pid}", pid.Value);
+                return pid.Value;
+            }
+
+            _logger.LogDebug("[DALAMUD-INJECT] ffxiv_dx11.exe not in /proc, retry {Attempt}/{Max}...", i + 1, ProcessDetectionMaxRetries);
+            await Task.Delay(ProcessDetectionRetryDelayMs, ct);
+        }
+
+        return null;
+    }
+
+    private static int? FindGamePidFromProc()
+    {
+        // Return the newest (highest PID) ffxiv_dx11.exe.
+        // Wine uses prctl(PR_SET_NAME) to set the process comm to the exe name,
+        // so we read /proc/[pid]/comm — same as what 'pgrep ffxiv_dx11.exe' does.
+        // cmdline may still contain wine64 as argv[0], so comm is more reliable.
+        int? newestPid = null;
+        try
+        {
+            foreach (var procDir in Directory.GetDirectories("/proc"))
+            {
+                if (!int.TryParse(Path.GetFileName(procDir), out var pid))
+                    continue;
+
+                var commPath = Path.Combine(procDir, "comm");
+                if (!File.Exists(commPath))
+                    continue;
+
+                var comm = File.ReadAllText(commPath).Trim();
+                if (comm.Equals("ffxiv_dx11.exe", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!newestPid.HasValue || pid > newestPid.Value)
+                        newestPid = pid;
+                }
+            }
+        }
+        catch { /* /proc entries may disappear mid-scan */ }
+
+        return newestPid;
+    }
+
+    /// <summary>
+    /// Wait for game process to appear (using winedbg "info proc") — used by Inject mode.
     /// </summary>
     private async Task<int?> WaitForGameProcessAsync(
-        string winePath, 
+        WineLauncher launcher, 
         Dictionary<string, string> environment,
         CancellationToken ct)
     {
@@ -354,7 +558,7 @@ public class DalamudInjectorService
         {
             ct.ThrowIfCancellationRequested();
             
-            var pids = await GetWineProcessIdsAsync(winePath, environment, "ffxiv_dx11.exe");
+            var pids = await GetWineProcessIdsAsync(launcher, environment, "ffxiv_dx11.exe");
             if (pids != null && pids.Length > 0)
             {
                 // Get last (newest) process
@@ -377,17 +581,16 @@ public class DalamudInjectorService
     /// winedbg is a Windows program, must be executed via Wine
     /// </summary>
     private async Task<int[]?> GetWineProcessIdsAsync(
-        string winePath,
+        WineLauncher launcher,
         Dictionary<string, string> environment,
         string executableName)
     {
         try
         {
-            // winedbg must be executed via wine64
             var psi = new ProcessStartInfo
             {
-                FileName = winePath,
-                Arguments = "winedbg --command \"info proc\"",
+                FileName = launcher.Executable,
+                Arguments = launcher.BuildArguments("winedbg --command \"info proc\""),
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -401,7 +604,7 @@ public class DalamudInjectorService
                 psi.Environment[key] = value;
             }
             
-            _logger.LogDebug("[DALAMUD-INJECT] Running: {Wine} winedbg --command \"info proc\"", winePath);
+            _logger.LogDebug("[DALAMUD-INJECT] Running: {Exe} winedbg --command \"info proc\"", launcher.Executable);
             
             using var process = Process.Start(psi);
             if (process == null)
@@ -462,7 +665,7 @@ public class DalamudInjectorService
     /// CRITICAL: Must use Wine Z:\ path format for DALAMUD_RUNTIME and DOTNET_ROOT
     /// Dalamud passes this path to hostfxr, which needs Windows-style path in Wine
     /// </summary>
-    private void AddDalamudEnvironment(Dictionary<string, string> env, string winePath)
+    private void AddDalamudEnvironment(Dictionary<string, string> env)
     {
         var runtimePath = _pathService.RuntimePath;
         
@@ -476,25 +679,6 @@ public class DalamudInjectorService
         env["DOTNET_EnableWriteXorExecute"] = "0";  // Disable W^X for Apple Silicon compatibility
         env["COMPlus_EnableAlternateStackCheck"] = "0";  // Disable stack checks that may fail in Wine
         env["COMPlus_gcAllowVeryLargeObjects"] = "1";  // Allow large objects
-        
-        // On Linux + Wine/Proton, ICU symbol resolution may fail for bundled runtime.
-        // Use invariant globalization to keep Injector startup stable across distros.
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-        {
-            env["DOTNET_SYSTEM_GLOBALIZATION_INVARIANT"] = "1";
-            env["DALAMUD_FORCE_MINHOOK"] = "true";
-        }
-        
-        // CRITICAL: Prepend system library paths for ICU
-        // .NET Runtime needs libicuuc from system libraries
-        if (env.ContainsKey("LD_LIBRARY_PATH"))
-        {
-            env["LD_LIBRARY_PATH"] = $"/usr/lib64:/usr/lib:{env["LD_LIBRARY_PATH"]}";
-        }
-        else
-        {
-            env["LD_LIBRARY_PATH"] = "/usr/lib64:/usr/lib";
-        }
         
         _logger.LogInformation("[DALAMUD-INJECT] Environment configured for Dalamud injection");
     }
@@ -688,7 +872,7 @@ public class DalamudInjectorService
     /// Execute injector
     /// </summary>
     private async Task<DalamudInjectionResult> ExecuteInjectorAsync(
-        string winePath,
+        WineLauncher launcher,
         string arguments,
         Dictionary<string, string> environment,
         CancellationToken ct)
@@ -704,8 +888,8 @@ public class DalamudInjectorService
         
         var psi = new ProcessStartInfo
         {
-            FileName = winePath,
-            Arguments = $"\"{injectorPath}\" {arguments}",
+            FileName = launcher.Executable,
+            Arguments = launcher.BuildArguments($"\"{injectorPath}\" {arguments}"),
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
@@ -778,8 +962,8 @@ public class DalamudInjectorService
         // Log exit code explicitly for debugging
         _logger.LogDebug("[DALAMUD-INJECT] Total environment variables: {Count}", psi.Environment.Count);
         
-        _logger.LogInformation("[DALAMUD-INJECT] Executing: {Wine} \"{Injector}\" {Args}", 
-            winePath, injectorPath, arguments);
+        _logger.LogInformation("[DALAMUD-INJECT] Executing: {Exe} \"{Injector}\" {Args}", 
+            launcher.Executable, injectorPath, arguments);
         
         var stdout = new StringBuilder();
         var stderr = new StringBuilder();
@@ -829,7 +1013,11 @@ public class DalamudInjectorService
         try
         {
             await process.WaitForExitAsync(linkedCts.Token);
-            await Task.WhenAll(stdoutTask, stderrTask);
+            
+            // In EntryPoint mode, the game process may inherit the injector's stdout/stderr
+            // pipe handles, keeping them open until the game exits. Drain with a short timeout.
+            var outputDrain = Task.WhenAll(stdoutTask, stderrTask);
+            await Task.WhenAny(outputDrain, Task.Delay(3000, CancellationToken.None));
         }
         catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
         {
@@ -851,7 +1039,8 @@ public class DalamudInjectorService
             return new DalamudInjectionResult
             {
                 Success = true,
-                ExitCode = exitCode
+                ExitCode = exitCode,
+                StdOut = stdout.ToString()
             };
         }
         else
@@ -956,7 +1145,7 @@ public class DalamudInjectorService
     {
         var sb = new StringBuilder();
 
-        sb.Append($"launch -g \"{gameExeWinePath}\" -m entrypoint --no-wait");
+        sb.Append($"launch -g \"{gameExeWinePath}\" -m entrypoint");
 
         var workingDir = ConvertToWinePath(_pathService.HooksDevPath);
         sb.Append($" --dalamud-working-directory=\"{workingDir}\"");
@@ -1099,7 +1288,11 @@ public class DalamudInjectorService
         try
         {
             await process.WaitForExitAsync(linkedCts.Token);
-            await Task.WhenAll(stdoutTask, stderrTask);
+            
+            // In EntryPoint mode, the game process may inherit the injector's stdout/stderr
+            // pipe handles, keeping them open until the game exits. Drain with a short timeout.
+            var outputDrain = Task.WhenAll(stdoutTask, stderrTask);
+            await Task.WhenAny(outputDrain, Task.Delay(3000, CancellationToken.None));
         }
         catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
         {
@@ -1121,7 +1314,8 @@ public class DalamudInjectorService
             return new DalamudInjectionResult
             {
                 Success = true,
-                ExitCode = exitCode
+                ExitCode = exitCode,
+                StdOut = stdout.ToString()
             };
         }
         else
@@ -1167,4 +1361,17 @@ public class DalamudInjectionResult
     /// Game process PID — populated by EntryPoint mode after Dalamud.Injector starts the game.
     /// </summary>
     public int? GamePid { get; set; }
+
+    /// <summary>
+    /// The injector (umu-run) process kept alive as a game lifetime proxy.
+    /// Without --no-wait, the injector stays alive until the game exits — use this
+    /// as the monitor process instead of scanning /proc for the game PID.
+    /// </summary>
+    public Process? InjectorProcess { get; set; }
+
+    /// <summary>
+    /// Raw stdout from the injector process. In EntryPoint mode contains the JSON line
+    /// {"pid": &lt;WinePID&gt;, "handle": &lt;handle&gt;} output by Dalamud.Injector.
+    /// </summary>
+    public string? StdOut { get; set; }
 }

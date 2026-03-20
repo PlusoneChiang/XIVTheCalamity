@@ -5,14 +5,18 @@ using XIVTheCalamity.Core.Models;
 using XIVTheCalamity.Core.Models.Progress;
 using XIVTheCalamity.Core.Services;
 using XIVTheCalamity.Platform;
+using XIVTheCalamity.Platform.Linux.Umu;
 
 namespace XIVTheCalamity.Platform.Linux.Proton;
 
 /// <summary>
 /// Linux Proton-GE runtime service.
+/// Uses umu-launcher (when available) to execute Windows programs inside pressure-vessel,
+/// which resolves FASMX64/Reloaded.Hooks native-AV crashes that occur with raw wine64.
 /// </summary>
 public class ProtonGeEnvironmentService(
     ProtonGeDownloadService downloadService,
+    UmuDownloadService umuDownloadService,
     ConfigService configService,
     ILogger<ProtonGeEnvironmentService>? logger = null
 ) : IEnvironmentService
@@ -85,11 +89,33 @@ public class ProtonGeEnvironmentService(
             logger?.LogInformation("[PROTON-GE] Proton-GE already installed: {Version}", protonStatus.Version ?? "unknown");
         }
 
+        // Step 2: Download umu-launcher before prefix creation.
+        // umu must be available so EnsurePrefixAsync can use pressure-vessel for initialization.
+        // Failure is non-fatal: prefix will be created via direct wine64 as fallback.
+        yield return new EnvironmentProgressEvent
+        {
+            Stage = "init_umu",
+            MessageKey = "progress.checking_wine",
+            CompletedItems = 82,
+            TotalItems = 100
+        };
+
+        try
+        {
+            await umuDownloadService.EnsureAvailableAsync(cancellationToken);
+            logger?.LogInformation("[PROTON-GE] umu-launcher ready: {Path}", umuDownloadService.UmuRunPath);
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "[PROTON-GE] umu download failed; prefix will be created via wine64 fallback");
+        }
+
+        // Step 3: Create wineprefix (via umu if available, otherwise direct wine64).
         yield return new EnvironmentProgressEvent
         {
             Stage = "init_prefix",
             MessageKey = "progress.init_wine_prefix",
-            CompletedItems = 82,
+            CompletedItems = 90,
             TotalItems = 100
         };
 
@@ -124,9 +150,36 @@ public class ProtonGeEnvironmentService(
             throw new FileNotFoundException($"Proton wine64 executable not found: {ProtonWine}");
         }
 
-        logger?.LogInformation("[PROTON-GE] Initializing Wine prefix via Proton: {Prefix}", WinePrefix);
+        logger?.LogInformation("[PROTON-GE] Initializing Wine prefix: {Prefix}", WinePrefix);
+        Directory.CreateDirectory(WinePrefix);
 
         var env = GetEnvironment();
+
+        if (umuDownloadService.IsAvailable())
+        {
+            // Use umu/pressure-vessel to initialize the prefix.
+            // This runs Proton's wineboot inside the Steam Runtime container,
+            // ensuring the prefix is correctly configured for Proton games.
+            var python3Path = ResolvePython3Path();
+            if (!string.IsNullOrEmpty(python3Path))
+            {
+                logger?.LogInformation("[PROTON-GE] Initializing prefix via umu (pressure-vessel)");
+                var umuEnv = new Dictionary<string, string>(env)
+                {
+                    ["WINEPREFIX"] = WinePrefix,
+                    ["GAMEID"] = "0",
+                    ["PROTONPATH"] = ProtonRoot,
+                    ["STORE"] = "none",
+                };
+                await RunProtonCommandAsync(python3Path, $"\"{umuDownloadService.UmuRunPath}\" wineboot -u", umuEnv, "umu wineboot", cancellationToken);
+                EnsureProtonSystemDllsInPrefix();
+                logger?.LogInformation("[PROTON-GE] Wine prefix initialized via umu");
+                return;
+            }
+        }
+
+        // Fallback: initialize prefix directly via Proton wine64
+        logger?.LogInformation("[PROTON-GE] Initializing prefix via Proton wine64 (direct)");
         var winebootExe = File.Exists(ProtonWineboot) ? ProtonWineboot : ProtonWine;
         var winebootArgs = File.Exists(ProtonWineboot) ? "-u" : "wineboot -u";
         await RunProtonCommandAsync(winebootExe, winebootArgs, env, "wineboot", cancellationToken);
@@ -145,45 +198,69 @@ public class ProtonGeEnvironmentService(
         {
             Directory.CreateDirectory(PrefixSystem32);
 
-            var sourceDirs = new[]
-            {
-                Path.Combine(ProtonRoot, "files", "lib", "vkd3d", "x86_64-windows"),
-                Path.Combine(ProtonRoot, "files", "lib64", "vkd3d", "x86_64-windows"),
-                Path.Combine(ProtonRoot, "files", "share", "default_pfx", "drive_c", "windows", "system32"),
-            }.Where(Directory.Exists).ToArray();
-
-            if (sourceDirs.Length == 0)
-            {
-                logger?.LogWarning("[PROTON-GE] No source directories found for Proton system DLL installation");
-                return;
-            }
-
-            var requiredDlls = new[]
-            {
-                "libvkd3d-1.dll",
-                "libvkd3d-shader-1.dll",
-            };
-
-            foreach (var dll in requiredDlls)
-            {
-                var sourcePath = sourceDirs
-                    .Select(dir => Path.Combine(dir, dll))
-                    .FirstOrDefault(File.Exists);
-
-                if (string.IsNullOrEmpty(sourcePath))
-                {
-                    logger?.LogWarning("[PROTON-GE] Required DLL not found in Proton runtime: {Dll}", dll);
-                    continue;
-                }
-
-                var targetPath = Path.Combine(PrefixSystem32, dll);
-                File.Copy(sourcePath, targetPath, overwrite: true);
-                logger?.LogDebug("[PROTON-GE] Installed {Dll} to prefix system32", dll);
-            }
+            InstallVkd3dDlls();
+            InstallIcuDlls();
         }
         catch (Exception ex)
         {
             logger?.LogWarning(ex, "[PROTON-GE] Failed to install required Proton system DLLs into prefix");
+        }
+    }
+
+    private void InstallVkd3dDlls()
+    {
+        var sourceDirs = new[]
+        {
+            Path.Combine(ProtonRoot, "files", "lib", "vkd3d", "x86_64-windows"),
+            Path.Combine(ProtonRoot, "files", "lib64", "vkd3d", "x86_64-windows"),
+            Path.Combine(ProtonRoot, "files", "share", "default_pfx", "drive_c", "windows", "system32"),
+        }.Where(Directory.Exists).ToArray();
+
+        var requiredDlls = new[] { "libvkd3d-1.dll", "libvkd3d-shader-1.dll" };
+
+        foreach (var dll in requiredDlls)
+        {
+            var sourcePath = sourceDirs
+                .Select(dir => Path.Combine(dir, dll))
+                .FirstOrDefault(File.Exists);
+
+            if (string.IsNullOrEmpty(sourcePath))
+            {
+                logger?.LogWarning("[PROTON-GE] Required DLL not found in Proton runtime: {Dll}", dll);
+                continue;
+            }
+
+            var targetPath = Path.Combine(PrefixSystem32, dll);
+            File.Copy(sourcePath, targetPath, overwrite: true);
+            logger?.LogDebug("[PROTON-GE] Installed {Dll} to prefix system32", dll);
+        }
+    }
+
+    // icu.dll (Wine builtin) is a forwarder DLL that delegates to icuuc68.dll/icuin68.dll/icudt68.dll.
+    // Without these DLLs in the prefix, .NET's ICU initialization fails with Error 127 (ERROR_PROC_NOT_FOUND).
+    // This mirrors what the Proton script does when initializing a user prefix.
+    private void InstallIcuDlls()
+    {
+        var icuSourceDir = Path.Combine(ProtonRoot, "files", "lib", "wine", "icu", "x86_64-windows");
+        if (!Directory.Exists(icuSourceDir))
+        {
+            logger?.LogWarning("[PROTON-GE] Proton ICU DLL directory not found: {Dir}", icuSourceDir);
+            return;
+        }
+
+        var icuDlls = new[] { "icuuc68.dll", "icuin68.dll", "icudt68.dll" };
+        foreach (var dll in icuDlls)
+        {
+            var sourcePath = Path.Combine(icuSourceDir, dll);
+            if (!File.Exists(sourcePath))
+            {
+                logger?.LogWarning("[PROTON-GE] Proton ICU DLL not found: {Path}", sourcePath);
+                continue;
+            }
+
+            var targetPath = Path.Combine(PrefixSystem32, dll);
+            File.Copy(sourcePath, targetPath, overwrite: true);
+            logger?.LogDebug("[PROTON-GE] Installed {Dll} to prefix system32 (ICU)", dll);
         }
     }
 
@@ -241,6 +318,40 @@ public class ProtonGeEnvironmentService(
         return ProtonWine;
     }
 
+    /// <summary>
+    /// Returns umu-based launcher when umu-run is available, falling back to raw wine64.
+    /// umu uses pressure-vessel to sandbox the Proton environment, which fixes
+    /// FASMX64.dll/Reloaded.Hooks AV crashes on Linux.
+    /// </summary>
+    public WineLauncher GetLauncherCommand()
+    {
+        if (umuDownloadService.IsAvailable())
+        {
+            var python3Path = ResolvePython3Path();
+            if (!string.IsNullOrEmpty(python3Path))
+            {
+                logger?.LogDebug("[PROTON-GE] Using umu launcher: {Python3} {UmuRun}", python3Path, umuDownloadService.UmuRunPath);
+                return new WineLauncher(python3Path, [umuDownloadService.UmuRunPath]);
+            }
+            logger?.LogWarning("[PROTON-GE] python3 not found, falling back to wine64");
+        }
+
+        logger?.LogDebug("[PROTON-GE] umu not available, falling back to wine64: {Wine}", ProtonWine);
+        return new WineLauncher(ProtonWine, []);
+    }
+
+    private static string ResolvePython3Path()
+    {
+        // Check common fixed locations first (faster than PATH search)
+        string[] candidates = ["/usr/bin/python3", "/usr/local/bin/python3", "/bin/python3"];
+        foreach (var candidate in candidates)
+        {
+            if (File.Exists(candidate))
+                return candidate;
+        }
+        return string.Empty;
+    }
+
     public Dictionary<string, string> GetEnvironment()
     {
         // Ensure required Proton-side system DLLs are present before generating launch environment.
@@ -250,6 +361,50 @@ public class ProtonGeEnvironmentService(
         var config = configService.LoadConfigAsync().GetAwaiter().GetResult();
         var wineConfig = config.WineXIV ?? new WineXIVConfig();
 
+        // umu/pressure-vessel manages LD_LIBRARY_PATH and WINEDLLPATH internally.
+        // Passing these manually causes library conflicts and crashes.
+        if (umuDownloadService.IsAvailable())
+        {
+            return GetUmuEnvironment(wineConfig);
+        }
+
+        return GetDirectWineEnvironment(wineConfig);
+    }
+
+    /// <summary>
+    /// Environment for umu/pressure-vessel mode.
+    /// umu handles all library paths internally — we only set high-level directives.
+    /// </summary>
+    private Dictionary<string, string> GetUmuEnvironment(WineXIVConfig wineConfig)
+    {
+        var env = new Dictionary<string, string>
+        {
+            ["WINEPREFIX"] = WinePrefix,
+            ["GAMEID"] = "0",
+            ["PROTONPATH"] = ProtonRoot,
+            ["STORE"] = "none",
+            ["WINEDLLOVERRIDES"] = "mshtml=",
+            ["WINEESYNC"] = wineConfig.EsyncEnabled ? "1" : "0",
+            ["WINEFSYNC"] = wineConfig.FsyncEnabled ? "1" : "0",
+            ["DXVK_HUD"] = wineConfig.DxvkHudEnabled ? "fps,frametime,memory" : "0",
+            ["DXVK_ASYNC"] = "0",
+            ["WINEDEBUG"] = string.IsNullOrEmpty(wineConfig.WineDebug) ? "-all" : wineConfig.WineDebug,
+            ["XL_WINEONLINUX"] = "true",
+        };
+
+        if (wineConfig.GameModeEnabled)
+            env["LD_PRELOAD"] = "/usr/lib/libgamemodeauto.so.0";
+
+        logger?.LogDebug("[PROTON-GE] umu environment: GAMEID=0, PROTONPATH={ProtonRoot}, WINEPREFIX={Prefix}", ProtonRoot, WinePrefix);
+        return env;
+    }
+
+    /// <summary>
+    /// Environment for direct wine64 mode (no umu).
+    /// Must manually configure all library paths that Proton normally sets up.
+    /// </summary>
+    private Dictionary<string, string> GetDirectWineEnvironment(WineXIVConfig wineConfig)
+    {
         var protonFiles = Path.Combine(ProtonRoot, "files");
         var wineLibPath = Directory.Exists(Path.Combine(protonFiles, "lib64", "wine"))
             ? Path.Combine(protonFiles, "lib64", "wine")
@@ -268,42 +423,18 @@ public class ProtonGeEnvironmentService(
         var protonLib64 = Path.Combine(protonFiles, "lib64");
         var protonLib = Path.Combine(protonFiles, "lib");
 
-        if (Directory.Exists(protonLib64))
-        {
-            ldLibraryParts.Add(protonLib64);
-        }
-
-        if (Directory.Exists(protonLib))
-        {
-            ldLibraryParts.Add(protonLib);
-        }
-
-        if (Directory.Exists(unixLibPath))
-        {
-            ldLibraryParts.Add(unixLibPath);
-        }
+        if (Directory.Exists(protonLib64)) ldLibraryParts.Add(protonLib64);
+        if (Directory.Exists(protonLib)) ldLibraryParts.Add(protonLib);
+        if (Directory.Exists(unixLibPath)) ldLibraryParts.Add(unixLibPath);
 
         var inheritedLdLibrary = Environment.GetEnvironmentVariable("LD_LIBRARY_PATH");
         if (!string.IsNullOrWhiteSpace(inheritedLdLibrary))
-        {
             ldLibraryParts.Add(inheritedLdLibrary);
-        }
 
         var wineDllParts = new List<string>();
-        if (Directory.Exists(dxvkDllPath))
-        {
-            wineDllParts.Add(dxvkDllPath);
-        }
-
-        if (Directory.Exists(wineDllPath))
-        {
-            wineDllParts.Add(wineDllPath);
-        }
-
-        if (Directory.Exists(vkd3dDllPath))
-        {
-            wineDllParts.Add(vkd3dDllPath);
-        }
+        if (Directory.Exists(dxvkDllPath)) wineDllParts.Add(dxvkDllPath);
+        if (Directory.Exists(wineDllPath)) wineDllParts.Add(wineDllPath);
+        if (Directory.Exists(vkd3dDllPath)) wineDllParts.Add(vkd3dDllPath);
 
         var env = new Dictionary<string, string>
         {
@@ -321,15 +452,13 @@ public class ProtonGeEnvironmentService(
         };
 
         if (wineConfig.GameModeEnabled)
-        {
             env["LD_PRELOAD"] = "/usr/lib/libgamemodeauto.so.0";
-            logger?.LogDebug("[PROTON-GE] GameMode enabled");
-        }
 
-        logger?.LogDebug("[PROTON-GE] Generated environment with config: Esync={Esync}, Fsync={Fsync}, DXVK HUD={DxvkHud}, GameMode={GameMode}",
+        logger?.LogDebug("[PROTON-GE] Direct wine64 environment: Esync={Esync}, Fsync={Fsync}, DXVK HUD={DxvkHud}, GameMode={GameMode}",
             wineConfig.EsyncEnabled, wineConfig.FsyncEnabled, wineConfig.DxvkHudEnabled, wineConfig.GameModeEnabled);
 
         return env;
+
     }
 
     public async Task<ProcessResult> ExecuteAsync(string command, string[] args, CancellationToken cancellationToken = default)
@@ -387,12 +516,16 @@ public class ProtonGeEnvironmentService(
             ? File.ReadAllText(downloadService.ProtonVersionFilePath).Trim()
             : "unknown";
 
+        var umuVersion = umuDownloadService.GetInstalledVersionAsync().GetAwaiter().GetResult() ?? "not installed";
+
         return $"Proton-GE Environment:\n" +
                $"  Version: {version}\n" +
                $"  Proton Root: {ProtonRoot}\n" +
                $"  Wine Prefix: {WinePrefix}\n" +
                $"  Wine Executable: {ProtonWine}\n" +
-               $"  Installed: {File.Exists(ProtonWine)}";
+               $"  Installed: {File.Exists(ProtonWine)}\n" +
+               $"  umu-launcher: {umuVersion} ({(umuDownloadService.IsAvailable() ? umuDownloadService.UmuRunPath : "unavailable")})\n" +
+               $"  Launcher Mode: {(umuDownloadService.IsAvailable() ? "umu (pressure-vessel)" : "wine64 (direct)")}";
     }
 
     public Task ApplyConfigAsync(CancellationToken cancellationToken = default)

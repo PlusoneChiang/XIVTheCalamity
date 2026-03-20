@@ -157,19 +157,18 @@ public static class GameEndpoints
                     }
                     else
                     {
-                        var emulatorDir = environmentService.GetEmulatorDirectory();
-                        var winePath = Path.Combine(emulatorDir, "bin", "wine64");
+                        var launcher = environmentService.GetLauncherCommand();
 
-                        if (string.IsNullOrEmpty(emulatorDir) || !File.Exists(winePath))
+                        if (!launcher.IsValid)
                         {
-                            logger.LogError("[GAME] Wine/Wine-XIV not available for EntryPoint launch");
+                            logger.LogError("[GAME] Wine/Proton executable not available for EntryPoint launch: {Exe}", launcher.Executable);
                             return Results.BadRequest(ApiErrorResponse.Create(
                                 "WINE_NOT_AVAILABLE", "Wine executable not found"));
                         }
 
                         var environment = environmentService.GetEnvironment();
                         entryResult = await dalamudInjector.LaunchWithEntryPointAsync(
-                            winePath, exePath, gameArgs, environment, options, cancellationToken);
+                            launcher, exePath, gameArgs, environment, options, cancellationToken);
                     }
 
                     if (!entryResult.Success)
@@ -179,12 +178,25 @@ public static class GameEndpoints
                             "GAME_LAUNCH_FAILED", entryResult.ErrorMessage ?? "EntryPoint launch failed"));
                     }
 
-                    if (entryResult.GamePid.HasValue)
+                    // Without --no-wait the injector process stays alive until the game exits.
+                    // Use it as a direct game-lifetime proxy — no /proc scanning needed.
+                    if (entryResult.InjectorProcess != null)
+                    {
+                        gameLaunchService.SetMonitorProcess(entryResult.InjectorProcess);
+                        logger.LogInformation("[GAME] EntryPoint launch successful, tracking via injector PID: {Pid}", entryResult.InjectorProcess.Id);
+                    }
+                    else if (entryResult.GamePid.HasValue)
+                    {
                         gameLaunchService.RegisterExternalGameProcess(entryResult.GamePid.Value);
+                        logger.LogInformation("[GAME] EntryPoint launch successful, tracking via game PID: {Pid}", entryResult.GamePid.Value);
+                    }
+                    else
+                    {
+                        logger.LogWarning("[GAME] EntryPoint launch succeeded but no process handle available for exit tracking");
+                    }
 
-                    logger.LogInformation("[GAME] EntryPoint launch successful, PID: {Pid}", entryResult.GamePid);
                     return Results.Ok(ApiResponse<GameLaunchResponse>.Ok(
-                        new GameLaunchResponse(entryResult.GamePid ?? 0)));
+                        new GameLaunchResponse(entryResult.InjectorProcess?.Id ?? entryResult.GamePid ?? 0)));
                 }
 
                 var result = await gameLaunchService.LaunchGameAsync(
@@ -285,9 +297,9 @@ public static class GameEndpoints
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) || RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
                 // macOS/Linux: Wine-based injection
-                var winePath = environmentService.GetWineExecutablePath();
-                
-                if (string.IsNullOrEmpty(winePath) || !File.Exists(winePath))
+                var launcher = environmentService.GetLauncherCommand();
+
+                if (!launcher.IsValid)
                 {
                     logger.LogWarning("[GAME] Wine/Wine-XIV not available, cannot inject Dalamud");
                     return;
@@ -306,7 +318,7 @@ public static class GameEndpoints
                 }
 
                 logger.LogInformation("[GAME] Using Wine Dalamud injection");
-                result = await dalamudInjector.InjectAsync(winePath, environment, options, cancellationToken);
+                result = await dalamudInjector.InjectAsync(launcher, environment, options, cancellationToken);
             }
             else
             {

@@ -36,6 +36,14 @@ public interface IEnvironmentService
     /// Windows: Empty string
     /// </summary>
     string GetWineExecutablePath();
+
+    /// <summary>
+    /// Get the launcher command used to execute Windows programs.
+    /// For plain wine: returns (wine64, [])
+    /// For umu: returns ("python3", ["/path/to/umu-run"])
+    /// The full invocation is: Executable PrefixArgs... windowsExe windowsArgs...
+    /// </summary>
+    WineLauncher GetLauncherCommand() => new WineLauncher(GetWineExecutablePath(), []);
     
     /// <summary>
     /// Get environment variables configuration
@@ -72,6 +80,30 @@ public interface IEnvironmentService
     /// <param name="esyncEnabled">Esync enabled</param>
     /// <param name="msyncEnabled">Msync enabled</param>
     void StartAudioRouter(int gamePid, bool esyncEnabled, bool msyncEnabled);
+}
+
+/// <summary>
+/// Represents the launcher command used to execute Windows executables.
+/// For plain Wine: Executable="wine64", PrefixArgs=[]
+/// For umu-launcher: Executable="python3", PrefixArgs=["/path/to/umu-run"]
+/// Full invocation: Executable PrefixArgs... windowsExe windowsArgs...
+/// </summary>
+public record WineLauncher(string Executable, IReadOnlyList<string> PrefixArgs)
+{
+    public bool IsValid => !string.IsNullOrEmpty(Executable) && File.Exists(Executable);
+
+    /// <summary>
+    /// Builds an Arguments string that prepends PrefixArgs before the given windowsArgs.
+    /// Example (umu): BuildArguments("\"/path/game.exe\" /arg") → "/path/umu-run \"/path/game.exe\" /arg"
+    /// </summary>
+    public string BuildArguments(string windowsArgs)
+    {
+        if (PrefixArgs.Count == 0)
+            return windowsArgs;
+
+        var prefix = string.Join(" ", PrefixArgs.Select(a => a.Contains(' ') ? $"\"{a}\"" : a));
+        return string.IsNullOrEmpty(windowsArgs) ? prefix : $"{prefix} {windowsArgs}";
+    }
 }
 
 /// <summary>

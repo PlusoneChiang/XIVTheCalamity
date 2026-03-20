@@ -32,9 +32,10 @@ public class GameLaunchService
     public Process? GameProcess => _gameProcess;
     
     /// <summary>
-    /// Check if game is running
+    /// Check if game is running — tracks both the managed process and any wine process in /proc.
     /// </summary>
-    public bool IsGameRunning => _gameProcess != null && !_gameProcess.HasExited;
+    public bool IsGameRunning =>
+        _gameProcess != null && !_gameProcess.HasExited;
     
     /// <summary>
     /// Fake Launch - Test launch game (without Session ID)
@@ -183,26 +184,17 @@ public class GameLaunchService
                     // Dalamud.Boot executes inside the game process and needs these variables.
                     if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                     {
-                        // Prefer DXVK when Dalamud is enabled on Linux.
-                        baseEnvironment["WINEDLLOVERRIDES"] = "mshtml=;d3d11,dxgi,d3d10core,d3d9=n,b";
-                        baseEnvironment["PROTON_USE_WINED3D"] = "0";
                         baseEnvironment["DALAMUD_FORCE_MINHOOK"] = "true";
                         baseEnvironment["DOTNET_EnableWriteXorExecute"] = "0";
                         baseEnvironment["COMPlus_EnableAlternateStackCheck"] = "0";
                         baseEnvironment["COMPlus_gcAllowVeryLargeObjects"] = "1";
-                        baseEnvironment["DOTNET_SYSTEM_GLOBALIZATION_INVARIANT"] = "1";
+                        // NOTE: Do NOT set DOTNET_SYSTEM_GLOBALIZATION_INVARIANT — Dalamud
+                        // requires zh-hant culture (CultureInfo.GetCultureInfo("zh-hant")),
+                        // which fails in invariant mode.
+                        // NOTE: Do NOT prepend /usr/lib64:/usr/lib — system ICU 75 uses versioned
+                        // symbols (u_charsToUChars_75) that Wine cannot resolve. Proton-GE's own
+                        // lib paths from GetEnvironment() are sufficient.
                         
-                        if (baseEnvironment.TryGetValue("LD_LIBRARY_PATH", out var existingLdLibraryPath))
-                        {
-                            baseEnvironment["LD_LIBRARY_PATH"] = $"/usr/lib64:/usr/lib:{existingLdLibraryPath}";
-                        }
-                        else
-                        {
-                            baseEnvironment["LD_LIBRARY_PATH"] = "/usr/lib64:/usr/lib";
-                        }
-                        
-                        _logger.LogWarning("[GAME] Linux graphics env: WINEDLLOVERRIDES={Overrides}, PROTON_USE_WINED3D={ProtonUseWineD3D}, DALAMUD_FORCE_MINHOOK={ForceMinHook}",
-                            baseEnvironment["WINEDLLOVERRIDES"], baseEnvironment["PROTON_USE_WINED3D"], baseEnvironment["DALAMUD_FORCE_MINHOOK"]);
                         _logger.LogInformation("[GAME] Applied Linux Dalamud runtime environment overrides");
                     }
                     
@@ -351,19 +343,19 @@ public class GameLaunchService
             };
         }
         
-        var winePath = _environmentService.GetWineExecutablePath();
-        
-        if (string.IsNullOrEmpty(winePath) || !File.Exists(winePath))
+        var launcher = _environmentService.GetLauncherCommand();
+
+        if (!launcher.IsValid)
         {
-            _logger.LogError("[GAME] Wine executable not found: {WinePath}", winePath);
+            _logger.LogError("[GAME] Wine/launcher executable not found: {Exe}", launcher.Executable);
             return new GameLaunchResult
             {
                 Success = false,
-                ErrorMessage = $"Wine executable not found: {winePath}"
+                ErrorMessage = $"Wine executable not found: {launcher.Executable}"
             };
         }
-        
-        _logger.LogInformation("[GAME] Launching with Wine: {WinePath}", winePath);
+
+        _logger.LogInformation("[GAME] Launching with: {Exe} (prefix args: {Prefix})", launcher.Executable, string.Join(" ", launcher.PrefixArgs));
         _logger.LogInformation("[GAME] Game executable: {ExePath}", exePath);
         
         // Log environment variables (only key ones)
@@ -380,8 +372,8 @@ public class GameLaunchService
         
         var startInfo = new ProcessStartInfo
         {
-            FileName = winePath,
-            Arguments = $"\"{exePath}\" {arguments}",
+            FileName = launcher.Executable,
+            Arguments = launcher.BuildArguments($"\"{exePath}\" {arguments}"),
             WorkingDirectory = workingDir,
             UseShellExecute = false,
             CreateNoWindow = false,
@@ -683,15 +675,16 @@ public class GameLaunchService
     }
 
     /// <summary>
-    /// Wait for game to exit and get exit code
+    /// Wait for game to exit and get exit code.
     /// </summary>
     public async Task<int?> WaitForExitAsync(CancellationToken cancellationToken = default)
     {
         if (_gameProcess == null)
         {
+            _logger.LogWarning("[GAME] No game process to wait for");
             return null;
         }
-        
+
         try
         {
             await _gameProcess.WaitForExitAsync(cancellationToken);
@@ -704,6 +697,16 @@ public class GameLaunchService
             _logger.LogWarning("[GAME] Wait for exit was cancelled");
             return null;
         }
+    }
+
+    /// <summary>
+    /// Set an externally-created monitor process (e.g. wineserver -w).
+    /// IsGameRunning and WaitForExitAsync will track this process.
+    /// </summary>
+    public void SetMonitorProcess(Process process)
+    {
+        _gameProcess = process;
+        _logger.LogInformation("[GAME] Set monitor process PID: {Pid}", process.Id);
     }
     
     private string GetGameVersion(string gamePath)

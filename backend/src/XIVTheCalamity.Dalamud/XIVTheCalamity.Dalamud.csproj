@@ -8,11 +8,12 @@
 
   <ItemGroup>
     <PackageReference Include="SharpCompress" Version="0.42.1" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.2" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\XIVTheCalamity.Core\XIVTheCalamity.Core.csproj" />
+    <ProjectReference Include="..\XIVTheCalamity.Platform\XIVTheCalamity.Platform.csproj" />
   </ItemGroup>
 
 </Project>
