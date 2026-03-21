@@ -145,7 +145,8 @@ public static class GameEndpoints
                     var options = new DalamudInjectionOptions
                     {
                         NoPlugin = config.Dalamud.SafeMode,
-                        NoThirdPartyPlugin = config.Dalamud.SafeMode
+                        NoThirdPartyPlugin = config.Dalamud.SafeMode,
+                        PluginRepoUrl = config.Dalamud.PluginRepoUrl
                     };
 
                     DalamudInjectionResult entryResult;
@@ -309,7 +310,8 @@ public static class GameEndpoints
                 InjectionDelayMs = dalamudConfig.InjectDelay > 0 ? dalamudConfig.InjectDelay : null,
                 DelayInitializeMs = dalamudConfig.InjectDelay > 0 ? dalamudConfig.InjectDelay : null,
                 NoPlugin = dalamudConfig.SafeMode,
-                NoThirdPartyPlugin = dalamudConfig.SafeMode
+                NoThirdPartyPlugin = dalamudConfig.SafeMode,
+                PluginRepoUrl = dalamudConfig.PluginRepoUrl
             };
             
             DalamudInjectionResult result;

@@ -91,6 +91,9 @@ public class ConfigService
                 Console.WriteLine("[Config] Initialized ProtonGe config with defaults");
             }
             
+            // Force-overwrite managed fields that users must not change
+            config.Dalamud.PluginRepoUrl = DalamudConfig.ManagedPluginRepoUrl;
+
             Console.WriteLine("[Config] Config loaded successfully");
             return config;
         }
@@ -120,6 +123,9 @@ public class ConfigService
     /// </summary>
     public async Task SaveConfigAsync(AppConfig config)
     {
+        // Force-overwrite managed fields before validation and save
+        config.Dalamud.PluginRepoUrl = DalamudConfig.ManagedPluginRepoUrl;
+
         ValidateConfig(config);
         
         lock (_lock)
@@ -176,7 +182,7 @@ public class ConfigService
                 Enabled = false,
                 InjectDelay = 5000,
                 SafeMode = false,
-                PluginRepoUrl = "https://kamori.goats.dev/Dalamud/Release/Meta"
+                PluginRepoUrl = DalamudConfig.ManagedPluginRepoUrl
             },
             Launcher = new LauncherConfig
             {

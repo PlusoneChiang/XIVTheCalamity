@@ -64,7 +64,7 @@ public class DalamudInjectorService
             
                         // Prepare environment variables (add DALAMUD_RUNTIME first, as winedbg needs same environment)
             var injectorEnv = new Dictionary<string, string>(environment);
-            AddDalamudEnvironment(injectorEnv);
+            AddDalamudEnvironment(injectorEnv, options);
             
             // Ensure Wine %APPDATA%/XIVLauncherTC symlink points to our Config directory
             // Dalamud hardcodes %APPDATA%/XIVLauncherTC for safe mode, log commands, etc.
@@ -173,7 +173,7 @@ public class DalamudInjectorService
             _logger.LogInformation("[DALAMUD-INJECT] Injector arguments: {Args}", injectorArgs);
             
             // Build environment variables
-            var injectorEnv = BuildInjectorEnvironmentWindows();
+            var injectorEnv = BuildInjectorEnvironmentWindows(options);
             
             // Execute injection (directly, no Wine)
             var result = await ExecuteInjectorWindowsAsync(injectorArgs, injectorEnv, cancellationToken);
@@ -227,7 +227,7 @@ public class DalamudInjectorService
             }
 
             var injectorEnv = new Dictionary<string, string>(environment);
-            AddDalamudEnvironment(injectorEnv);
+            AddDalamudEnvironment(injectorEnv, options);
 
             EnsureWineAppDataSymlink(injectorEnv);
 
@@ -352,7 +352,7 @@ public class DalamudInjectorService
 
             var injectorArgs = BuildEntryPointArgumentsWindows(gameExePath, gameArguments, options);
             _logger.LogInformation("[DALAMUD-INJECT] EntryPoint arguments: {Args}", injectorArgs);
-            var injectorEnv = BuildInjectorEnvironmentWindows();
+            var injectorEnv = BuildInjectorEnvironmentWindows(options);
 
             var result = await ExecuteInjectorWindowsAsync(injectorArgs, injectorEnv, cancellationToken);
             if (!result.Success)
@@ -740,7 +740,7 @@ public class DalamudInjectorService
     /// CRITICAL: Must use Wine Z:\ path format for DALAMUD_RUNTIME and DOTNET_ROOT
     /// Dalamud passes this path to hostfxr, which needs Windows-style path in Wine
     /// </summary>
-    private void AddDalamudEnvironment(Dictionary<string, string> env)
+    private void AddDalamudEnvironment(Dictionary<string, string> env, DalamudInjectionOptions? options = null)
     {
         var runtimePath = _pathService.RuntimePath;
         
@@ -754,6 +754,9 @@ public class DalamudInjectorService
         env["DOTNET_EnableWriteXorExecute"] = "0";  // Disable W^X for Apple Silicon compatibility
         env["COMPlus_EnableAlternateStackCheck"] = "0";  // Disable stack checks that may fail in Wine
         env["COMPlus_gcAllowVeryLargeObjects"] = "1";  // Allow large objects
+
+        if (!string.IsNullOrWhiteSpace(options?.PluginRepoUrl))
+            env["DALAMUD_MAIN_REPO_URL"] = options.PluginRepoUrl;
         
         _logger.LogInformation("[DALAMUD-INJECT] Environment configured for Dalamud injection");
     }
@@ -1200,13 +1203,16 @@ public class DalamudInjectorService
     /// <summary>
     /// Build environment variables for Windows native injection
     /// </summary>
-    private Dictionary<string, string> BuildInjectorEnvironmentWindows()
+    private Dictionary<string, string> BuildInjectorEnvironmentWindows(DalamudInjectionOptions? options = null)
     {
         var env = new Dictionary<string, string>();
         
         var runtimePath = _pathService.RuntimePath;
         env["DALAMUD_RUNTIME"] = runtimePath;
         env["DOTNET_ROOT"] = runtimePath;
+
+        if (!string.IsNullOrWhiteSpace(options?.PluginRepoUrl))
+            env["DALAMUD_MAIN_REPO_URL"] = options.PluginRepoUrl;
         
         _logger.LogInformation("[DALAMUD-INJECT] Windows environment: DALAMUD_RUNTIME={RuntimePath}", runtimePath);
         
@@ -1421,6 +1427,9 @@ public class DalamudInjectionOptions
     
     /// <summary>Do not load third-party plugins</summary>
     public bool NoThirdPartyPlugin { get; set; }
+
+    /// <summary>Main plugin repository URL (passed as DALAMUD_MAIN_REPO_URL)</summary>
+    public string? PluginRepoUrl { get; set; }
 }
 
 /// <summary>

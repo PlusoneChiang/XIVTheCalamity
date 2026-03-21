@@ -6,6 +6,11 @@ namespace XIVTheCalamity.Core.Models;
 public class DalamudConfig
 {
     /// <summary>
+    /// Managed plugin repository URL — always enforced, not user-editable.
+    /// </summary>
+    public const string ManagedPluginRepoUrl =
+        "https://raw.githubusercontent.com/yanmucorp/PluginDistD17/refs/heads/main/pluginmaster.json";
+    /// <summary>
     /// Enable Dalamud
     /// </summary>
     public bool Enabled { get; set; } = false;
@@ -23,7 +28,7 @@ public class DalamudConfig
     /// <summary>
     /// Plugin repository URL
     /// </summary>
-    public string PluginRepoUrl { get; set; } = "https://kamori.goats.dev/Dalamud/Release/Meta";
+    public string PluginRepoUrl { get; set; } = ManagedPluginRepoUrl;
 
     /// <summary>
     /// Use EntryPoint injection mode (Dalamud.Injector starts the game directly)
