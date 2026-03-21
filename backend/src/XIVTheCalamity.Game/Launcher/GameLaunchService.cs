@@ -39,7 +39,7 @@ public class GameLaunchService
     
     /// <summary>
     /// Fake Launch - Test launch game (without Session ID)
-    /// For macOS, pass WineConfig. For Linux, pass WineXIVConfig (cast to object).
+    /// For macOS, pass WineConfig. For Linux, pass ProtonGeConfig (cast to object).
     /// </summary>
     public async Task<GameLaunchResult> FakeLaunchAsync(
         string gamePath,
@@ -63,7 +63,7 @@ public class GameLaunchService
     
     /// <summary>
     /// Launch game officially
-    /// For macOS, pass WineConfig. For Linux, pass WineXIVConfig (cast to object).
+    /// For macOS, pass WineConfig. For Linux, pass ProtonGeConfig (cast to object).
     /// </summary>
     public async Task<GameLaunchResult> LaunchGameAsync(
         string gamePath,

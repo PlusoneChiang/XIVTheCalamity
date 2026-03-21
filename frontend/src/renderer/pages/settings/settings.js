@@ -57,7 +57,7 @@ async function init() {
   // Initialize each tab
   initGeneralTab();
   initWineTab();
-  initWineXIVTab();
+  initProtonGeTab();
   initDalamudTab();
   initAboutTab();
   
@@ -270,13 +270,14 @@ function collectFormData() {
       imeCandidatePositionX: parseInt(document.getElementById('imePosX').value) || 25,
       imeCandidatePositionY: parseInt(document.getElementById('imePosY').value) || 85
     },
-    wineXIV: {
-      dxvkHudEnabled: document.getElementById('winexivDxvkHudEnabled')?.checked || false,
-      maxFramerate: parseInt(document.getElementById('winexivMaxFramerate')?.value || 60),
+    protonGe: {
+      dxvkHudEnabled: document.getElementById('protongeDxvkHudEnabled')?.checked || false,
+      maxFramerate: parseInt(document.getElementById('protongeMaxFramerate')?.value || 60),
       gameModeEnabled: false, // GameMode disabled by default due to compatibility issues
-      esyncEnabled: document.getElementById('winexivEsyncEnabled')?.checked !== false,
-      fsyncEnabled: document.getElementById('winexivFsyncEnabled')?.checked !== false,
-      wineDebug: document.getElementById('winexivWineDebug')?.value || ''
+      esyncEnabled: document.getElementById('protongeEsyncEnabled')?.checked !== false,
+      fsyncEnabled: document.getElementById('protongeFsyncEnabled')?.checked !== false,
+      wineDebug: document.getElementById('protongeWineDebug')?.value || '',
+      extraEnvironmentVariables: parseExtraEnvVars(document.getElementById('protongeExtraEnvVars')?.value || '')
     },
     dalamud: {
       enabled: document.getElementById('dalamudEnabled').checked,
@@ -641,28 +642,52 @@ async function openWineTool(tool) {
 }
 
 /**
+ * Parse "KEY=VALUE" multiline text into { key: value } dict.
+ * Lines without '=' are ignored.
+ */
+function parseExtraEnvVars(text) {
+  const result = {};
+  for (const line of text.split('\n')) {
+    const idx = line.indexOf('=');
+    if (idx <= 0) continue;
+    const key = line.slice(0, idx).trim();
+    const value = line.slice(idx + 1).trim();
+    if (key) result[key] = value;
+  }
+  return result;
+}
+
+/**
+ * Format { key: value } dict into "KEY=VALUE" multiline text.
+ */
+function formatExtraEnvVars(dict) {
+  return Object.entries(dict).map(([k, v]) => `${k}=${v}`).join('\n');
+}
+
+/**
  * Initialize Wine-XIV Tab (Linux)
  */
-function initWineXIVTab() {
-  if (!currentConfig?.wineXIV) {
-    console.warn('[Settings] WineXIV config not found');
+function initProtonGeTab() {
+  if (!currentConfig?.protonGe) {
+    console.warn('[Settings] ProtonGe config not found');
     return;
   }
   
-  const config = currentConfig.wineXIV;
-  console.log('[Settings] Loading WineXIV settings:', config);
+  const config = currentConfig.protonGe;
+  console.log('[Settings] Loading ProtonGe settings:', config);
   
   // Graphics
-  document.getElementById('winexivDxvkHudEnabled').checked = config.dxvkHudEnabled || false;
-  document.getElementById('winexivMaxFramerate').value = config.maxFramerate || 60;
+  document.getElementById('protongeDxvkHudEnabled').checked = config.dxvkHudEnabled || false;
+  document.getElementById('protongeMaxFramerate').value = config.maxFramerate || 60;
   
   // Performance - GameMode is now disabled by default and hidden from UI
-  // document.getElementById('winexivGameModeEnabled').checked = config.gameModeEnabled !== false;
+  // document.getElementById('protongeGameModeEnabled').checked = config.gameModeEnabled !== false;
   
   // Advanced
-  document.getElementById('winexivEsyncEnabled').checked = config.esyncEnabled !== false; // default true
-  document.getElementById('winexivFsyncEnabled').checked = config.fsyncEnabled !== false; // default true
-  document.getElementById('winexivWineDebug').value = config.wineDebug || '';
+  document.getElementById('protongeEsyncEnabled').checked = config.esyncEnabled !== false; // default true
+  document.getElementById('protongeFsyncEnabled').checked = config.fsyncEnabled !== false; // default true
+  document.getElementById('protongeWineDebug').value = config.wineDebug || '';
+  document.getElementById('protongeExtraEnvVars').value = formatExtraEnvVars(config.extraEnvironmentVariables || {});
 }
 
 /**

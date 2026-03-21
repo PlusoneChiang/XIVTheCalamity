@@ -1,9 +1,9 @@
 namespace XIVTheCalamity.Core.Models;
 
 /// <summary>
-/// Wine-XIV configuration (Linux only)
+/// GE-Proton configuration (Linux only)
 /// </summary>
-public class WineXIVConfig
+public class ProtonGeConfig
 {
     /// <summary>
     /// Enable DXVK HUD display
@@ -21,7 +21,7 @@ public class WineXIVConfig
     public bool EsyncEnabled { get; set; } = true;
     
     /// <summary>
-    /// Enable Fsync synchronization (Wine-XIV specific)
+    /// Enable Fsync synchronization
     /// </summary>
     public bool FsyncEnabled { get; set; } = true;
     
@@ -34,4 +34,10 @@ public class WineXIVConfig
     /// Wine debug flags (e.g., "-all,+module" or empty to disable)
     /// </summary>
     public string WineDebug { get; set; } = "";
+
+    /// <summary>
+    /// Extra environment variables to pass to the Wine/Proton environment.
+    /// Key-value pairs that override or extend the default environment.
+    /// </summary>
+    public Dictionary<string, string> ExtraEnvironmentVariables { get; set; } = new();
 }

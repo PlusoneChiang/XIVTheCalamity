@@ -13,7 +13,7 @@ namespace XIVTheCalamity.Api.NativeAOT;
 [JsonSerializable(typeof(DalamudConfig))]
 [JsonSerializable(typeof(LauncherConfig))]
 [JsonSerializable(typeof(WineConfig))]
-[JsonSerializable(typeof(WineXIVConfig))]
+[JsonSerializable(typeof(ProtonGeConfig))]
 [JsonSerializable(typeof(LoginResult))]
 [JsonSerializable(typeof(WineInitProgress))]
 

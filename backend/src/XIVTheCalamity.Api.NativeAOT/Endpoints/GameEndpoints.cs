@@ -44,7 +44,7 @@ public static class GameEndpoints
                 
                 var result = await gameLaunchService.FakeLaunchAsync(
                     config.Game.GamePath,
-                    RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? config.WineXIV : config.Wine,
+                    RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? config.ProtonGe : config.Wine,
                     dalamudRuntimePath,
                     cancellationToken);
                 
@@ -64,7 +64,7 @@ public static class GameEndpoints
                         logger.LogInformation("[GAME] Dalamud enabled, starting injection...");
                         _ = InjectDalamudAsync(
                             config.Dalamud,
-                            RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? config.WineXIV : config.Wine,
+                            RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? config.ProtonGe : config.Wine,
                             result.LaunchEnvironment,
                             environmentService,
                             dalamudInjector,
@@ -178,17 +178,12 @@ public static class GameEndpoints
                             "GAME_LAUNCH_FAILED", entryResult.ErrorMessage ?? "EntryPoint launch failed"));
                     }
 
-                    // Without --no-wait the injector process stays alive until the game exits.
-                    // Use it as a direct game-lifetime proxy — no /proc scanning needed.
+                    // Without --no-wait, the injector process stays alive until the game exits.
+                    // Use it as a direct game-lifetime proxy.
                     if (entryResult.InjectorProcess != null)
                     {
                         gameLaunchService.SetMonitorProcess(entryResult.InjectorProcess);
                         logger.LogInformation("[GAME] EntryPoint launch successful, tracking via injector PID: {Pid}", entryResult.InjectorProcess.Id);
-                    }
-                    else if (entryResult.GamePid.HasValue)
-                    {
-                        gameLaunchService.RegisterExternalGameProcess(entryResult.GamePid.Value);
-                        logger.LogInformation("[GAME] EntryPoint launch successful, tracking via game PID: {Pid}", entryResult.GamePid.Value);
                     }
                     else
                     {
@@ -196,13 +191,13 @@ public static class GameEndpoints
                     }
 
                     return Results.Ok(ApiResponse<GameLaunchResponse>.Ok(
-                        new GameLaunchResponse(entryResult.InjectorProcess?.Id ?? entryResult.GamePid ?? 0)));
+                        new GameLaunchResponse(entryResult.InjectorProcess?.Id ?? 0)));
                 }
 
                 var result = await gameLaunchService.LaunchGameAsync(
                     config.Game.GamePath,
                     request.SessionId,
-                    RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? config.WineXIV : config.Wine,
+                    RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? config.ProtonGe : config.Wine,
                     dalamudRuntimePath,
                     cancellationToken);
                 
@@ -222,7 +217,7 @@ public static class GameEndpoints
                         logger.LogInformation("[GAME] Dalamud enabled, starting injection...");
                         _ = InjectDalamudAsync(
                             config.Dalamud,
-                            RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? config.WineXIV : config.Wine,
+                            RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? config.ProtonGe : config.Wine,
                             result.LaunchEnvironment,
                             environmentService,
                             dalamudInjector,

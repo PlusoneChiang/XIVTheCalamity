@@ -76,10 +76,10 @@ public class ConfigService
                 };
                 Console.WriteLine("[Config] Initialized Wine config with defaults");
             }
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && config.WineXIV == null)
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && config.ProtonGe == null)
             {
                 // Linux uses Wine-XIV
-                config.WineXIV = new WineXIVConfig
+                config.ProtonGe = new ProtonGeConfig
                 {
                     DxvkHudEnabled = false,
                     MaxFramerate = 60,
@@ -88,7 +88,7 @@ public class ConfigService
                     GameModeEnabled = true,
                     WineDebug = ""
                 };
-                Console.WriteLine("[Config] Initialized WineXIV config with defaults");
+                Console.WriteLine("[Config] Initialized ProtonGe config with defaults");
             }
             
             Console.WriteLine("[Config] Config loaded successfully");
@@ -208,7 +208,7 @@ public class ConfigService
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
             // Linux uses Wine-XIV
-            config.WineXIV = new WineXIVConfig
+            config.ProtonGe = new ProtonGeConfig
             {
                 DxvkHudEnabled = false,
                 MaxFramerate = 60,

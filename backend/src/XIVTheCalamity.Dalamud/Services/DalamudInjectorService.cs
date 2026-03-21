@@ -266,12 +266,14 @@ public class DalamudInjectorService
             _logger.LogInformation("[DALAMUD-INJECT] Executing: {Exe} \"{Injector}\" {Args}",
                 launcher.Executable, injectorPath, injectorArgs);
 
-            // NOTE: no `using` — process stays alive until game exits (no --no-wait)
+            // Without --no-wait, the injector stays alive until the game exits (bwrap keeps the
+            // pressure-vessel container alive). Use this process as a game-lifetime proxy.
+            // NOTE: no `using` — intentionally kept alive
             var process = Process.Start(psi);
             if (process == null)
                 return new DalamudInjectionResult { Success = false, ErrorMessage = "Failed to start injector process" };
 
-            // Drain stdout/stderr to prevent pipe-buffer deadlock
+            // Drain stderr to prevent pipe-buffer deadlock (game inherits injector's pipes)
             _ = Task.Run(async () =>
             {
                 try { while (!process.StandardOutput.EndOfStream) await process.StandardOutput.ReadLineAsync(); } catch { }
@@ -289,7 +291,7 @@ public class DalamudInjectorService
                 catch { }
             });
 
-            _logger.LogInformation("[DALAMUD-INJECT] EntryPoint launch started; umu-run PID {Pid} tracks game lifetime", process.Id);
+            _logger.LogInformation("[DALAMUD-INJECT] EntryPoint launch started; injector PID {Pid} tracks game lifetime", process.Id);
             return new DalamudInjectionResult { Success = true, InjectorProcess = process };
         }
         catch (OperationCanceledException)
@@ -1363,9 +1365,9 @@ public class DalamudInjectionResult
     public int? GamePid { get; set; }
 
     /// <summary>
-    /// The injector (umu-run) process kept alive as a game lifetime proxy.
-    /// Without --no-wait, the injector stays alive until the game exits — use this
-    /// as the monitor process instead of scanning /proc for the game PID.
+    /// The umu-run process handle (valid only when running without --no-wait).
+    /// The injector stays alive until the game exits, so this process acts as a
+    /// game-lifetime proxy — monitor it instead of scanning /proc.
     /// </summary>
     public Process? InjectorProcess { get; set; }
 

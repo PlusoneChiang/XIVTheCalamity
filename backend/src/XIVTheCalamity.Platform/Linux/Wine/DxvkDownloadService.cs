@@ -16,7 +16,7 @@ public class DxvkDownloadService(
     private readonly PlatformPathService _platformPaths = PlatformPathService.Instance;
     private readonly HttpClient _httpClient = new();
 
-    // DXVK GPLAsync release (from PlusoneChiang/wine-xiv-git)
+    // DXVK GPLAsync release
     private const string DxvkReleaseName = "dxvk-gplasync-v2.7.1-1";
     private const string DxvkDownloadUrl = "https://raw.githubusercontent.com/PlusoneChiang/wine-xiv-git/refs/heads/master/dxvk-gplasync-v2.7.1-1.tar.gz";
 

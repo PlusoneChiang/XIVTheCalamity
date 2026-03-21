@@ -140,36 +140,6 @@ public class PlatformPathService
     }
 
     /// <summary>
-    /// Get Wine-XIV installation directory (Linux only)
-    /// This is where Wine-XIV is downloaded and stored
-    /// </summary>
-    public string GetWineXIVDirectory()
-    {
-        return Path.Combine(UserDataDirectory, "wine");
-    }
-
-    /// <summary>
-    /// Get Wine/Wine-XIV emulator root directory
-    /// macOS: Wine directory
-    /// Linux: Wine-XIV directory (~/.config/XIVTheCalamity/wine/)
-    /// Windows: Empty (native execution)
-    /// </summary>
-    public string GetEmulatorRootDirectory()
-    {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-        {
-            return GetMacOSWineDirectory();
-        }
-        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-        {
-            return GetLinuxWineXIVDirectory();
-        }
-
-        throw new PlatformNotSupportedException(
-            $"Emulator not supported on platform: {RuntimeInformation.OSDescription}");
-    }
-
-    /// <summary>
     /// Get macOS Wine directory
     /// Priority: 1. AppData (downloaded), 2. Dev environment (project root), 3. Resources (production)
     /// Returns null if Wine is not found (will be downloaded on first launch)
@@ -206,40 +176,6 @@ public class PlatformPathService
 
         // Wine not found - return expected appData path (will be created by download)
         return appDataWine;
-    }
-
-    /// <summary>
-    /// Get Linux Wine-XIV directory
-    /// Returns: ~/.config/XIVTheCalamity/wine/
-    /// </summary>
-    private string GetLinuxWineXIVDirectory()
-    {
-        // Wine-XIV is always downloaded to user config directory
-        var wineRoot = Path.Combine(UserDataDirectory, "wine");
-        return wineRoot;
-    }
-
-    /// <summary>
-    /// Get Wine/Wine-XIV executable path
-    /// macOS: wine executable in Wine directory
-    /// Linux: wine64 executable in Wine-XIV bin directory
-    /// </summary>
-    public string GetWineExecutable()
-    {
-        var emulatorRoot = GetEmulatorRootDirectory();
-
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-        {
-            // macOS: wine/bin/wine64
-            return Path.Combine(emulatorRoot, "bin", "wine64");
-        }
-        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-        {
-            // Linux Wine-XIV: wine/bin/wine64
-            return Path.Combine(emulatorRoot, "bin", "wine64");
-        }
-
-        throw new PlatformNotSupportedException();
     }
 
     private OSPlatform GetCurrentPlatform()
@@ -284,8 +220,6 @@ AppDataDirectory: {AppDataDirectory}
 UserDataDirectory: {UserDataDirectory}
 CacheDirectory: {CacheDirectory}
 LogsDirectory: {LogsDirectory}
-Emulator Root: {GetEmulatorRootDirectory()}
-Wine Executable: {GetWineExecutable()}
 Base Directory: {AppContext.BaseDirectory}";
     }
 }

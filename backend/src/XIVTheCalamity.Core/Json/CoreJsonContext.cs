@@ -16,7 +16,7 @@ namespace XIVTheCalamity.Core.Json;
 [JsonSerializable(typeof(DalamudConfig))]
 [JsonSerializable(typeof(LauncherConfig))]
 [JsonSerializable(typeof(WineConfig))]
-[JsonSerializable(typeof(WineXIVConfig))]
+[JsonSerializable(typeof(ProtonGeConfig))]
 [JsonSerializable(typeof(LoginResult))]
 public partial class CoreJsonContext : JsonSerializerContext
 {

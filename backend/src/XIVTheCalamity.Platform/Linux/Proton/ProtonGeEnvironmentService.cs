@@ -359,7 +359,7 @@ public class ProtonGeEnvironmentService(
         EnsureProtonSystemDllsInPrefix();
 
         var config = configService.LoadConfigAsync().GetAwaiter().GetResult();
-        var wineConfig = config.WineXIV ?? new WineXIVConfig();
+        var wineConfig = config.ProtonGe ?? new ProtonGeConfig();
 
         // umu/pressure-vessel manages LD_LIBRARY_PATH and WINEDLLPATH internally.
         // Passing these manually causes library conflicts and crashes.
@@ -375,7 +375,7 @@ public class ProtonGeEnvironmentService(
     /// Environment for umu/pressure-vessel mode.
     /// umu handles all library paths internally — we only set high-level directives.
     /// </summary>
-    private Dictionary<string, string> GetUmuEnvironment(WineXIVConfig wineConfig)
+    private Dictionary<string, string> GetUmuEnvironment(ProtonGeConfig wineConfig)
     {
         var env = new Dictionary<string, string>
         {
@@ -395,15 +395,45 @@ public class ProtonGeEnvironmentService(
         if (wineConfig.GameModeEnabled)
             env["LD_PRELOAD"] = "/usr/lib/libgamemodeauto.so.0";
 
+        // IME (input method) support — detect fcitx5/ibus and set required env vars
+        var imeFramework = DetectImeFramework();
+        if (imeFramework != null)
+        {
+            env["XMODIFIERS"] = $"@im={imeFramework}";
+            env["GTK_IM_MODULE"] = imeFramework;
+            env["QT_IM_MODULE"] = imeFramework;
+            logger?.LogInformation("[PROTON-GE] IME detected: {Framework}, set XMODIFIERS/GTK_IM_MODULE/QT_IM_MODULE", imeFramework);
+        }
+
+        // Apply extra user-defined environment variables (these override defaults)
+        foreach (var (key, value) in wineConfig.ExtraEnvironmentVariables)
+        {
+            env[key] = value;
+            logger?.LogDebug("[PROTON-GE] Extra env: {Key}={Value}", key, value);
+        }
+
         logger?.LogDebug("[PROTON-GE] umu environment: GAMEID=0, PROTONPATH={ProtonRoot}, WINEPREFIX={Prefix}", ProtonRoot, WinePrefix);
         return env;
+    }
+
+    private static string? DetectImeFramework()
+    {
+        if (System.Diagnostics.Process.GetProcessesByName("fcitx5").Length > 0 ||
+            System.Diagnostics.Process.GetProcessesByName("fcitx5-bin").Length > 0 ||
+            System.Diagnostics.Process.GetProcessesByName("fcitx").Length > 0)
+            return "fcitx";
+
+        if (System.Diagnostics.Process.GetProcessesByName("ibus-daemon").Length > 0)
+            return "ibus";
+
+        return null;
     }
 
     /// <summary>
     /// Environment for direct wine64 mode (no umu).
     /// Must manually configure all library paths that Proton normally sets up.
     /// </summary>
-    private Dictionary<string, string> GetDirectWineEnvironment(WineXIVConfig wineConfig)
+    private Dictionary<string, string> GetDirectWineEnvironment(ProtonGeConfig wineConfig)
     {
         var protonFiles = Path.Combine(ProtonRoot, "files");
         var wineLibPath = Directory.Exists(Path.Combine(protonFiles, "lib64", "wine"))
@@ -446,13 +476,20 @@ public class ProtonGeEnvironmentService(
             ["WINEESYNC"] = wineConfig.EsyncEnabled ? "1" : "0",
             ["WINEFSYNC"] = wineConfig.FsyncEnabled ? "1" : "0",
             ["DXVK_HUD"] = wineConfig.DxvkHudEnabled ? "fps,frametime,memory" : "0",
-            ["DXVK_ASYNC"] = "0",
+            ["DXVK_ASYNC"] = "1",
             ["WINEDEBUG"] = string.IsNullOrEmpty(wineConfig.WineDebug) ? "-all" : wineConfig.WineDebug,
             ["XL_WINEONLINUX"] = "true",
         };
 
         if (wineConfig.GameModeEnabled)
             env["LD_PRELOAD"] = "/usr/lib/libgamemodeauto.so.0";
+
+        // Apply extra user-defined environment variables (these override defaults)
+        foreach (var (key, value) in wineConfig.ExtraEnvironmentVariables)
+        {
+            env[key] = value;
+            logger?.LogDebug("[PROTON-GE] Extra env: {Key}={Value}", key, value);
+        }
 
         logger?.LogDebug("[PROTON-GE] Direct wine64 environment: Esync={Esync}, Fsync={Fsync}, DXVK HUD={DxvkHud}, GameMode={GameMode}",
             wineConfig.EsyncEnabled, wineConfig.FsyncEnabled, wineConfig.DxvkHudEnabled, wineConfig.GameModeEnabled);

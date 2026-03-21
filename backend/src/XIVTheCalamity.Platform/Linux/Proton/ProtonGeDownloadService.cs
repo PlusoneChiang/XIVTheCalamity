@@ -3,7 +3,6 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using XIVTheCalamity.Core.Models.Progress;
 using XIVTheCalamity.Core.Services;
-using XIVTheCalamity.Platform.Linux.Wine;
 
 namespace XIVTheCalamity.Platform.Linux.Proton;
 
@@ -17,7 +16,8 @@ public class ProtonGeDownloadService(
     private readonly PlatformPathService _platformPaths = PlatformPathService.Instance;
     private readonly HttpClient _httpClient = new();
 
-    private const string LatestReleaseApiUrl = "https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/latest";
+    private const string PinnedVersion = "GE-Proton10-33";
+    private const string PinnedReleaseApiUrl = "https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/tags/GE-Proton10-33";
     private const string RequestUserAgent = "XIVTheCalamity/1.0";
 
     public string ProtonBaseDirectory => Path.Combine(_platformPaths.UserDataDirectory, "proton");
@@ -160,7 +160,7 @@ public class ProtonGeDownloadService(
 
     private async Task<ProtonReleaseAsset> GetLatestReleaseAsync(CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, LatestReleaseApiUrl);
+        using var request = new HttpRequestMessage(HttpMethod.Get, PinnedReleaseApiUrl);
         request.Headers.UserAgent.ParseAdd(RequestUserAgent);
         request.Headers.Accept.ParseAdd("application/vnd.github+json");
 
@@ -318,4 +318,11 @@ public class ProtonGeDownloadService(
     }
 
     private sealed record ProtonReleaseAsset(string TagName, string AssetName, string DownloadUrl);
+}
+
+public class DownloadStatus
+{
+    public bool IsInstalled { get; set; }
+    public string? Version { get; set; }
+    public string? InstalledPath { get; set; }
 }

@@ -45,7 +45,7 @@
 
 - 🎮 **遊戲啟動**
   - macOS: Wine Crossover + DXMT (DirectX → Metal)
-  - Linux: Wine-XIV + DXVK (DirectX → Vulkan)
+  - Linux: GE-Proton + DXVK (DirectX → Vulkan)
   - 自動環境配置與初始化
   - 支援 Dalamud 插件框架
 
@@ -72,7 +72,7 @@
   - 詳細的錯誤訊息與記錄
 
 - 🐧 **Linux 特性**
-  - Wine-XIV 自動下載與配置
+  - GE-Proton 自動下載與配置
   - DXVK/VKD3D 支援
   - GameMode 整合
   - Esync/Fsync 支援
@@ -116,7 +116,7 @@
 | 平台 | Wine 版本 | 圖形層 | 音訊路由 |
 |------|-----------|--------|----------|
 | **macOS** | Wine Crossover 24.x | DXMT (DX→Metal) | XTCAudioRouter |
-| **Linux** | Wine-XIV (runtime) | DXVK (DX→Vulkan) | PulseAudio/PipeWire |
+| **Linux** | GE-Proton (runtime) | DXVK (DX→Vulkan) | PulseAudio/PipeWire |
 | **Windows** | Native | Native DirectX | Native |
 
 ### 主要組件
@@ -127,7 +127,7 @@
 | **後端** | ASP.NET Core 9 | 遊戲邏輯、更新管理、平台控制 |
 | **通訊** | HTTP REST API | 前後端資料交換 |
 | **Wine (macOS)** | Wine Crossover (Fork) | macOS Wine 環境 |
-| **Wine (Linux)** | Wine-XIV | Linux Wine 環境（運行時下載）|
+| **Wine (Linux)** | GE-Proton | Linux Wine 環境（GE-Proton，運行時下載）|
 
 ### 專案架構
 
@@ -171,7 +171,7 @@ XIVTheCalamity/
 
 - **發行版**：Ubuntu 22.04+ / Fedora 38+ 或其他主流發行版
 - **架構**：x86_64 (AMD64)
-- **儲存空間**：約 100 GB（遊戲 + 登入器，Wine-XIV 自動下載）
+- **儲存空間**：約 100 GB（遊戲 + 登入器，GE-Proton 自動下載）
 - **依賴項**：
   - libfuse2 (AppImage 需要)
   - PulseAudio 或 PipeWire (音訊)
@@ -275,7 +275,7 @@ chmod +x XIVTheCalamity-1.1.0-linux-x86_64.AppImage
 # 執行
 ./XIVTheCalamity-1.1.0-linux-x86_64.AppImage
 
-# Wine-XIV 會在首次運行時自動下載（~120MB）
+# GE-Proton 會在首次運行時自動下載
 ```
 
 **Steam Deck / 遊戲模式啟動**：
@@ -296,7 +296,7 @@ chmod +x XIVTheCalamity-1.1.0-linux-x86_64.AppImage
 - 使用此參數會降低應用程式的安全隔離性
 
 **首次啟動**：
-- Wine-XIV 自動下載和配置（需要網路連接）
+- GE-Proton 自動下載和配置（需要網路連接）
 - 預計需要 3-5 分鐘
 - 下載進度會顯示在標題欄
 
@@ -360,7 +360,7 @@ vim frontend/src/renderer/version.json
 
 | 組件 | macOS | Linux |
 |------|-------|-------|
-| Wine | 本地編譯（wine/） | 運行時下載（Wine-XIV）|
+| Wine | 本地編譯（wine/） | 運行時下載（GE-Proton）|
 | 音訊路由 | XTCAudioRouter | PulseAudio/PipeWire |
 | 圖形 API | DXMT (DX→Metal) | DXVK (DX→Vulkan) |
 
@@ -379,7 +379,7 @@ vim frontend/src/renderer/version.json
 - **[XIV on Mac](https://github.com/marzent/XIV-on-Mac)** - Wine 配置、字型設定
 - **[XIVLauncher.Core](https://github.com/goatcorp/XIVLauncher.Core)** - Linux 平台參考實作
 - **[Wine Crossover (winecx)](https://github.com/marzent/winecx)** - macOS Wine 相容層（已 Fork 並修改）
-- **[Wine-XIV](https://github.com/rankynbass/wine-xiv-git)** - Linux Wine 環境
+
 - **GStreamer** - 多媒體框架
 - **Electron** - 跨平台桌面框架
 - **.NET** - 後端執行環境
@@ -420,7 +420,7 @@ vim frontend/src/renderer/version.json
 #### 已完成 ✅
 - [x] 基礎登入功能（多帳號、OTP 支援）
 - [x] macOS Wine 環境自動配置
-- [x] Linux Wine-XIV 運行時下載
+- [x] Linux GE-Proton 運行時下載
 - [x] 遊戲版本檢查與更新
 - [x] 多執行緒並行下載
 - [x] Dalamud 框架整合（跨平台）
@@ -448,7 +448,7 @@ vim frontend/src/renderer/version.json
 - **[XIVLauncher](https://github.com/goatcorp/FFXIVQuickLauncher)** - Windows 登入器先驅
 - **[XIVLauncher.Core](https://github.com/goatcorp/XIVLauncher.Core)** - Linux 跨平台實作
 - **[Wine Crossover](https://github.com/marzent/winecx)** - macOS Wine 基礎
-- **[Wine-XIV](https://github.com/rankynbass/wine-xiv-git)** - Linux Wine 優化版本
+
 - **Wine 社群** - 持續改善 Windows 相容性
 - **FFXIV 台服社群** - 測試與回饋
 
