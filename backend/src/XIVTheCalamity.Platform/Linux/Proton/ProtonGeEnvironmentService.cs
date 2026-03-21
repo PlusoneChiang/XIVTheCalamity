@@ -194,20 +194,63 @@ public class ProtonGeEnvironmentService(
         logger?.LogInformation("[PROTON-GE] Wine prefix initialized successfully");
     }
 
+    private string DxvkCachePath => Path.Combine(WinePrefix, "dxvk_cache");
+
     private void EnsureProtonSystemDllsInPrefix()
     {
         try
         {
             Directory.CreateDirectory(PrefixSystem32);
+            Directory.CreateDirectory(DxvkCachePath);
 
             InstallVkd3dDlls();
             InstallIcuDlls();
             SyncDxvkAsyncDlls();
+            EnsureDxvkConf();
         }
         catch (Exception ex)
         {
             logger?.LogWarning(ex, "[PROTON-GE] Failed to install required Proton system DLLs into prefix");
         }
+    }
+
+    private void EnsureDxvkConf()
+    {
+        var destPath = Path.Combine(WinePrefix, "dxvk.conf");
+        if (File.Exists(destPath))
+            return;
+
+        var sourcePath = FindResourceFile(Path.Combine("dxvk", "dxvk.conf"));
+        if (sourcePath != null)
+        {
+            File.Copy(sourcePath, destPath);
+            logger?.LogInformation("[PROTON-GE] Copied dxvk.conf from {Source} to {Dest}", sourcePath, destPath);
+        }
+        else
+        {
+            File.WriteAllText(destPath, string.Empty);
+            logger?.LogWarning("[PROTON-GE] dxvk.conf not found in resources, created empty file at {Path}", destPath);
+        }
+    }
+
+    private string? FindResourceFile(string relativePath)
+    {
+        var appDir = AppContext.BaseDirectory;
+
+        // Production (AppImage): resources/ is sibling of backend/
+        var bundlePath = Path.GetFullPath(Path.Combine(appDir, "..", "resources", relativePath));
+        if (File.Exists(bundlePath)) return bundlePath;
+
+        // Development: search upward for shared/resources
+        var dir = new DirectoryInfo(appDir);
+        while (dir != null)
+        {
+            var devPath = Path.Combine(dir.FullName, "shared", "resources", relativePath);
+            if (File.Exists(devPath)) return devPath;
+            dir = dir.Parent;
+        }
+
+        return null;
     }
 
     private void InstallVkd3dDlls()
@@ -393,6 +436,8 @@ public class ProtonGeEnvironmentService(
             ["WINEFSYNC"] = wineConfig.FsyncEnabled ? "1" : "0",
             ["DXVK_HUD"] = wineConfig.DxvkHudEnabled ? "fps,frametime,memory" : "0",
             ["DXVK_ASYNC"] = wineConfig.DxvkAsyncEnabled ? "1" : "0",
+            ["DXVK_SHADER_CACHE_PATH"] = DxvkCachePath,
+            ["DXVK_CONFIG_FILE"] = Path.Combine(WinePrefix, "dxvk.conf"),
             ["WINEDEBUG"] = string.IsNullOrEmpty(wineConfig.WineDebug) ? "-all" : wineConfig.WineDebug,
             ["XL_WINEONLINUX"] = "true",
         };
