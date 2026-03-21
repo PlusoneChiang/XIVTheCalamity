@@ -20,9 +20,12 @@ public class DalamudUpdater
     private readonly ILogger<DalamudUpdater> _logger;
     private readonly DalamudPathService _pathService;
     private readonly HttpClient _httpClient;
-    
-    private const string VersionUrl = "https://plusonechiang.github.io/Dalamud/version.json";
-    private const string AssetUrl = "https://plusonechiang.github.io/DalamudAssets/asset.json";
+    // private const string VersionUrl = "https://plusonechiang.github.io/XIV-on-Mac-in-TC/dalamud_version.json";
+    // private const string AssetUrl = "https://plusonechiang.github.io/XIV-on-Mac-in-TC/dalamud_asset.json";
+
+    private const string VersionUrl = "https://plusonechiang.github.io/XIV-on-Mac-in-TC/dalamud_version.json";
+    private const string AssetUrl = "https://plusonechiang.github.io/XIV-on-Mac-in-TC/dalamud_asset.json";
+
     private const string DotnetRuntimeUrl = "https://dotnetcli.azureedge.net/dotnet/Runtime/{0}/dotnet-runtime-{0}-win-x64.zip";
     private const string DesktopRuntimeUrl = "https://dotnetcli.azureedge.net/dotnet/WindowsDesktop/{0}/windowsdesktop-runtime-{0}-win-x64.zip";
     
@@ -232,7 +235,8 @@ public class DalamudUpdater
         };
         yield return progress;
         
-        var tempFile = Path.Combine(Path.GetTempPath(), $"dalamud_{versionInfo.AssemblyVersion}.zip");
+        var ext = GetArchiveExtension(versionInfo.DownloadUrl);
+        var tempFile = Path.Combine(Path.GetTempPath(), $"dalamud_{versionInfo.AssemblyVersion}{ext}");
         var targetDir = _pathService.GetHooksVersionPath(versionInfo.AssemblyVersion);
         
         try
@@ -249,7 +253,7 @@ public class DalamudUpdater
             // 解壓
             progress = ReportProgress(progress, DalamudUpdateStage.ExtractingDalamud, "解壓 Dalamud...");
             yield return progress;
-            await ExtractZipAsync(tempFile, targetDir, ct);
+            await ExtractArchiveAsync(tempFile, targetDir, ct);
             
             // 保存版本資訊
             var versionJson = JsonSerializer.Serialize(versionInfo, DalamudJsonContext.Default.DalamudVersionInfo);
@@ -591,7 +595,8 @@ public class DalamudUpdater
     private async IAsyncEnumerable<DalamudUpdateProgress> DownloadAssetPackageAsync(
         DalamudAssetManifest manifest, string assetDir, [EnumeratorCancellation] CancellationToken ct)
     {
-        var tempFile = Path.Combine(Path.GetTempPath(), $"dalamud_assets_{manifest.Version}.zip");
+        var ext = GetArchiveExtension(manifest.Package!);
+        var tempFile = Path.Combine(Path.GetTempPath(), $"dalamud_assets_{manifest.Version}{ext}");
         
         try
         {
@@ -615,7 +620,7 @@ public class DalamudUpdater
                 Directory.Delete(assetDir, true);
             Directory.CreateDirectory(assetDir);
             
-            await ExtractZipAsync(tempFile, assetDir, ct);
+            await ExtractArchiveAsync(tempFile, assetDir, ct);
             _logger.LogInformation("Assets 整包解壓完成");
         }
         finally
@@ -750,6 +755,32 @@ public class DalamudUpdater
         }, ct);
     }
     
+    /// <summary>
+    /// 根據副檔名自動選擇解壓方式 (.7z → SevenZip，其他 → ZIP)
+    /// </summary>
+    private Task ExtractArchiveAsync(string archivePath, string targetDir, CancellationToken ct)
+    {
+        var ext = Path.GetExtension(archivePath).ToLowerInvariant();
+        if (ext == ".7z")
+        {
+            _logger.LogInformation("使用 7z 解壓: {Archive}", archivePath);
+            return ExtractSevenZipAsync(archivePath, targetDir, ct);
+        }
+
+        _logger.LogInformation("使用 ZIP 解壓: {Archive}", archivePath);
+        return ExtractZipAsync(archivePath, targetDir, ct);
+    }
+
+    /// <summary>
+    /// 從 URL 取得封存副檔名，預設 .zip
+    /// </summary>
+    private static string GetArchiveExtension(string url)
+    {
+        var path = new Uri(url).AbsolutePath;
+        var ext = Path.GetExtension(path).ToLowerInvariant();
+        return ext is ".7z" or ".zip" ? ext : ".zip";
+    }
+
     /// <summary>
     /// 解壓 ZIP 檔案 (優先使用快速方式，失敗則用傳統方式)
     /// </summary>

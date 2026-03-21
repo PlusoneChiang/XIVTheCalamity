@@ -10,6 +10,7 @@ namespace XIVTheCalamity.Dalamud.Json;
 [JsonSourceGenerationOptions(
     WriteIndented = true,
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    PropertyNameCaseInsensitive = true,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(DalamudVersionInfo))]
 [JsonSerializable(typeof(DalamudAssetManifest))]

@@ -1,5 +1,15 @@
 # Release Notes
 
+## v1.7.1
+
+#### 🇹🇼 zh-TW
+### 🐛 修復
+- 改回Dalamud CN版API 12分支，暫緩國際服版本相容性問題。
+
+#### 🇺🇸 English
+### 🐛 Bug Fixes
+- Reverted to Dalamud CN API branch 12 to temporarily defer global server compatibility issues.
+
 ## v1.7.0
 
 #### 🇹🇼 zh-TW
