@@ -184,6 +184,13 @@ public static class GameEndpoints
                     {
                         gameLaunchService.SetMonitorProcess(entryResult.InjectorProcess);
                         logger.LogInformation("[GAME] EntryPoint launch successful, tracking via injector PID: {Pid}", entryResult.InjectorProcess.Id);
+
+                        if (config.Wine?.AudioRouting == true)
+                        {
+                            environmentService.StartAudioRouter(entryResult.InjectorProcess.Id,
+                                config.Wine?.EsyncEnabled ?? false,
+                                config.Wine?.Msync ?? false);
+                        }
                     }
                     else
                     {

@@ -292,6 +292,26 @@ public class DalamudInjectorService
             });
 
             _logger.LogInformation("[DALAMUD-INJECT] EntryPoint launch started; injector PID {Pid} tracks game lifetime", process.Id);
+
+            // On macOS, wine64 is a thin wrapper that exits after spawning the game inside Wine.
+            // We must wait for the injector to finish, then find the actual game OS process.
+            if (OperatingSystem.IsMacOS())
+            {
+                _logger.LogInformation("[DALAMUD-INJECT] macOS: waiting for injector to finish bootstrapping...");
+                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                timeoutCts.CancelAfter(TimeSpan.FromSeconds(30));
+                try { await process.WaitForExitAsync(timeoutCts.Token); } catch (OperationCanceledException) { }
+
+                var gameProcess = await FindGameProcessOnMacOSAsync(cancellationToken);
+                if (gameProcess != null)
+                {
+                    _logger.LogInformation("[DALAMUD-INJECT] Found game process PID {Pid} after injector exit", gameProcess.Id);
+                    return new DalamudInjectionResult { Success = true, InjectorProcess = gameProcess };
+                }
+                _logger.LogWarning("[DALAMUD-INJECT] Could not find game process after injector exit; tracking unavailable");
+                return new DalamudInjectionResult { Success = true };
+            }
+
             return new DalamudInjectionResult { Success = true, InjectorProcess = process };
         }
         catch (OperationCanceledException)
@@ -484,6 +504,59 @@ public class DalamudInjectorService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "[DALAMUD-INJECT] winedbg procmap failed: {Message}", ex.Message);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// macOS: use pgrep to find the wine process running ffxiv_dx11.exe, retrying until found.
+    /// </summary>
+    private async Task<Process?> FindGameProcessOnMacOSAsync(CancellationToken ct)
+    {
+        for (int i = 0; i < ProcessDetectionMaxRetries; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = "/usr/bin/pgrep",
+                Arguments = "-f ffxiv_dx11",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                CreateNoWindow = true
+            };
+
+            using var proc = Process.Start(psi);
+            if (proc != null)
+            {
+                var output = await proc.StandardOutput.ReadToEndAsync(ct);
+                await proc.WaitForExitAsync(ct);
+
+                var pid = output.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(l => int.TryParse(l.Trim(), out var p) ? (int?)p : null)
+                    .Where(p => p.HasValue)
+                    .Select(p => p!.Value)
+                    .OrderByDescending(p => p)
+                    .FirstOrDefault();
+
+                if (pid > 0)
+                {
+                    try
+                    {
+                        var gameProcess = Process.GetProcessById(pid);
+                        _logger.LogInformation("[DALAMUD-INJECT] Found ffxiv_dx11.exe via pgrep, macOS PID: {Pid}", pid);
+                        return gameProcess;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "[DALAMUD-INJECT] pgrep returned PID {Pid} but failed to attach", pid);
+                    }
+                }
+            }
+
+            _logger.LogDebug("[DALAMUD-INJECT] ffxiv_dx11.exe not found via pgrep, retry {Attempt}/{Max}...", i + 1, ProcessDetectionMaxRetries);
+            await Task.Delay(ProcessDetectionRetryDelayMs, ct);
         }
 
         return null;
@@ -1186,7 +1259,7 @@ public class DalamudInjectorService
     {
         var sb = new StringBuilder();
 
-        sb.Append($"launch -g \"{gameExePath}\" -m entrypoint --no-wait");
+        sb.Append($"launch -g \"{gameExePath}\" -m entrypoint");
 
         sb.Append($" --dalamud-working-directory=\"{_pathService.HooksDevPath}\"");
         sb.Append($" --dalamud-configuration-path=\"{_pathService.DalamudConfigPath}\"");
