@@ -178,27 +178,51 @@ public static class GameEndpoints
                             "GAME_LAUNCH_FAILED", entryResult.ErrorMessage ?? "EntryPoint launch failed"));
                     }
 
-                    // Without --no-wait, the injector process stays alive until the game exits.
-                    // Use it as a direct game-lifetime proxy.
-                    if (entryResult.InjectorProcess != null)
-                    {
-                        gameLaunchService.SetMonitorProcess(entryResult.InjectorProcess);
-                        logger.LogInformation("[GAME] EntryPoint launch successful, tracking via injector PID: {Pid}", entryResult.InjectorProcess.Id);
+                    int reportedPid;
 
-                        if (config.Wine?.AudioRouting == true)
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        // On Windows, the injector exits immediately after launching the game.
+                        // Use the real game PID detected by WaitForGameProcessWindowsAsync.
+                        if (entryResult.GamePid.HasValue)
                         {
-                            environmentService.StartAudioRouter(entryResult.InjectorProcess.Id,
-                                config.Wine?.EsyncEnabled ?? false,
-                                config.Wine?.Msync ?? false);
+                            gameLaunchService.RegisterExternalGameProcess(entryResult.GamePid.Value);
+                            logger.LogInformation("[GAME] EntryPoint launch successful, tracking game PID: {Pid}", entryResult.GamePid.Value);
+                            reportedPid = entryResult.GamePid.Value;
+                        }
+                        else
+                        {
+                            logger.LogWarning("[GAME] EntryPoint launch succeeded but game PID not detected");
+                            reportedPid = 0;
                         }
                     }
                     else
                     {
-                        logger.LogWarning("[GAME] EntryPoint launch succeeded but no process handle available for exit tracking");
+                        // On Linux/Mac, the injector (umu-run/Wine wrapper) stays alive until the game exits.
+                        // Use it as a direct game-lifetime proxy.
+                        if (entryResult.InjectorProcess != null)
+                        {
+                            gameLaunchService.SetMonitorProcess(entryResult.InjectorProcess);
+                            logger.LogInformation("[GAME] EntryPoint launch successful, tracking via injector PID: {Pid}", entryResult.InjectorProcess.Id);
+
+                            if (config.Wine?.AudioRouting == true)
+                            {
+                                environmentService.StartAudioRouter(entryResult.InjectorProcess.Id,
+                                    config.Wine?.EsyncEnabled ?? false,
+                                    config.Wine?.Msync ?? false);
+                            }
+
+                            reportedPid = entryResult.InjectorProcess.Id;
+                        }
+                        else
+                        {
+                            logger.LogWarning("[GAME] EntryPoint launch succeeded but no process handle available for exit tracking");
+                            reportedPid = 0;
+                        }
                     }
 
                     return Results.Ok(ApiResponse<GameLaunchResponse>.Ok(
-                        new GameLaunchResponse(entryResult.InjectorProcess?.Id ?? 0)));
+                        new GameLaunchResponse(reportedPid)));
                 }
 
                 var result = await gameLaunchService.LaunchGameAsync(
