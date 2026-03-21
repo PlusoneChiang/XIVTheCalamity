@@ -251,6 +251,13 @@
               <p class="help-text" data-i18n="settings.protonge.dxvk_hud_help">顯示 DXVK 效能監控</p>
             </div>
             <div>
+              <label>
+                <input type="checkbox" id="protongeDxvkAsyncEnabled">
+                <span data-i18n="settings.protonge.dxvk_async">DXVK Async (GPLAsync)</span>
+              </label>
+              <p class="help-text" data-i18n="settings.protonge.dxvk_async_help">下載並安裝 DXVK GPLAsync，啟用非同步著色器編譯</p>
+            </div>
+            <div>
               <label for="protongeMaxFramerate" data-i18n="settings.protonge.max_framerate">最高幀率</label>
               <input type="number" id="protongeMaxFramerate" min="30" max="240" step="10" value="60">
               <p class="help-text" data-i18n="settings.protonge.max_framerate_help">限制最高 FPS (30-240)</p>

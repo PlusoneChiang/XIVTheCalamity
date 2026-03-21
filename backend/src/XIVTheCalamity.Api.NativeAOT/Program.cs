@@ -70,6 +70,7 @@ try
             XIVTheCalamity.Platform.Linux.Proton.ProtonGeEnvironmentService>();
         builder.Services.AddSingleton<XIVTheCalamity.Platform.Linux.Proton.ProtonGeDownloadService>();
         builder.Services.AddSingleton<XIVTheCalamity.Platform.Linux.Umu.UmuDownloadService>();
+        builder.Services.AddSingleton<XIVTheCalamity.Platform.Linux.Wine.DxvkDownloadService>();
         // Add Wine services for Linux (using macOS implementation as it's cross-platform)
         builder.Services.AddSingleton<WinePrefixService>();
         builder.Services.AddSingleton<WineConfigService>();

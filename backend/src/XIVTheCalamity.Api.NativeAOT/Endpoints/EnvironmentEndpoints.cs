@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using XIVTheCalamity.Api.NativeAOT.DTOs;
 using XIVTheCalamity.Api.NativeAOT.Helpers;
 using XIVTheCalamity.Core.Models.Progress;

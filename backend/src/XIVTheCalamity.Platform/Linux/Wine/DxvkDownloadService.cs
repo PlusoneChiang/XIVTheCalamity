@@ -22,7 +22,7 @@ public class DxvkDownloadService(
 
     private string DxvkBaseDirectory => Path.Combine(_platformPaths.UserDataDirectory, "dxvk");
     private string DxvkVersionDirectory => Path.Combine(DxvkBaseDirectory, DxvkReleaseName);
-    private string DxvkDllDirectory => Path.Combine(DxvkVersionDirectory, "x64");
+    public string DxvkDllDirectory => Path.Combine(DxvkVersionDirectory, "x64");
 
     /// <summary>
     /// Check if DXVK is already downloaded
@@ -126,6 +126,18 @@ public class DxvkDownloadService(
                 logger?.LogWarning(ex, "[DXVK] Failed to clean up temp directory");
             }
         }
+    }
+
+    /// <summary>
+    /// Download DXVK if not already present (synchronous wrapper).
+    /// </summary>
+    public void EnsureDxvk()
+    {
+        if (IsInstalled()) return;
+        Task.Run(async () =>
+        {
+            await foreach (var _ in EnsureDxvkAsync()) { }
+        }).GetAwaiter().GetResult();
     }
 
     /// <summary>

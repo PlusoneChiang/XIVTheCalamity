@@ -6,6 +6,7 @@ using XIVTheCalamity.Core.Models.Progress;
 using XIVTheCalamity.Core.Services;
 using XIVTheCalamity.Platform;
 using XIVTheCalamity.Platform.Linux.Umu;
+using XIVTheCalamity.Platform.Linux.Wine;
 
 namespace XIVTheCalamity.Platform.Linux.Proton;
 
@@ -17,6 +18,7 @@ namespace XIVTheCalamity.Platform.Linux.Proton;
 public class ProtonGeEnvironmentService(
     ProtonGeDownloadService downloadService,
     UmuDownloadService umuDownloadService,
+    DxvkDownloadService dxvkDownloadService,
     ConfigService configService,
     ILogger<ProtonGeEnvironmentService>? logger = null
 ) : IEnvironmentService
@@ -200,6 +202,7 @@ public class ProtonGeEnvironmentService(
 
             InstallVkd3dDlls();
             InstallIcuDlls();
+            SyncDxvkAsyncDlls();
         }
         catch (Exception ex)
         {
@@ -383,11 +386,13 @@ public class ProtonGeEnvironmentService(
             ["GAMEID"] = "0",
             ["PROTONPATH"] = ProtonRoot,
             ["STORE"] = "none",
-            ["WINEDLLOVERRIDES"] = "mshtml=",
+            ["WINEDLLOVERRIDES"] = wineConfig.DxvkAsyncEnabled
+                ? "mshtml=;d3d11,dxgi,d3d10core,d3d9=n,b"
+                : "mshtml=",
             ["WINEESYNC"] = wineConfig.EsyncEnabled ? "1" : "0",
             ["WINEFSYNC"] = wineConfig.FsyncEnabled ? "1" : "0",
             ["DXVK_HUD"] = wineConfig.DxvkHudEnabled ? "fps,frametime,memory" : "0",
-            ["DXVK_ASYNC"] = "0",
+            ["DXVK_ASYNC"] = wineConfig.DxvkAsyncEnabled ? "1" : "0",
             ["WINEDEBUG"] = string.IsNullOrEmpty(wineConfig.WineDebug) ? "-all" : wineConfig.WineDebug,
             ["XL_WINEONLINUX"] = "true",
         };
@@ -414,6 +419,57 @@ public class ProtonGeEnvironmentService(
 
         logger?.LogDebug("[PROTON-GE] umu environment: GAMEID=0, PROTONPATH={ProtonRoot}, WINEPREFIX={Prefix}", ProtonRoot, WinePrefix);
         return env;
+    }
+
+    private void SyncDxvkAsyncDlls()
+    {
+        var config = configService.LoadConfigAsync().GetAwaiter().GetResult();
+        var wineConfig = config.ProtonGe ?? new ProtonGeConfig();
+
+        if (wineConfig.DxvkAsyncEnabled)
+        {
+            logger?.LogInformation("[DXVK-ASYNC] DxvkAsync enabled — ensuring GPLAsync is installed");
+            dxvkDownloadService.EnsureDxvk();
+
+            foreach (var srcPath in Directory.GetFiles(dxvkDownloadService.DxvkDllDirectory, "*.dll"))
+            {
+                var dllName  = Path.GetFileName(srcPath);
+                var destPath = Path.Combine(PrefixSystem32, dllName);
+                var bakPath  = destPath + ".bak";
+
+                if (File.Exists(destPath) && !File.Exists(bakPath))
+                {
+                    File.Move(destPath, bakPath);
+                    logger?.LogInformation("[DXVK-ASYNC] Backed up {Dll} → .bak", dllName);
+                }
+
+                File.Copy(srcPath, destPath, overwrite: true);
+                logger?.LogInformation("[DXVK-ASYNC] Installed GPLAsync {Dll}", dllName);
+            }
+        }
+        else
+        {
+            if (!Directory.Exists(dxvkDownloadService.DxvkDllDirectory)) return;
+
+            foreach (var srcPath in Directory.GetFiles(dxvkDownloadService.DxvkDllDirectory, "*.dll"))
+            {
+                var dllName  = Path.GetFileName(srcPath);
+                var dllPath  = Path.Combine(PrefixSystem32, dllName);
+                var bakPath  = dllPath + ".bak";
+
+                if (File.Exists(dllPath))
+                {
+                    File.Delete(dllPath);
+                    logger?.LogInformation("[DXVK-ASYNC] Removed GPLAsync {Dll}", dllName);
+                }
+
+                if (File.Exists(bakPath))
+                {
+                    File.Move(bakPath, dllPath);
+                    logger?.LogInformation("[DXVK-ASYNC] Restored {Dll} from .bak", dllName);
+                }
+            }
+        }
     }
 
     private static string? DetectImeFramework()
