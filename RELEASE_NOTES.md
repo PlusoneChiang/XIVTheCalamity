@@ -1,5 +1,29 @@
 # Release Notes
 
+## v1.7.0
+
+#### 🇹🇼 zh-TW
+### 🐛 修復
+- Linux桌面環境輸入法無法使用問題
+- Linux啟用輸入法時，頻繁出現吃鍵問題
+- Steam虛擬鍵盤按鍵操作穿透問題
+
+### 🔧 調整
+- Dalamud改為自編譯版本
+- Dalamud注入模式改為預設EntryPoint
+- Linux執行環境換為Proton-GE
+
+#### 🇺🇸 English
+### 🐛 Bug Fixes
+- Fixed IME input not working in Linux desktop environments
+- Fixed frequent key input being swallowed when IME is enabled on Linux
+- Fixed Steam virtual keyboard key presses passing through to the game
+
+### 🔧 Changes
+- Dalamud switched to a custom-built version
+- Dalamud injection mode changed to EntryPoint by default
+- Linux runtime switched to Proton-GE
+
 ## v1.6.14
 
 #### 🇹🇼 zh-TW
