@@ -190,6 +190,10 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
+      # Pre-install NSIS to avoid electron-builder auto-download failures
+      - name: Install NSIS
+        run: choco install nsis --no-progress -y
+
       # Build backend (NativeAOT)
       - name: Build backend
         run: |
