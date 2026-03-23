@@ -278,7 +278,8 @@ function collectFormData() {
       esyncEnabled: document.getElementById('protongeEsyncEnabled')?.checked !== false,
       fsyncEnabled: document.getElementById('protongeFsyncEnabled')?.checked !== false,
       wineDebug: document.getElementById('protongeWineDebug')?.value || '',
-      extraEnvironmentVariables: parseExtraEnvVars(document.getElementById('protongeExtraEnvVars')?.value || '')
+      extraEnvironmentVariables: parseExtraEnvVars(document.getElementById('protongeExtraEnvVars')?.value || ''),
+      launchOptions: document.getElementById('protongeLaunchOptions')?.value || '%command%'
     },
     dalamud: {
       enabled: document.getElementById('dalamudEnabled').checked,
@@ -690,6 +691,7 @@ function initProtonGeTab() {
   document.getElementById('protongeFsyncEnabled').checked = config.fsyncEnabled !== false; // default true
   document.getElementById('protongeWineDebug').value = config.wineDebug || '';
   document.getElementById('protongeExtraEnvVars').value = formatExtraEnvVars(config.extraEnvironmentVariables || {});
+  document.getElementById('protongeLaunchOptions').value = config.launchOptions || '%command%';
 }
 
 

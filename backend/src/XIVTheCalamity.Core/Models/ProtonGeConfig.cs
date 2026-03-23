@@ -48,4 +48,11 @@ public class ProtonGeConfig
     /// Key-value pairs that override or extend the default environment.
     /// </summary>
     public Dictionary<string, string> ExtraEnvironmentVariables { get; set; } = new();
+
+    /// <summary>
+    /// Launch options string, supports %command% placeholder (like Steam launch options).
+    /// Example: "~/fgmod/fgmod %command%"
+    /// Default is "%command%" which means no wrapper.
+    /// </summary>
+    public string LaunchOptions { get; set; } = "%command%";
 }

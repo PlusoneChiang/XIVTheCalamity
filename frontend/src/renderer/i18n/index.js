@@ -209,6 +209,8 @@ const translations = {
     'settings.protonge.wine_debug_help': 'Wine 除錯旗標（進階使用者，例如：-all,+module）',
     'settings.protonge.extra_env_vars': '額外環境變數',
     'settings.protonge.extra_env_vars_help': '每行一個 KEY=VALUE，將覆蓋預設 Wine 環境變數',
+    'settings.protonge.launch_options': '啟動選項(實驗性功能)',
+    'settings.protonge.launch_options_help': '使用 %command% 代表遊戲指令，例如：~/fgmod/fgmod %command%',
     
     // Dalamud settings
     'settings.dalamud.basic': '基本設定',
@@ -631,6 +633,8 @@ const translations = {
     'settings.protonge.wine_debug_help': 'Wine debug flags (advanced users, e.g., -all,+module)',
     'settings.protonge.extra_env_vars': 'Extra Environment Variables',
     'settings.protonge.extra_env_vars_help': 'One KEY=VALUE per line, overrides default Wine environment variables',
+    'settings.protonge.launch_options': 'Launch Options (Experimental)',
+    'settings.protonge.launch_options_help': 'Use %command% as a placeholder for the game command, e.g.: ~/fgmod/fgmod %command%',
     
     // Dalamud settings
     'settings.dalamud.basic': 'Basic Settings',

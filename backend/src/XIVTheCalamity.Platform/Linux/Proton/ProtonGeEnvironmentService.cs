@@ -371,19 +371,61 @@ public class ProtonGeEnvironmentService(
     /// </summary>
     public WineLauncher GetLauncherCommand()
     {
+        WineLauncher baseLauncher;
         if (umuDownloadService.IsAvailable())
         {
             var python3Path = ResolvePython3Path();
             if (!string.IsNullOrEmpty(python3Path))
             {
                 logger?.LogDebug("[PROTON-GE] Using umu launcher: {Python3} {UmuRun}", python3Path, umuDownloadService.UmuRunPath);
-                return new WineLauncher(python3Path, [umuDownloadService.UmuRunPath]);
+                baseLauncher = new WineLauncher(python3Path, [umuDownloadService.UmuRunPath]);
             }
-            logger?.LogWarning("[PROTON-GE] python3 not found, falling back to wine64");
+            else
+            {
+                logger?.LogWarning("[PROTON-GE] python3 not found, falling back to wine64");
+                baseLauncher = new WineLauncher(ProtonWine, []);
+            }
+        }
+        else
+        {
+            logger?.LogDebug("[PROTON-GE] umu not available, falling back to wine64: {Wine}", ProtonWine);
+            baseLauncher = new WineLauncher(ProtonWine, []);
         }
 
-        logger?.LogDebug("[PROTON-GE] umu not available, falling back to wine64: {Wine}", ProtonWine);
-        return new WineLauncher(ProtonWine, []);
+        var config = configService.LoadConfigAsync().GetAwaiter().GetResult();
+        var launchOptions = config.ProtonGe?.LaunchOptions ?? "%command%";
+        return ApplyLaunchOptions(baseLauncher, launchOptions);
+    }
+
+    private WineLauncher ApplyLaunchOptions(WineLauncher baseLauncher, string launchOptions)
+    {
+        var trimmed = launchOptions.Trim();
+        if (string.IsNullOrEmpty(trimmed) || trimmed == "%command%")
+            return baseLauncher;
+
+        var cmdIndex = trimmed.IndexOf("%command%", StringComparison.OrdinalIgnoreCase);
+        if (cmdIndex < 0)
+        {
+            logger?.LogWarning("[PROTON-GE] LaunchOptions missing %%command%% placeholder, ignoring: {Options}", trimmed);
+            return baseLauncher;
+        }
+
+        var prefix = trimmed[..cmdIndex].Trim();
+        if (string.IsNullOrEmpty(prefix))
+            return baseLauncher;
+
+        var tokens = prefix.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var wrapperExe = tokens[0].Replace("~", home);
+
+        // new PrefixArgs = wrapper extra tokens + original exe + original prefix args
+        var newPrefixArgs = tokens[1..]
+            .Concat([baseLauncher.Executable])
+            .Concat(baseLauncher.PrefixArgs)
+            .ToList();
+
+        logger?.LogInformation("[PROTON-GE] Launch wrapper applied: {Exe} [{Prefix}]", wrapperExe, string.Join(", ", newPrefixArgs));
+        return new WineLauncher(wrapperExe, newPrefixArgs);
     }
 
     private static string ResolvePython3Path()
