@@ -1,7 +1,23 @@
 # Release Notes
 
-## v1.7.1
+## v1.7.2
+#### 🇹🇼 zh-TW
+### 🐛 修復
+- 修復Dalamud國際服分支相容性問題，目前最新版本為12.0.1.5 TC build 13(12.0.1.5-tc.13)
+- 修復本地化相容性問題
 
+### ✨ 新功能
+- Linux Proton-GE 新增啟動選項實驗性功能。
+
+#### 🇺🇸 English
+### 🐛 Bug Fixes
+- Fixed Dalamud global server branch compatibility; latest version is now 12.0.1.5 TC build 13 (12.0.1.5-tc.13)
+- Fixed localization compatibility issues
+
+### ✨ New Features
+- Added experimental Launch Options support for Linux Proton-GE
+
+## v1.7.1
 #### 🇹🇼 zh-TW
 ### 🐛 修復
 - 改回Dalamud CN版API 12分支，暫緩國際服版本相容性問題。
