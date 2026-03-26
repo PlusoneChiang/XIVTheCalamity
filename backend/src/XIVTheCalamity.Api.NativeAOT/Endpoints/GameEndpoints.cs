@@ -46,6 +46,7 @@ public static class GameEndpoints
                     config.Game.GamePath,
                     RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? config.ProtonGe : config.Wine,
                     dalamudRuntimePath,
+                    config.Dalamud.Enabled ? config.Dalamud.PluginRepoUrl : null,
                     cancellationToken);
                 
                 if (result.Success && result.Process != null)
@@ -231,6 +232,7 @@ public static class GameEndpoints
                     request.SessionId,
                     RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? config.ProtonGe : config.Wine,
                     dalamudRuntimePath,
+                    config.Dalamud.Enabled ? config.Dalamud.PluginRepoUrl : null,
                     cancellationToken);
                 
                 if (result.Success)

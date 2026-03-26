@@ -34,4 +34,10 @@ public class DalamudConfig
     /// Use EntryPoint injection mode (Dalamud.Injector starts the game directly)
     /// </summary>
     public bool UseEntryPoint { get; set; } = true;
+
+    /// <summary>
+    /// Use latest pre-release version from GitHub releases instead of the stable version channel.
+    /// Falls back to the latest stable release if no pre-release is available.
+    /// </summary>
+    public bool UseLatestPreRelease { get; set; } = false;
 }

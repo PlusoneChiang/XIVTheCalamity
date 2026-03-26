@@ -7,6 +7,7 @@ using SharpCompress.Archives;
 using SharpCompress.Archives.SevenZip;
 using SharpCompress.Common;
 using SharpCompress.Readers;
+using XIVTheCalamity.Core.Services;
 using XIVTheCalamity.Dalamud.Json;
 using XIVTheCalamity.Dalamud.Models;
 
@@ -19,22 +20,25 @@ public class DalamudUpdater
 {
     private readonly ILogger<DalamudUpdater> _logger;
     private readonly DalamudPathService _pathService;
+    private readonly ConfigService _configService;
     private readonly HttpClient _httpClient;
     // private const string VersionUrl = "https://plusonechiang.github.io/XIV-on-Mac-in-TC/dalamud_version.json";
     // private const string AssetUrl = "https://plusonechiang.github.io/XIV-on-Mac-in-TC/dalamud_asset.json";
 
     private const string VersionUrl = "https://plusonechiang.github.io/Dalamud/version.json";
     private const string AssetUrl = "https://plusonechiang.github.io/DalamudAssets/asset.json";
+    private const string GitHubReleasesUrl = "https://api.github.com/repos/PlusoneChiang/Dalamud/releases?per_page=20";
 
     private const string DotnetRuntimeUrl = "https://dotnetcli.azureedge.net/dotnet/Runtime/{0}/dotnet-runtime-{0}-win-x64.zip";
     private const string DesktopRuntimeUrl = "https://dotnetcli.azureedge.net/dotnet/WindowsDesktop/{0}/windowsdesktop-runtime-{0}-win-x64.zip";
     
     private CancellationTokenSource? _cts;
     
-    public DalamudUpdater(ILogger<DalamudUpdater> logger, DalamudPathService pathService)
+    public DalamudUpdater(ILogger<DalamudUpdater> logger, DalamudPathService pathService, ConfigService configService)
     {
         _logger = logger;
         _pathService = pathService;
+        _configService = configService;
         
         // Configure HttpClient for optimal performance
         var handler = new SocketsHttpHandler
@@ -68,7 +72,11 @@ public class DalamudUpdater
         try
         {
             status.State = DalamudState.Checking;
-            var remoteVersion = await GetRemoteVersionAsync();
+
+            var config = await _configService.LoadConfigAsync();
+            var remoteVersion = config.Dalamud.UseLatestPreRelease
+                ? await GetLatestPreReleaseVersionInfoAsync()
+                : await GetRemoteVersionAsync();
             
             if (remoteVersion == null)
             {
@@ -120,6 +128,55 @@ public class DalamudUpdater
             return null;
         }
     }
+
+    /// <summary>
+    /// Get version info from GitHub Releases.
+    /// Prefers the latest release marked as pre-release; falls back to the latest stable release.
+    /// </summary>
+    public async Task<DalamudVersionInfo?> GetLatestPreReleaseVersionInfoAsync()
+    {
+        try
+        {
+            var releases = await _httpClient.GetFromJsonAsync(GitHubReleasesUrl, DalamudJsonContext.Default.ListGitHubRelease);
+            if (releases == null || releases.Count == 0)
+            {
+                _logger.LogWarning("GitHub Releases API returned no releases");
+                return null;
+            }
+
+            // Prefer pre-release; fall back to latest stable
+            var target = releases.FirstOrDefault(r => r.Prerelease) ?? releases[0];
+
+            _logger.LogInformation("GitHub release selected: {Tag} (prerelease={IsPreRelease})",
+                target.TagName, target.Prerelease);
+
+            var zipAsset = target.Assets.FirstOrDefault(a =>
+                a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) ||
+                a.Name.EndsWith(".7z", StringComparison.OrdinalIgnoreCase));
+
+            if (zipAsset == null)
+            {
+                _logger.LogWarning("GitHub release {Tag} has no zip/7z asset", target.TagName);
+                return null;
+            }
+
+            return new DalamudVersionInfo
+            {
+                AssemblyVersion = target.TagName,
+                DownloadUrl = zipAsset.BrowserDownloadUrl,
+                SupportedGameVer = string.Empty,
+                RuntimeRequired = false,
+                RuntimeVersion = string.Empty,
+                Track = target.Prerelease ? "pre-release" : "stable",
+                DisplayName = target.Name
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve GitHub release version information");
+            return null;
+        }
+    }
     
     /// <summary>Get Asset list</summary>
     public async Task<DalamudAssetManifest?> GetAssetManifestAsync()
@@ -146,8 +203,11 @@ public class DalamudUpdater
         // 1. Check version
         currentProgress = ReportProgress(currentProgress, DalamudUpdateStage.CheckingVersion, "Checking version...");
         yield return currentProgress;
-        
-        var versionInfo = await GetRemoteVersionAsync();
+
+        var config = await _configService.LoadConfigAsync();
+        var versionInfo = config.Dalamud.UseLatestPreRelease
+            ? await GetLatestPreReleaseVersionInfoAsync()
+            : await GetRemoteVersionAsync();
         if (versionInfo == null)
         {
             currentProgress = ReportProgress(currentProgress, DalamudUpdateStage.Failed, "Failed to retrieve version");

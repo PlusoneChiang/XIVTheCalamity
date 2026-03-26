@@ -45,11 +45,11 @@ public class GameLaunchService
         string gamePath,
         object? platformConfig,
         string? dalamudRuntimePath = null,
+        string? pluginRepoUrl = null,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("[GAME] Starting Fake Launch (test mode)");
         
-        // Fake launch doesn't need real Session ID, use fake test ID
         var fakeSessionId = "0";
         
         return await LaunchGameInternalAsync(
@@ -58,6 +58,7 @@ public class GameLaunchService
             platformConfig,
             isFakeLaunch: true,
             dalamudRuntimePath,
+            pluginRepoUrl,
             cancellationToken);
     }
     
@@ -70,6 +71,7 @@ public class GameLaunchService
         string sessionId,
         object? platformConfig,
         string? dalamudRuntimePath = null,
+        string? pluginRepoUrl = null,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("[GAME] Starting game with session ID");
@@ -89,6 +91,7 @@ public class GameLaunchService
             platformConfig,
             isFakeLaunch: false,
             dalamudRuntimePath,
+            pluginRepoUrl,
             cancellationToken);
     }
     
@@ -98,6 +101,7 @@ public class GameLaunchService
         object? platformConfig,
         bool isFakeLaunch,
         string? dalamudRuntimePath,
+        string? pluginRepoUrl,
         CancellationToken cancellationToken)
     {
         try
@@ -152,7 +156,7 @@ public class GameLaunchService
             // Launch based on platform
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                return await LaunchWindowsAsync(exePath, workingDir, arguments, dalamudRuntimePath, cancellationToken);
+                return await LaunchWindowsAsync(exePath, workingDir, arguments, dalamudRuntimePath, pluginRepoUrl, cancellationToken);
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) || 
                      RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
@@ -208,6 +212,13 @@ public class GameLaunchService
                     }
                     
                     _logger.LogInformation("[GAME] Dalamud Runtime path (Wine): {Path}", wineDalamudPath);
+                }
+
+                // Set plugin repo URL so Dalamud reads it from game process env (works for both inject and entrypoint modes)
+                if (!string.IsNullOrWhiteSpace(pluginRepoUrl))
+                {
+                    baseEnvironment["DALAMUD_MAIN_REPO_URL"] = pluginRepoUrl;
+                    _logger.LogInformation("[GAME] DALAMUD_MAIN_REPO_URL set: {Url}", pluginRepoUrl);
                 }
                 
                 return await LaunchWithEnvironmentServiceAsync(
@@ -282,6 +293,7 @@ public class GameLaunchService
         string workingDir,
         string arguments,
         string? dalamudRuntimePath,
+        string? pluginRepoUrl,
         CancellationToken cancellationToken)
     {
         _logger.LogInformation("[GAME] Launching on Windows: {ExePath}", exePath);
@@ -301,6 +313,13 @@ public class GameLaunchService
             startInfo.Environment["DALAMUD_RUNTIME"] = dalamudRuntimePath;
             startInfo.Environment["DOTNET_ROOT"] = dalamudRuntimePath;
             _logger.LogInformation("[GAME] Dalamud Runtime path: {Path}", dalamudRuntimePath);
+        }
+
+        // Set plugin repo URL so Dalamud reads it from game process env (works for both inject and entrypoint modes)
+        if (!string.IsNullOrWhiteSpace(pluginRepoUrl))
+        {
+            startInfo.Environment["DALAMUD_MAIN_REPO_URL"] = pluginRepoUrl;
+            _logger.LogInformation("[GAME] DALAMUD_MAIN_REPO_URL set: {Url}", pluginRepoUrl);
         }
         
         _gameProcess = Process.Start(startInfo);

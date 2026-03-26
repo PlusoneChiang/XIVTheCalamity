@@ -147,6 +147,16 @@ async function loadConfig() {
 }
 
 /**
+ * Show/hide elements marked with class "debug-only" based on Debug mode state
+ */
+function updateDebugOnlyVisibility() {
+  const isDebug = document.getElementById('debugLogging')?.checked || false;
+  document.querySelectorAll('.debug-only').forEach(el => {
+    el.style.display = isDebug ? '' : 'none';
+  });
+}
+
+/**
  * Update Dalamud tab visibility based on configuration
  */
 function updateDalamudTabVisibility() {
@@ -189,6 +199,7 @@ function populateForm(config) {
     document.getElementById('language').value = config.launcher.language || 'zh-TW';
     i18n.setLocale(config.launcher.language || 'zh-TW');
     document.getElementById('debugLogging').checked = config.launcher.developmentMode || false;
+    updateDebugOnlyVisibility();
   }
   
   if (config.game) {
@@ -233,6 +244,7 @@ function populateForm(config) {
     document.getElementById('safeMode').checked = config.dalamud.safeMode || false;
     document.getElementById('pluginRepoUrl').value = config.dalamud.pluginRepoUrl || '';
     document.getElementById('entryPointMode').checked = config.dalamud.useEntryPoint ?? true;
+    document.getElementById('useLatestPreRelease').checked = config.dalamud.useLatestPreRelease || false;
   }
 }
 
@@ -286,7 +298,8 @@ function collectFormData() {
       injectDelay: parseInt(document.getElementById('injectDelay').value),
       safeMode: document.getElementById('safeMode').checked,
       pluginRepoUrl: document.getElementById('pluginRepoUrl').value,
-      useEntryPoint: document.getElementById('entryPointMode').checked
+      useEntryPoint: document.getElementById('entryPointMode').checked,
+      useLatestPreRelease: document.getElementById('useLatestPreRelease').checked
     }
   };
   console.log('[Settings] collectFormData - audioRouting:', formData.wine.audioRouting, 'wineDebug:', formData.wine.wineDebug);
@@ -471,6 +484,8 @@ function initGeneralTab() {
     i18n.setLocale(e.target.value);
     i18n.updateElements();
   });
+
+  document.getElementById('debugLogging').addEventListener('change', updateDebugOnlyVisibility);
   
   // Open LOG path
   document.getElementById('openLogPathButton').addEventListener('click', async () => {

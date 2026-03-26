@@ -1,7 +1,17 @@
 # Release Notes
 
-## v1.7.2
+## v1.7.3
 #### 🇹🇼 zh-TW
+### 🐛 修復
+- 修復Dalamud TC分支問題。
+- 修復Dalamud在inject模式時，環境變數未正確設定問題。
+
+#### 🇺🇸 English
+### 🐛 Bug Fixes
+- Fixed Dalamud TC branch issues.
+- Fixed environment variables not being set correctly when using Dalamud inject mode.
+
+## v1.7.2
 ### 🐛 修復
 - 修復Dalamud國際服分支相容性問題，目前最新版本為12.0.1.5 TC build 13(12.0.1.5-tc.13)
 - 修復本地化相容性問題

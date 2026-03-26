@@ -16,6 +16,9 @@ namespace XIVTheCalamity.Dalamud.Json;
 [JsonSerializable(typeof(DalamudAssetManifest))]
 [JsonSerializable(typeof(DalamudAssetEntry))]
 [JsonSerializable(typeof(DalamudStatus))]
+[JsonSerializable(typeof(List<GitHubRelease>))]
+[JsonSerializable(typeof(GitHubRelease))]
+[JsonSerializable(typeof(GitHubReleaseAsset))]
 public partial class DalamudJsonContext : JsonSerializerContext
 {
 }
