@@ -1,5 +1,17 @@
 # Release Notes
 
+## v1.7.4
+#### 🇹🇼 zh-TW
+### 🐛 Mac修復
+- WineCX版本更新至v2026.03.30
+- 修正IME按鍵處理流程，避免IME功能被wine錯誤攔截而出現問題
+
+#### 🇺🇸 English
+### 🐛 Mac Bug Fixes
+- Updated WineCX to v2026.03.30
+- Fixed IME key handling to prevent Wine from incorrectly intercepting IME input
+
+
 ## v1.7.3
 #### 🇹🇼 zh-TW
 ### 🐛 修復
