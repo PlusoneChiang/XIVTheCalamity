@@ -1,5 +1,23 @@
 # Release Notes
 
+
+## v1.7.5
+#### 🇹🇼 zh-TW
+### 🔧 調整 
+- 免費試玩功能已啟用
+
+### ✨ 重要調整
+- 老公，我要去當兵了，再見！
+- 愚人節快樂！
+
+#### 🇺🇸 English
+### 🔧 Changes
+- Free trial feature enabled
+
+### ✨ Important Changes
+- Honey, I'm off to the military, goodbye!
+- Happy April Fools' Day!
+
 ## v1.7.4
 #### 🇹🇼 zh-TW
 ### 🐛 Mac修復
