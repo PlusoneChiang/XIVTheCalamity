@@ -322,6 +322,7 @@ const translations = {
     
     'login.sub_crystal': '水晶訂閱',
     'login.sub_credit': '信用卡訂閱',
+    'login.sub_free': '免費試玩',
     'login.sub_unknown': '未知',
     'login.game_setup.title': '遊戲目錄設定',
     'login.game_setup.description': '首次使用需要設定遊戲目錄，請選擇您的情況',
@@ -342,6 +343,7 @@ const translations = {
     'login.seconds': '秒',
     'login.sub_type': '訂閱方式：',
     'login.remain_time': '剩餘時間：',
+    'login.remain_unlimited': '無限制',
     'login.session_time': 'Session 已建立：',
     'login.session_expired_warning': '⚠️ Session 已超過 3 小時，請重新登入以避免無法啟動遊戲',
     'login.init_env': '正在初始化環境...',
@@ -746,6 +748,7 @@ const translations = {
     
     'login.sub_crystal': 'Crystal Subscription',
     'login.sub_credit': 'Credit Card Subscription',
+    'login.sub_free': 'Free Trial',
     'login.sub_unknown': 'Unknown',
     'login.time_less_1h': 'Less than 1 hour',
     'login.days': 'days',
@@ -754,6 +757,7 @@ const translations = {
     'login.seconds': 'sec',
     'login.sub_type': 'Subscription Type: ',
     'login.remain_time': 'Remaining Time: ',
+    'login.remain_unlimited': 'Unlimited',
     'login.session_time': 'Session Obtained: ',
     'login.session_expired_warning': '⚠️ Session has exceeded 3 hours, please re-login to avoid launch failure',
     'login.init_env': 'Initializing environment...',

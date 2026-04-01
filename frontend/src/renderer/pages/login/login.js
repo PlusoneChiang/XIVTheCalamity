@@ -374,6 +374,7 @@ async function handleLogin(event) {
     // handleApiResponse already unwrapped the data, no need to check .success
     // If we got here without error, login was successful
     console.log('[Login] Login successful');
+    console.log('[Login] Full response data:', JSON.stringify(data, null, 2));
     console.log('[Login] sessionId:', data.sessionId);
     console.log('[Login] subscriptionType:', data.subscriptionType);
     console.log('[Login] remain (seconds):', data.remain);
@@ -733,7 +734,8 @@ function updateSubscriptionInfo(subscriptionType, remainSeconds) {
   window._lastSubscriptionType = subscriptionType;
   window._lastRemainSeconds = remainSeconds;
   
-  const subTypeKey = subscriptionType === 1 ? 'login.sub_crystal' : 
+  const subTypeKey = subscriptionType === 0 ? 'login.sub_free' :
+                     subscriptionType === 1 ? 'login.sub_crystal' : 
                      subscriptionType === 2 ? 'login.sub_credit' : 
                      'login.sub_unknown';
   
@@ -748,7 +750,13 @@ function updateSubscriptionInfo(subscriptionType, remainSeconds) {
   `;
   
   // Start remain countdown (subscription time)
-  startRemainCountdown(remainSeconds);
+  // Free trial (type 0) with remain=0 means unlimited
+  if (subscriptionType === 0 && remainSeconds === 0) {
+    const el = document.getElementById('remainCountdown');
+    if (el) el.textContent = i18n.t('login.remain_unlimited');
+  } else {
+    startRemainCountdown(remainSeconds);
+  }
   
   // Start session countdown (3-hour session TTL)
   startSessionCountdown();
