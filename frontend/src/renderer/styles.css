@@ -81,6 +81,22 @@ button {
   box-shadow: 0 5px 20px rgba(233, 69, 96, 0.4);
 }
 
+.btn-danger {
+  background: linear-gradient(135deg,
+    rgba(231, 76, 60, 0.8) 0%,
+    rgba(192, 57, 43, 0.8) 100%);
+  color: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(231, 76, 60, 0.5);
+}
+
+.btn-danger:hover {
+  background: linear-gradient(135deg,
+    rgba(231, 76, 60, 1) 0%,
+    rgba(192, 57, 43, 1) 100%);
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.5);
+  transform: translateY(-1px);
+}
+
 .btn-secondary {
   background: #0f3460;
   color: white;
@@ -188,3 +204,59 @@ button {
   color: #2196f3;
   border: 1px solid rgba(33, 150, 243, 0.3);
 }
+
+/* ================================================
+ * THEME: LIGHT
+ * ================================================ */
+html[data-theme="light"] body {
+  background: linear-gradient(135deg, #f0f4f8 0%, #dde6f0 100%);
+  color: #1a1a2e;
+}
+
+html[data-theme="light"] header h1 {
+  color: #e94560;
+  text-shadow: 0 0 20px rgba(233, 69, 96, 0.2);
+}
+
+html[data-theme="light"] .subtitle {
+  color: #555;
+}
+
+html[data-theme="light"] .btn-secondary {
+  background: rgba(0, 0, 0, 0.07);
+  color: #333;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+}
+
+html[data-theme="light"] .btn-secondary:hover {
+  background: rgba(0, 0, 0, 0.13);
+}
+
+html[data-theme="light"] .lang-btn {
+  background: rgba(0, 0, 0, 0.06);
+  color: #555;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+html[data-theme="light"] .lang-btn:hover {
+  background: rgba(0, 0, 0, 0.12);
+  color: #1a1a2e;
+}
+
+html[data-theme="light"] .progress-bar {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+html[data-theme="light"] .progress-bar-fill {
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+}
+
+html[data-theme="light"] .progress-message {
+  color: rgba(26, 26, 46, 0.6);
+}
+
+/* ================================================
+ * THEME: VALENTINE
+ * Valentine uses same body/heading as Dark; the decorative
+ * overlay is handled in login/style.css and settings.css.
+ * ================================================ */

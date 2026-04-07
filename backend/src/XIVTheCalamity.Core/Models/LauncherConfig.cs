@@ -34,4 +34,9 @@ public class LauncherConfig
     /// Show Dalamud tab in settings (frontend-only, developer mode)
     /// </summary>
     public bool ShowDalamudTab { get; set; } = false;
+
+    /// <summary>
+    /// UI theme (dark, light, valentine)
+    /// </summary>
+    public string Theme { get; set; } = "dark";
 }

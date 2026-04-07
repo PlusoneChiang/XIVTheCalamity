@@ -3,6 +3,7 @@
  */
 
 import i18n from '../../i18n/index.js';
+import { applyTheme } from '../../utils/theme.js';
 
 let currentConfig = null;
 let currentPlatform = 'win32';
@@ -200,6 +201,11 @@ function populateForm(config) {
     i18n.setLocale(config.launcher.language || 'zh-TW');
     document.getElementById('debugLogging').checked = config.launcher.developmentMode || false;
     updateDebugOnlyVisibility();
+    
+    const savedTheme = config.launcher.theme || 'dark';
+    const themeRadio = document.querySelector(`input[name="theme"][value="${savedTheme}"]`);
+    if (themeRadio) themeRadio.checked = true;
+    applyTheme(savedTheme);
   }
   
   if (config.game) {
@@ -256,6 +262,7 @@ function collectFormData() {
     launcher: {
       developmentMode: document.getElementById('debugLogging').checked,
       language: document.getElementById('language').value,
+      theme: document.querySelector('input[name="theme"]:checked')?.value || 'dark',
       // Preserve showDalamudTab from current config (set via Konami code)
       showDalamudTab: currentConfig?.launcher?.showDalamudTab || false
     },
@@ -325,6 +332,8 @@ async function saveConfig() {
     if (localeChanged) {
       i18n.setLocale(newLocale);
     }
+    
+    applyTheme(formData.launcher.theme || 'dark');
     
     console.log('[Settings] Saving configuration:', formData);
     
@@ -408,6 +417,8 @@ async function applyConfig() {
     if (localeChanged) {
       i18n.setLocale(newLocale);
     }
+    
+    applyTheme(formData.launcher.theme || 'dark');
     
     console.log('[Settings] Applying configuration:', formData);
     

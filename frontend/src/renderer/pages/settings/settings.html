@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="dark">
   <title>Settings - XIVTheCalamity</title>
+  <link rel="stylesheet" href="../../styles/themes.css">
   <link rel="stylesheet" href="settings.css">
 </head>
 <body>
@@ -42,6 +43,29 @@
                 <span data-i18n="settings.general.debug">Debug 記錄</span>
               </label>
               <button id="openLogPathButton" class="btn btn-secondary btn-sm" data-i18n="settings.general.open_log">開啟</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h2 data-i18n="settings.general.theme">主題設定</h2>
+          <div class="form-group">
+            <div class="full-width">
+              <div class="radio-group" id="themeRadioGroup">
+                <label>
+                  <input type="radio" name="theme" value="dark">
+                  <span data-i18n="settings.general.theme_dark">深色</span>
+                </label>
+                <label>
+                  <input type="radio" name="theme" value="light">
+                  <span data-i18n="settings.general.theme_light">淺色</span>
+                </label>
+                <label>
+                  <input type="radio" name="theme" value="valentine">
+                  <span data-i18n="settings.general.theme_valentine">戀人節 💕</span>
+                </label>
+              </div>
+              <p class="help-text" data-i18n="settings.general.theme_help">選擇介面主題配色</p>
             </div>
           </div>
         </div>
@@ -188,11 +212,8 @@
         </div>
 
         <div class="settings-section platform-darwin">
-          <h2 data-i18n="settings.wine.keyboard_mapping">按鍵映射</h2>
+          <h2 data-i18n="settings.wine.ime_section">輸入法設定</h2>
           <div class="form-group">
-            <div class="full-width">
-              <h3 data-i18n="settings.wine.ime_section">輸入法設定</h3>
-            </div>
             <div>
               <label for="imePosX" data-i18n="settings.wine.ime_pos_x">候選字視窗 X 位置 (%)</label>
               <input type="number" id="imePosX" min="0" max="100" value="25">
@@ -203,9 +224,12 @@
               <input type="number" id="imePosY" min="0" max="100" value="85">
               <p class="help-text" data-i18n="settings.wine.ime_pos_y_help">從視窗頂部算起的百分比 (0-100)</p>
             </div>
-            <div class="full-width">
-              <h3 data-i18n="settings.wine.key_mapping_section">按鍵設定</h3>
-            </div>
+          </div>
+        </div>
+
+        <div class="settings-section platform-darwin">
+          <h2 data-i18n="settings.wine.keyboard_mapping">按鍵映射</h2>
+          <div class="form-group">
             <div>
               <label for="leftOptionMapping" data-i18n="settings.wine.left_option">左側 Option 鍵</label>
               <select id="leftOptionMapping">

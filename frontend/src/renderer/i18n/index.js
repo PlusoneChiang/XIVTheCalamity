@@ -134,6 +134,11 @@ const translations = {
     'settings.general.test_success': '測試完成',
     'settings.general.test_failed': '測試失敗',
     'settings.general.abnormal_exit': '遊戲異常結束，Exit Code: {code}',
+    'settings.general.theme': '主題設定',
+    'settings.general.theme_help': '選擇介面主題配色',
+    'settings.general.theme_dark': '深色',
+    'settings.general.theme_light': '淺色',
+    'settings.general.theme_valentine': '戀人節 💕',
     
     // Konami Code
     'settings.konami.prompt': '是否啟用 Dalamud 設定頁面？',
@@ -562,6 +567,11 @@ const translations = {
     'settings.general.test_success': 'Test Complete',
     'settings.general.test_failed': 'Test Failed',
     'settings.general.abnormal_exit': 'Game exited abnormally, Exit Code: {code}',
+    'settings.general.theme': 'Theme',
+    'settings.general.theme_help': 'Select interface color theme',
+    'settings.general.theme_dark': 'Dark',
+    'settings.general.theme_light': 'Light',
+    'settings.general.theme_valentine': "Valentine's Day 💕",
     
     // Konami Code
     'settings.konami.prompt': 'Enable Dalamud settings page?',

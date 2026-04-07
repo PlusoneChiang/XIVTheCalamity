@@ -12,6 +12,7 @@ import { startBackgroundUpdate, startLoginUpdate, cancelBackgroundUpdate, setApp
 import { startDalamudUpdate, cancelDalamudUpdate, handleDalamudConfigChanged, isDalamudUpdating } from './dalamudManager.js';
 import { initAppUpdater } from './appUpdater.js';
 import { handleApiResponse, getErrorMessage } from '../../utils/apiError.js';
+import { applyTheme } from '../../utils/theme.js';
 
 // Constants
 const SITE_KEY = "6Ld6VmorAAAAANQdQeqkaOeScR42qHC7Hyalq00r";
@@ -64,6 +65,7 @@ async function init() {
     if (config?.launcher?.language) {
       i18n.setLocale(config.launcher.language);
     }
+    applyTheme(config?.launcher?.theme || 'dark');
     if (config?.launcher?.developmentMode) {
       document.body.classList.add('dev-mode');
     }
@@ -131,6 +133,7 @@ async function init() {
         if (config?.launcher?.language) {
           i18n.setLocale(config.launcher.language);
         }
+        applyTheme(config?.launcher?.theme || 'dark');
         if (config?.launcher?.developmentMode) {
           document.body.classList.add('dev-mode');
         } else {

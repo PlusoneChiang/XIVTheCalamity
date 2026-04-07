@@ -51,20 +51,9 @@ body {
   -webkit-backdrop-filter: blur(40px);
   z-index: 0;
   pointer-events: none;
-  
-  -webkit-mask-image: linear-gradient(#000, #000), url('../../../../resources/mask.png');
-  mask-image: linear-gradient(#000, #000), url('../../../../resources/mask.png');
-  -webkit-mask-size: cover, contain;
-  mask-size: cover, contain;
-  -webkit-mask-repeat: no-repeat, no-repeat;
-  mask-repeat: no-repeat, no-repeat;
-  -webkit-mask-position: center, center;
-  mask-position: center, center;
-  -webkit-mask-composite: source-out;
-  mask-composite: exclude;
 }
 
-/* Semi-transparent overlay on mask cutout area */
+/* Seasonal overlay on mask cutout area (hidden by default, activated by valentine theme) */
 .settings-container::after {
   content: '';
   position: absolute;
@@ -72,18 +61,9 @@ body {
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.5);
+  background: transparent;
   z-index: 0;
   pointer-events: none;
-  
-  -webkit-mask-image: url('../../../../resources/mask.png');
-  mask-image: url('../../../../resources/mask.png');
-  -webkit-mask-size: contain;
-  mask-size: contain;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  mask-position: center;
 }
 
 /* Ensure content is above background */
@@ -376,16 +356,16 @@ body {
 }
 
 .btn-danger {
-  background: linear-gradient(135deg, 
-    rgba(231, 76, 60, 0.8) 0%, 
+  background: linear-gradient(135deg,
+    rgba(231, 76, 60, 0.8) 0%,
     rgba(192, 57, 43, 0.8) 100%);
   color: rgba(255, 255, 255, 0.95);
   border: 1px solid rgba(231, 76, 60, 0.5);
 }
 
 .btn-danger:hover {
-  background: linear-gradient(135deg, 
-    rgba(231, 76, 60, 1) 0%, 
+  background: linear-gradient(135deg,
+    rgba(231, 76, 60, 1) 0%,
     rgba(192, 57, 43, 1) 100%);
   box-shadow: 0 4px 12px rgba(231, 76, 60, 0.5);
   transform: translateY(-1px);
@@ -661,3 +641,170 @@ body.platform-win32 .tab-button[data-tab="wine"] {
   display: none !important;
 }
 
+
+/* ================================================
+ * RADIO GROUP (Theme selector)
+ * ================================================ */
+.radio-group {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.radio-group label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 400;
+}
+
+.radio-group input[type="radio"] {
+  width: auto;
+  margin: 0;
+  cursor: pointer;
+  accent-color: #3498db;
+}
+
+/* ================================================
+ * THEME OVERRIDES (settings page)
+ * Colors defined in renderer/styles/themes.css via CSS variables.
+ * ================================================ */
+
+/* --- Light --- */
+html[data-theme="light"] .settings-container::before {
+  background: rgba(235, 238, 244, 0.97);
+}
+
+html[data-theme="light"] .tab-button {
+  background: rgba(200, 205, 215, 0.6);
+  border-color: rgba(0, 0, 0, 0.15);
+  color: var(--color-text-muted);
+}
+
+html[data-theme="light"] .tab-button:hover {
+  background: rgba(180, 188, 202, 0.7);
+  color: var(--color-text);
+  border-color: rgba(0, 0, 0, 0.2);
+}
+
+html[data-theme="light"] .tab-button.active {
+  background: rgba(160, 172, 192, 0.75);
+  color: var(--color-text);
+  border-color: rgba(0, 0, 0, 0.25);
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.1);
+}
+
+html[data-theme="light"] .tab-content-container {
+  background: rgba(245, 247, 252, 0.92);
+  border-color: rgba(0, 0, 0, 0.18);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), inset 0 1px 1px rgba(255, 255, 255, 0.8);
+}
+
+html[data-theme="light"] .settings-section h2 {
+  color: var(--color-text-muted);
+  border-bottom-color: rgba(0, 0, 0, 0.12);
+}
+
+html[data-theme="light"] .form-group label {
+  color: var(--color-text-muted);
+}
+
+html[data-theme="light"] .form-group input[type="text"],
+html[data-theme="light"] .form-group input[type="number"],
+html[data-theme="light"] .form-group select {
+  background: var(--color-input-bg);
+  border-color: var(--color-input-border);
+  color: var(--color-input-text);
+}
+
+html[data-theme="light"] .form-group input[type="text"]:focus,
+html[data-theme="light"] .form-group input[type="number"]:focus,
+html[data-theme="light"] .form-group select:focus {
+  border-color: rgba(52, 152, 219, 0.8);
+  background: rgba(255, 255, 255, 1);
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.15);
+}
+
+html[data-theme="light"] .help-text {
+  color: var(--color-text-faint);
+}
+
+html[data-theme="light"] .btn-secondary {
+  background: var(--color-btn-secondary-bg);
+  border-color: var(--color-btn-secondary-border);
+  color: var(--color-btn-secondary-text);
+}
+
+html[data-theme="light"] .btn-secondary:hover {
+  background: rgba(0, 0, 0, 0.13);
+}
+
+html[data-theme="light"] .slider-group input[type="range"] {
+  background: rgba(0, 0, 0, 0.18);
+}
+
+html[data-theme="light"] .slider-group span {
+  color: var(--color-text-muted);
+}
+
+html[data-theme="light"] .radio-group label {
+  color: var(--color-text-muted);
+}
+
+/* --- Valentine: mask overlay --- */
+html[data-theme="valentine"] .settings-container::before {
+  background: rgba(255, 182, 193, 0.85);
+  -webkit-mask-image: linear-gradient(#000, #000), url('../../../../resources/valentine.png');
+  mask-image: linear-gradient(#000, #000), url('../../../../resources/valentine.png');
+  -webkit-mask-size: cover, contain;
+  mask-size: cover, contain;
+  -webkit-mask-repeat: no-repeat, no-repeat;
+  mask-repeat: no-repeat, no-repeat;
+  -webkit-mask-position: center, center;
+  mask-position: center, center;
+  -webkit-mask-composite: source-out;
+  mask-composite: exclude;
+}
+
+html[data-theme="valentine"] .settings-container::after {
+  background: rgba(255, 150, 170, 0.3);
+  -webkit-mask-image: url('../../../../resources/valentine.png');
+  mask-image: url('../../../../resources/valentine.png');
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+/* --- Valentine: theme-aware text --- */
+html[data-theme="valentine"] .settings-section h2,
+html[data-theme="valentine"] .form-group label,
+html[data-theme="valentine"] .help-text,
+html[data-theme="valentine"] .tab-button,
+html[data-theme="valentine"] .radio-group label,
+html[data-theme="valentine"] .slider-group span,
+html[data-theme="valentine"] .checkbox-group label {
+  color: var(--color-text);
+}
+
+/* Semantic buttons keep white text — defined in themes.css, repeated here for clarity */
+html[data-theme="light"] .btn-primary,
+html[data-theme="light"] .btn-primary span,
+html[data-theme="light"] .btn-danger,
+html[data-theme="light"] .btn-danger span,
+html[data-theme="light"] .btn-success,
+html[data-theme="light"] .btn-success span,
+html[data-theme="valentine"] .btn-primary,
+html[data-theme="valentine"] .btn-primary span,
+html[data-theme="valentine"] .btn-danger,
+html[data-theme="valentine"] .btn-danger span,
+html[data-theme="valentine"] .btn-success,
+html[data-theme="valentine"] .btn-success span {
+    color: #ffffff;
+}

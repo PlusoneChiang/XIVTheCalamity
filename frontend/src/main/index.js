@@ -381,6 +381,7 @@ function loadJavaScriptFiles() {
   const basePath = path.join(__dirname, '../renderer');
   const files = {
     i18n: path.join(basePath, 'i18n/index.js'),
+    theme: path.join(basePath, 'utils/theme.js'),
     encoding: path.join(basePath, 'utils/encoding.js'),
     crypto: path.join(basePath, 'utils/crypto.js'),
     totp: path.join(basePath, 'utils/totp.js'),
@@ -407,6 +408,8 @@ function combineJavaScriptModules(jsFiles) {
   return [
     '// i18n module',
     stripModuleSyntax(jsFiles.i18n),
+    '// Theme utilities',
+    stripModuleSyntax(jsFiles.theme),
     '// Encoding utilities',
     stripModuleSyntax(jsFiles.encoding),
     '// Crypto utilities',
@@ -439,14 +442,31 @@ function combineJavaScriptModules(jsFiles) {
 const MASK_OVERLAY_ENABLED = false;
 
 function embedImageInCSS(css) {
+  const resourcesPath = path.join(__dirname, '../../resources');
+  
   if (!MASK_OVERLAY_ENABLED) {
     // Replace mask.png URL with 'none' to disable mask effect
-    return css.replace(/url\(['"]?.*?resources\/mask\.png['"]?\)/g, 'none');
+    let result = css.replace(/url\(['"]?.*?resources\/mask\.png['"]?\)/g, 'none');
+    // Embed valentine.png as base64 (used by valentine theme override)
+    const valentinePath = path.join(resourcesPath, 'valentine.png');
+    if (fs.existsSync(valentinePath)) {
+      const valentineBase64 = fs.readFileSync(valentinePath).toString('base64');
+      const valentineDataUrl = `data:image/png;base64,${valentineBase64}`;
+      result = result.replace(/url\(['"]?.*?resources\/valentine\.png['"]?\)/g, `url('${valentineDataUrl}')`);
+    }
+    return result;
   }
-  const maskPath = path.join(__dirname, '../../resources/mask.png');
+  const maskPath = path.join(resourcesPath, 'mask.png');
   const maskBase64 = fs.readFileSync(maskPath).toString('base64');
   const dataUrl = `data:image/png;base64,${maskBase64}`;
-  return css.replace(/url\(['"]?.*?resources\/mask\.png['"]?\)/g, `url('${dataUrl}')`);
+  let result = css.replace(/url\(['"]?.*?resources\/mask\.png['"]?\)/g, `url('${dataUrl}')`);
+  const valentinePath = path.join(resourcesPath, 'valentine.png');
+  if (fs.existsSync(valentinePath)) {
+    const valentineBase64 = fs.readFileSync(valentinePath).toString('base64');
+    const valentineDataUrl = `data:image/png;base64,${valentineBase64}`;
+    result = result.replace(/url\(['"]?.*?resources\/valentine\.png['"]?\)/g, `url('${valentineDataUrl}')`);
+  }
+  return result;
 }
 
 /**
@@ -501,14 +521,20 @@ function loadLoginPageWithVirtualHost(window) {
     
     const htmlPath = path.join(basePath, 'index.html');
     const cssPath = path.join(basePath, 'style.css');
+    const globalCssPath = path.join(__dirname, '../renderer/styles.css');
     
     safeLog('[Main] HTML path:', htmlPath);
     safeLog('[Main] CSS path:', cssPath);
     safeLog('[Main] HTML exists:', fs.existsSync(htmlPath));
     safeLog('[Main] CSS exists:', fs.existsSync(cssPath));
     
+    const themesCssPath = path.join(__dirname, '../renderer/styles/themes.css');
+    
     const html = fs.readFileSync(htmlPath, 'utf8');
-    const css = fs.readFileSync(cssPath, 'utf8');
+    const themesCss = fs.existsSync(themesCssPath) ? fs.readFileSync(themesCssPath, 'utf8') : '';
+    const globalCss = fs.existsSync(globalCssPath) ? fs.readFileSync(globalCssPath, 'utf8') : '';
+    const pageCss = fs.readFileSync(cssPath, 'utf8');
+    const css = themesCss + '\n' + globalCss + '\n' + pageCss;
     
     safeLog('[Main] HTML length:', html.length);
     safeLog('[Main] CSS length:', css.length);

@@ -274,18 +274,6 @@ body {
     -webkit-backdrop-filter: blur(40px);
     z-index: 0;
     pointer-events: none;
-    
-    /* 反转遮罩效果：使用组合遮罩 */
-    -webkit-mask-image: linear-gradient(#000, #000), url('../../../../resources/mask.png');
-    mask-image: linear-gradient(#000, #000), url('../../../../resources/mask.png');
-    -webkit-mask-size: cover, contain;
-    mask-size: cover, contain;
-    -webkit-mask-repeat: no-repeat, no-repeat;
-    mask-repeat: no-repeat, no-repeat;
-    -webkit-mask-position: center, center;
-    mask-position: center, center;
-    -webkit-mask-composite: source-out;
-    mask-composite: exclude;
 }
 
 /* News Section (Left 60%) - Card Style */
@@ -613,17 +601,8 @@ body {
     text-align: center;
 }
 
-.btn-primary {
-    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-    color: #ffffff;
-}
-
-.btn-primary:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(220, 38, 38, 0.4);
-}
-
-.btn-primary:disabled {
+.btn-primary:disabled,
+.btn-danger:disabled {
     opacity: 0.6;
     cursor: not-allowed;
 }
@@ -1024,4 +1003,191 @@ body {
 @keyframes breathe {
     0%, 100% { transform: translateX(-50%) scale(1); }
     50% { transform: translateX(-50%) scale(1.06); }
+}
+
+/* ================================================
+ * THEME OVERRIDES (login page)
+ * Colors defined in renderer/styles/themes.css via CSS variables.
+ * ================================================ */
+
+/* --- Light: backgrounds --- */
+html[data-theme="light"] body {
+    background: linear-gradient(135deg, #f0f4f8 0%, #dde6f0 100%);
+}
+
+html[data-theme="light"] .container::before {
+    background: var(--color-bg-overlay);
+}
+
+html[data-theme="light"] .login-box {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(0, 0, 0, 0.12);
+}
+
+html[data-theme="light"] .login-box h1 {
+    color: #e94560;
+}
+
+html[data-theme="light"] .timer-text {
+    fill: #1a1a2e;
+}
+
+html[data-theme="light"] .timer-bg {
+    stroke: rgba(0, 0, 0, 0.15);
+}
+
+html[data-theme="light"] .form-group input,
+html[data-theme="light"] .otp-secret-group .input-with-button input {
+    background: var(--color-input-bg);
+    border-color: var(--color-input-border);
+    color: var(--color-input-text);
+}
+
+html[data-theme="light"] .form-group input:focus {
+    border-color: rgba(52, 152, 219, 0.8);
+    background: #fff;
+}
+
+html[data-theme="light"] .form-group input::placeholder {
+    color: var(--color-text-faint);
+}
+
+html[data-theme="light"] .btn-secondary {
+    color: var(--color-btn-secondary-text);
+    background: var(--color-btn-secondary-bg);
+    border-color: var(--color-btn-secondary-border);
+}
+
+html[data-theme="light"] .btn-secondary:hover {
+    background: rgba(0, 0, 0, 0.13);
+}
+
+html[data-theme="light"] .progress-bar {
+    background: rgba(0, 0, 0, 0.12);
+}
+
+html[data-theme="light"] .dropdown-menu {
+    background: rgba(240, 244, 248, 0.97);
+    border-color: rgba(0, 0, 0, 0.15);
+}
+
+html[data-theme="light"] .dropdown-item:hover {
+    background: rgba(0, 0, 0, 0.07);
+}
+
+/* --- Light: all theme-aware text elements --- */
+html[data-theme="light"] label,
+html[data-theme="light"] span,
+html[data-theme="light"] p,
+html[data-theme="light"] h1,
+html[data-theme="light"] h2,
+html[data-theme="light"] h3,
+html[data-theme="light"] .form-group label,
+html[data-theme="light"] .form-group input,
+html[data-theme="light"] .title-bar-card span,
+html[data-theme="light"] .test-progress-btn,
+html[data-theme="light"] .input-addon-btn,
+html[data-theme="light"] .dropdown-item,
+html[data-theme="light"] .dropdown-empty,
+html[data-theme="light"] .otp-secret-group .help-text,
+html[data-theme="light"] .checkbox-group label,
+html[data-theme="light"] .loading-text,
+html[data-theme="light"] .session-info,
+html[data-theme="light"] .modal-content h2,
+html[data-theme="light"] .modal-content p,
+html[data-theme="light"] .app-update-dialog-title,
+html[data-theme="light"] .app-update-dialog-notes-label,
+html[data-theme="light"] .app-update-dialog-notes .notes-heading,
+html[data-theme="light"] .app-update-dialog-notes .notes-item,
+html[data-theme="light"] .app-update-btn-secondary,
+html[data-theme="light"] .tab-button,
+html[data-theme="light"] .update-status,
+html[data-theme="light"] .update-message,
+html[data-theme="light"] .progress-message,
+html[data-theme="light"] .sub-info,
+html[data-theme="light"] .sub-info-item,
+html[data-theme="light"] .sub-type,
+html[data-theme="light"] .sub-remain,
+html[data-theme="light"] .remain-value,
+html[data-theme="light"] .version-text,
+html[data-theme="light"] .copyright-text {
+    color: var(--color-text);
+}
+
+html[data-theme="light"] .tab-button.active {
+    color: var(--color-text);
+}
+
+html[data-theme="light"] .version-text,
+html[data-theme="light"] .copyright-text {
+    color: var(--color-text-faint);
+}
+
+/* --- Valentine: mask overlay --- */
+html[data-theme="valentine"] .container::before {
+    background: rgba(255, 182, 193, 0.85);
+    -webkit-mask-image: linear-gradient(#000, #000), url('../../../../resources/valentine.png');
+    mask-image: linear-gradient(#000, #000), url('../../../../resources/valentine.png');
+    -webkit-mask-size: cover, contain;
+    mask-size: cover, contain;
+    -webkit-mask-repeat: no-repeat, no-repeat;
+    mask-repeat: no-repeat, no-repeat;
+    -webkit-mask-position: center, center;
+    mask-position: center, center;
+    -webkit-mask-composite: source-out;
+    mask-composite: exclude;
+}
+
+/* --- Valentine: all theme-aware text elements --- */
+html[data-theme="valentine"] label,
+html[data-theme="valentine"] span,
+html[data-theme="valentine"] p,
+html[data-theme="valentine"] h2,
+html[data-theme="valentine"] h3,
+html[data-theme="valentine"] .form-group label,
+html[data-theme="valentine"] .title-bar-card span,
+html[data-theme="valentine"] .test-progress-btn,
+html[data-theme="valentine"] .input-addon-btn,
+html[data-theme="valentine"] .dropdown-item,
+html[data-theme="valentine"] .dropdown-empty,
+html[data-theme="valentine"] .otp-secret-group .help-text,
+html[data-theme="valentine"] .checkbox-group label,
+html[data-theme="valentine"] .loading-text,
+html[data-theme="valentine"] .session-info,
+html[data-theme="valentine"] .modal-content h2,
+html[data-theme="valentine"] .modal-content p,
+html[data-theme="valentine"] .app-update-btn-secondary,
+html[data-theme="valentine"] .tab-button,
+html[data-theme="valentine"] .update-status,
+html[data-theme="valentine"] .update-message,
+html[data-theme="valentine"] .progress-message,
+html[data-theme="valentine"] .sub-info,
+html[data-theme="valentine"] .sub-info-item,
+html[data-theme="valentine"] .sub-type,
+html[data-theme="valentine"] .sub-remain,
+html[data-theme="valentine"] .remain-value,
+html[data-theme="valentine"] .version-text,
+html[data-theme="valentine"] .copyright-text {
+    color: var(--color-text);
+}
+
+html[data-theme="valentine"] .version-text,
+html[data-theme="valentine"] .copyright-text {
+    color: var(--color-text-faint);
+}
+
+/* Semantic buttons always keep white text */
+html[data-theme="light"] .btn-primary,
+html[data-theme="light"] .btn-primary span,
+html[data-theme="light"] .btn-danger,
+html[data-theme="light"] .btn-danger span,
+html[data-theme="light"] .btn-success,
+html[data-theme="light"] .btn-success span,
+html[data-theme="valentine"] .btn-primary,
+html[data-theme="valentine"] .btn-primary span,
+html[data-theme="valentine"] .btn-danger,
+html[data-theme="valentine"] .btn-danger span,
+html[data-theme="valentine"] .btn-success,
+html[data-theme="valentine"] .btn-success span {
+    color: #ffffff;
 }

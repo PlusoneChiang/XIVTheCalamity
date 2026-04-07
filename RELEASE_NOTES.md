@@ -1,5 +1,15 @@
 # Release Notes
 
+## v1.8.0
+#### 🇹🇼 zh-TW
+### ✨ 新功能
+- 新增啟動器主題切換功能。
+- 提供三種主題，深色(預設值)、淺色以及復刻戀人節主題配色。
+
+#### 🇺🇸 English
+### ✨ New Features
+- Added launcher theme switching support.
+- Three themes available: Dark (default), Light, and a recreated Valentine's Day theme.
 
 ## v1.7.5
 #### 🇹🇼 zh-TW
