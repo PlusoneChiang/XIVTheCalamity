@@ -14,6 +14,7 @@ namespace XIVTheCalamity.Core.Json;
 [JsonSerializable(typeof(AppConfig))]
 [JsonSerializable(typeof(GameConfig))]
 [JsonSerializable(typeof(DalamudConfig))]
+[JsonSerializable(typeof(DiscordRpcConfig))]
 [JsonSerializable(typeof(LauncherConfig))]
 [JsonSerializable(typeof(WineConfig))]
 [JsonSerializable(typeof(ProtonGeConfig))]

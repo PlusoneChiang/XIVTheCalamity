@@ -4,6 +4,7 @@ using XIVTheCalamity.Api.NativeAOT;
 using XIVTheCalamity.Api.NativeAOT.Endpoints;
 using XIVTheCalamity.Core.Services;
 using XIVTheCalamity.Platform.MacOS.Wine;
+using XIVTheCalamity.Platform.MacOS.Discord;
 using XIVTheCalamity.Game.Services;
 using XIVTheCalamity.Game.Launcher;
 using XIVTheCalamity.Game.Authentication;
@@ -48,6 +49,7 @@ try
 
     // Register ConfigService
     builder.Services.AddSingleton<ConfigService>();
+    builder.Services.AddSingleton<DiscordRpcBridgeService>();
 
     // Platform services
     if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -140,6 +142,7 @@ try
     app.MapDalamudEndpoints();
     app.MapEnvironmentEndpoints();
     app.MapGameEndpoints();
+    app.MapDiscordRpcEndpoints();
     app.MapUpdateEndpoints();
     app.MapWineEndpoints();
 

@@ -104,6 +104,15 @@ public static class ConfigEndpoints
                     if (!string.IsNullOrEmpty(partialConfig.Dalamud.PluginRepoUrl))
                         currentConfig.Dalamud.PluginRepoUrl = partialConfig.Dalamud.PluginRepoUrl;
                 }
+
+                // Discord RPC configuration
+                if (partialConfig.DiscordRpc != null)
+                {
+                    currentConfig.DiscordRpc.Enabled = partialConfig.DiscordRpc.Enabled;
+                    currentConfig.DiscordRpc.AutoInstall = partialConfig.DiscordRpc.AutoInstall;
+                    if (!string.IsNullOrWhiteSpace(partialConfig.DiscordRpc.BridgeVersion))
+                        currentConfig.DiscordRpc.BridgeVersion = partialConfig.DiscordRpc.BridgeVersion;
+                }
                 
                 // Launcher configuration
                 if (partialConfig.Launcher != null)

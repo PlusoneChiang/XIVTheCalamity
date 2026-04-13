@@ -707,9 +707,17 @@ public class GameLaunchService
         try
         {
             await _gameProcess.WaitForExitAsync(cancellationToken);
-            var exitCode = _gameProcess.ExitCode;
-            _logger.LogInformation("[GAME] Game exited with code: {ExitCode}", exitCode);
-            return exitCode;
+            try
+            {
+                var exitCode = _gameProcess.ExitCode;
+                _logger.LogInformation("[GAME] Game exited with code: {ExitCode}", exitCode);
+                return exitCode;
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "[GAME] Game exited but exit code is unavailable for attached process PID: {Pid}", _gameProcess.Id);
+                return null;
+            }
         }
         catch (OperationCanceledException)
         {

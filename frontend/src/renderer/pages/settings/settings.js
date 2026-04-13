@@ -242,6 +242,13 @@ function populateForm(config) {
     document.getElementById('imePosX').value = config.wine.imeCandidatePositionX !== undefined ? config.wine.imeCandidatePositionX : 25;
     document.getElementById('imePosY').value = config.wine.imeCandidatePositionY !== undefined ? config.wine.imeCandidatePositionY : 85;
   }
+
+  // Discord RPC bridge settings (macOS only)
+  const discordRpc = config.discordRpc || {};
+  if (document.getElementById('discordRpcEnabled')) {
+    document.getElementById('discordRpcEnabled').checked = discordRpc.enabled || false;
+    updateDiscordRpcInstallButtonState();
+  }
   
   // Dalamud settings
   if (config.dalamud) {
@@ -300,6 +307,11 @@ function collectFormData() {
       extraEnvironmentVariables: parseExtraEnvVars(document.getElementById('protongeExtraEnvVars')?.value || ''),
       launchOptions: document.getElementById('protongeLaunchOptions')?.value || '%command%'
     },
+    discordRpc: {
+      enabled: document.getElementById('discordRpcEnabled')?.checked || false,
+      autoInstall: currentConfig?.discordRpc?.autoInstall !== false,
+      bridgeVersion: 'latest'
+    },
     dalamud: {
       enabled: document.getElementById('dalamudEnabled').checked,
       injectDelay: parseInt(document.getElementById('injectDelay').value),
@@ -351,6 +363,7 @@ async function saveConfig() {
     }
     
     console.log('[Settings] Configuration saved successfully');
+    currentConfig = formData;
     
     // Step 2: Apply Wine settings to registry (macOS only)
     if (currentPlatform === 'darwin') {
@@ -370,6 +383,7 @@ async function saveConfig() {
       }
       
       console.log('[Settings] Wine settings applied successfully');
+      await refreshDiscordRpcStatus();
     }
     
     // Step 3: 通知登入頁設定已變更
@@ -436,6 +450,7 @@ async function applyConfig() {
     }
     
     console.log('[Settings] Configuration saved successfully');
+    currentConfig = formData;
     
     // Step 2: Apply Wine settings to registry (macOS only)
     if (currentPlatform === 'darwin') {
@@ -455,6 +470,7 @@ async function applyConfig() {
       }
       
       console.log('[Settings] Wine settings applied successfully');
+      await refreshDiscordRpcStatus();
     }
     
     // Step 3: 通知登入頁設定已變更
@@ -472,9 +488,6 @@ async function applyConfig() {
       dalamudEnabledChanged: dalamudEnabledChanged ? newDalamudEnabled : undefined,
       newGamePath
     });
-    
-    // Update currentConfig for subsequent applies
-    currentConfig = formData;
     
     // Hide overlay and show success notification
     hideLoadingOverlay();
@@ -607,6 +620,16 @@ function initWineTab() {
   document.getElementById('openWineCfgButton').addEventListener('click', () => openWineTool('winecfg'));
   document.getElementById('openRegeditButton').addEventListener('click', () => openWineTool('regedit'));
   document.getElementById('openCmdButton').addEventListener('click', () => openWineTool('wineconsole'));
+
+  const installDiscordRpcButton = document.getElementById('installDiscordRpcButton');
+  if (installDiscordRpcButton) {
+    installDiscordRpcButton.addEventListener('click', installDiscordRpcBridge);
+    document.getElementById('discordRpcEnabled')?.addEventListener('change', () => {
+      updateDiscordRpcInstallButtonState();
+      refreshDiscordRpcStatus();
+    });
+    refreshDiscordRpcStatus();
+  }
 }
 
 /**
@@ -666,6 +689,106 @@ async function openWineTool(tool) {
     console.error(`[Settings] Failed to open ${tool}:`, error);
     hideLoadingOverlay();
     showError(i18n.t('settings.wine.tool_failed', { tool }));
+  }
+}
+
+function renderDiscordRpcStatus(message, hasError = false) {
+  const el = document.getElementById('discordRpcStatusText');
+  if (!el) return;
+
+  el.textContent = message;
+  el.style.color = hasError ? '#ef4444' : '';
+}
+
+function updateDiscordRpcInstallButtonState(bridgeStatus = null) {
+  const installButton = document.getElementById('installDiscordRpcButton');
+  const enabledCheckbox = document.getElementById('discordRpcEnabled');
+  if (!installButton || !enabledCheckbox) return;
+
+  const savedEnabled = currentConfig?.discordRpc?.enabled || false;
+  const pendingEnableApply = enabledCheckbox.checked && enabledCheckbox.checked !== savedEnabled;
+
+  if (pendingEnableApply) {
+    installButton.disabled = true;
+    return;
+  }
+
+  if (!bridgeStatus) {
+    installButton.disabled = false;
+    return;
+  }
+
+  installButton.disabled = !bridgeStatus.supported || !enabledCheckbox.checked;
+}
+
+async function refreshDiscordRpcStatus() {
+  if (currentPlatform !== 'darwin') return;
+
+  try {
+    const response = await window.electronAPI.backend.call('/api/discord-rpc/status', { method: 'GET' });
+    if (!response.ok) {
+      updateDiscordRpcInstallButtonState();
+      renderDiscordRpcStatus(i18n.t('settings.discord_rpc.status_error'), true);
+      return;
+    }
+
+    const payload = response.data?.success ? response.data.data : response.data;
+    const status = payload?.status;
+    if (!status) {
+      updateDiscordRpcInstallButtonState();
+      renderDiscordRpcStatus(i18n.t('settings.discord_rpc.status_error'), true);
+      return;
+    }
+
+    const savedEnabled = currentConfig?.discordRpc?.enabled || false;
+    const uiEnabled = document.getElementById('discordRpcEnabled')?.checked || false;
+    const pendingEnableApply = uiEnabled && uiEnabled !== savedEnabled;
+    if (pendingEnableApply) {
+      updateDiscordRpcInstallButtonState(status);
+      renderDiscordRpcStatus(i18n.t('settings.discord_rpc.status_pending_apply'));
+      return;
+    }
+
+    updateDiscordRpcInstallButtonState(status);
+
+    if (!status.supported) {
+      renderDiscordRpcStatus(i18n.t('settings.discord_rpc.status_unsupported'), true);
+      return;
+    }
+
+    if (!status.enabled) {
+      renderDiscordRpcStatus(i18n.t('settings.discord_rpc.status_disabled'));
+      return;
+    }
+
+    if (status.prefixBridgeInstalled) {
+      renderDiscordRpcStatus(i18n.t('settings.discord_rpc.status_ready'));
+      return;
+    }
+
+    renderDiscordRpcStatus(i18n.t('settings.discord_rpc.status_needs_install'), true);
+  } catch (error) {
+    console.error('[Settings] Failed to refresh Discord RPC status:', error);
+    updateDiscordRpcInstallButtonState();
+    renderDiscordRpcStatus(i18n.t('settings.discord_rpc.status_error'), true);
+  }
+}
+
+async function installDiscordRpcBridge() {
+  try {
+    showLoadingOverlay(i18n.t('settings.discord_rpc.installing'));
+    const response = await window.electronAPI.backend.call('/api/discord-rpc/install', { method: 'POST' });
+    if (!response.ok) {
+      throw new Error(response.data?.message || response.statusText || 'Install failed');
+    }
+
+    await refreshDiscordRpcStatus();
+    hideLoadingOverlay();
+    showSuccess(i18n.t('settings.discord_rpc.install_success'));
+  } catch (error) {
+    console.error('[Settings] Failed to install Discord RPC bridge:', error);
+    hideLoadingOverlay();
+    showError(i18n.t('settings.discord_rpc.install_failed'));
   }
 }
 

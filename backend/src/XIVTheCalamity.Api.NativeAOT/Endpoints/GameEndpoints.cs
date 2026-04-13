@@ -4,6 +4,7 @@ using XIVTheCalamity.Core.Models;
 using XIVTheCalamity.Core.Services;
 using XIVTheCalamity.Dalamud.Services;
 using XIVTheCalamity.Game.Launcher;
+using XIVTheCalamity.Platform.MacOS.Discord;
 using XIVTheCalamity.Platform;
 
 namespace XIVTheCalamity.Api.NativeAOT.Endpoints;
@@ -20,6 +21,7 @@ public static class GameEndpoints
             ConfigService configService,
             DalamudInjectorService dalamudInjector,
             DalamudPathService dalamudPathService,
+            DiscordRpcBridgeService discordRpcBridgeService,
             IEnvironmentService environmentService,
             ILogger<Program> logger,
             CancellationToken cancellationToken) =>
@@ -34,7 +36,13 @@ public static class GameEndpoints
                 {
                     return Results.BadRequest(ApiErrorResponse.Create("GAME_PATH_NOT_CONFIGURED", "Game path not configured"));
                 }
-                
+
+                var manageDiscordRpcSymlink = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) && config.DiscordRpc.Enabled;
+                if (manageDiscordRpcSymlink)
+                {
+                    await discordRpcBridgeService.EnsureTmpDirSymlinkReadyAsync(cancellationToken);
+                }
+                 
                 string? dalamudRuntimePath = null;
                 if (config.Dalamud.Enabled)
                 {
@@ -72,24 +80,44 @@ public static class GameEndpoints
                             logger,
                             CancellationToken.None);
                     }
-                    
-                    logger.LogInformation("[GAME] Waiting for game exit...");
-                    await result.Process.WaitForExitAsync(cancellationToken);
-                    var exitCode = result.Process.ExitCode;
-                    
-                    logger.LogInformation("[GAME] Game exited with code: {ExitCode}", exitCode);
-                    
-                    return Results.Ok(ApiResponse<GameLaunchResponse>.Ok(
-                        new GameLaunchResponse(result.ProcessId ?? 0, exitCode)));
+
+                    try
+                    {
+                        logger.LogInformation("[GAME] Waiting for game exit...");
+                        await result.Process.WaitForExitAsync(cancellationToken);
+                        var exitCode = result.Process.ExitCode;
+
+                        logger.LogInformation("[GAME] Game exited with code: {ExitCode}", exitCode);
+
+                        return Results.Ok(ApiResponse<GameLaunchResponse>.Ok(
+                            new GameLaunchResponse(result.ProcessId ?? 0, exitCode)));
+                    }
+                    finally
+                    {
+                        if (manageDiscordRpcSymlink)
+                        {
+                            await CleanupDiscordRpcSymlinkAsync(discordRpcBridgeService, logger, CancellationToken.None);
+                        }
+                    }
                 }
                 else if (result.Success)
                 {
+                    if (manageDiscordRpcSymlink)
+                    {
+                        await CleanupDiscordRpcSymlinkAsync(discordRpcBridgeService, logger, CancellationToken.None);
+                    }
+
                     logger.LogWarning("[GAME] Fake launch started but process reference lost");
                     return Results.Ok(ApiResponse<GameLaunchResponse>.Ok(
                         new GameLaunchResponse(result.ProcessId ?? 0, -1)));
                 }
                 else
                 {
+                    if (manageDiscordRpcSymlink)
+                    {
+                        await CleanupDiscordRpcSymlinkAsync(discordRpcBridgeService, logger, CancellationToken.None);
+                    }
+
                     logger.LogError("[GAME] Fake launch failed: {Error}", result.ErrorMessage);
                     return Results.BadRequest(ApiErrorResponse.Create("GAME_LAUNCH_FAILED", result.ErrorMessage ?? "Failed to launch game"));
                 }
@@ -109,6 +137,7 @@ public static class GameEndpoints
             ConfigService configService,
             DalamudInjectorService dalamudInjector,
             DalamudPathService dalamudPathService,
+            DiscordRpcBridgeService discordRpcBridgeService,
             IEnvironmentService environmentService,
             ILogger<Program> logger,
             CancellationToken cancellationToken) =>
@@ -128,7 +157,13 @@ public static class GameEndpoints
                 {
                     return Results.BadRequest(ApiErrorResponse.Create("GAME_PATH_NOT_CONFIGURED", "Game path not configured"));
                 }
-                
+
+                var manageDiscordRpcSymlink = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) && config.DiscordRpc.Enabled;
+                if (manageDiscordRpcSymlink)
+                {
+                    await discordRpcBridgeService.EnsureTmpDirSymlinkReadyAsync(cancellationToken);
+                }
+                 
                 string? dalamudRuntimePath = null;
                 if (config.Dalamud.Enabled)
                 {
@@ -175,6 +210,11 @@ public static class GameEndpoints
 
                     if (!entryResult.Success)
                     {
+                        if (manageDiscordRpcSymlink)
+                        {
+                            await CleanupDiscordRpcSymlinkAsync(discordRpcBridgeService, logger, CancellationToken.None);
+                        }
+
                         logger.LogError("[GAME] EntryPoint launch failed: {Error}", entryResult.ErrorMessage);
                         return Results.BadRequest(ApiErrorResponse.Create(
                             "GAME_LAUNCH_FAILED", entryResult.ErrorMessage ?? "EntryPoint launch failed"));
@@ -258,12 +298,17 @@ public static class GameEndpoints
                             logger,
                             CancellationToken.None);
                     }
-                    
+
                     return Results.Ok(ApiResponse<GameLaunchResponse>.Ok(
                         new GameLaunchResponse(result.ProcessId ?? 0)));
                 }
                 else
                 {
+                    if (manageDiscordRpcSymlink)
+                    {
+                        await CleanupDiscordRpcSymlinkAsync(discordRpcBridgeService, logger, CancellationToken.None);
+                    }
+
                     logger.LogError("[GAME] Launch failed: {Error}", result.ErrorMessage);
                     return Results.BadRequest(ApiErrorResponse.Create("GAME_LAUNCH_FAILED", result.ErrorMessage ?? "Failed to launch game"));
                 }
@@ -287,13 +332,35 @@ public static class GameEndpoints
         // GET /api/game/wait-exit
         group.MapGet("/wait-exit", async (
             GameLaunchService gameLaunchService,
+            DiscordRpcBridgeService discordRpcBridgeService,
             ILogger<Program> logger,
             CancellationToken cancellationToken) =>
         {
-            logger.LogInformation("[GAME] Waiting for game exit");
-            var exitCode = await gameLaunchService.WaitForExitAsync(cancellationToken);
-            return Results.Ok(ApiResponse<GameExitResponse>.Ok(new GameExitResponse(exitCode ?? 0)));
+            var manageDiscordRpcSymlink = RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
+
+            try
+            {
+                logger.LogInformation("[GAME] Waiting for game exit");
+                var exitCode = await gameLaunchService.WaitForExitAsync(cancellationToken);
+                return Results.Ok(ApiResponse<GameExitResponse>.Ok(new GameExitResponse(exitCode ?? 0)));
+            }
+            finally
+            {
+                if (manageDiscordRpcSymlink)
+                {
+                    await CleanupDiscordRpcSymlinkAsync(discordRpcBridgeService, logger, CancellationToken.None);
+                }
+            }
         });
+    }
+
+    private static async Task CleanupDiscordRpcSymlinkAsync(
+        DiscordRpcBridgeService discordRpcBridgeService,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        logger.LogInformation("[DISCORD-RPC] Symlink cleanup skipped (temporarily disabled for testing)");
+        await Task.CompletedTask;
     }
     
     private static async Task InjectDalamudAsync(
