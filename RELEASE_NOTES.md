@@ -1,5 +1,18 @@
 # Release Notes
 
+## v1.8.5
+#### 🇹🇼 zh-TW
+### 🔧 調整 (Mac版本)
+- 新增Discord Rich Presence IPC串接功能
+- 啟動器DRP，無需任何套件與啟用遊戲內橋接設定
+- 遊戲內如果要提供更豐富的DRP動態，需啟用遊戲內橋接，並啟用Dalamud，以及安裝Dalamud.RichPresence套件
+
+#### 🇺🇸 English
+### 🔧 Changes (Mac Version)
+- Added Discord Rich Presence IPC integration.
+- Launcher DRP now works without any extra package installation or enabling in-game bridge settings.
+- For richer in-game DRP updates, enable the in-game bridge, enable Dalamud, and install the `Dalamud.RichPresence` plugin.
+
 ## v1.8.0
 #### 🇹🇼 zh-TW
 ### ✨ 新功能
