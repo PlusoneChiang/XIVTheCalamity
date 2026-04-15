@@ -91,16 +91,7 @@ public class ConfigService
                 Console.WriteLine("[Config] Initialized ProtonGe config with defaults");
             }
 
-            if (config.DiscordRpc == null)
-            {
-                config.DiscordRpc = new DiscordRpcConfig
-                {
-                    Enabled = false,
-                    AutoInstall = true,
-                    BridgeVersion = "latest"
-                };
-                Console.WriteLine("[Config] Initialized Discord RPC config with defaults");
-            }
+            config.DiscordRpc ??= new DiscordRpcConfig();
              
             // Force-overwrite managed fields that users must not change
             config.Dalamud.PluginRepoUrl = DalamudConfig.ManagedPluginRepoUrl;
@@ -195,12 +186,7 @@ public class ConfigService
                 SafeMode = false,
                 PluginRepoUrl = DalamudConfig.ManagedPluginRepoUrl
             },
-            DiscordRpc = new DiscordRpcConfig
-            {
-                Enabled = false,
-                AutoInstall = true,
-                BridgeVersion = "latest"
-            },
+            DiscordRpc = new DiscordRpcConfig(),
             Launcher = new LauncherConfig
             {
                 EncryptedArguments = true,
@@ -299,12 +285,6 @@ public class ConfigService
             !Uri.TryCreate(config.Dalamud.PluginRepoUrl, UriKind.Absolute, out _))
         {
             throw new ArgumentException("PluginRepoUrl must be a valid URL");
-        }
-
-        // Validate Discord RPC config
-        if (string.IsNullOrWhiteSpace(config.DiscordRpc.BridgeVersion))
-        {
-            throw new ArgumentException("DiscordRpc.BridgeVersion must not be empty");
         }
     }
 

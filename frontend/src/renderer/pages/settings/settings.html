@@ -178,14 +178,11 @@
           <h2 data-i18n="settings.discord_rpc.title">Discord Rich Presence</h2>
           <div class="form-group">
             <div class="full-width">
-              <label>
-                <input type="checkbox" id="discordRpcEnabled">
-                <span data-i18n="settings.discord_rpc.enabled">啟用遊戲內 Discord Rich Presence</span>
-              </label>
-              <p class="help-text" data-i18n="settings.discord_rpc.enabled_help">啟用後由遊戲內 Dalamud.RichPresence 作為活動來源（需先儲存/套用）</p>
+              <p class="help-text" data-i18n="settings.discord_rpc.description">安裝 xbridge 以啟用遊戲內 Discord Rich Presence 橋接</p>
             </div>
             <div class="full-width button-group">
-              <button id="installDiscordRpcButton" class="btn btn-secondary btn-sm" data-i18n="settings.discord_rpc.install_button">安裝/修復 Bridge</button>
+              <button id="installDiscordRpcButton" class="btn btn-secondary btn-sm" data-i18n="settings.discord_rpc.install_button">安裝</button>
+              <button id="removeDiscordRpcButton" class="btn btn-danger btn-sm" data-i18n="settings.discord_rpc.remove_button">移除</button>
             </div>
             <div class="full-width">
               <p id="discordRpcStatusText" class="help-text" data-i18n="settings.discord_rpc.status_unknown">狀態：尚未檢查</p>

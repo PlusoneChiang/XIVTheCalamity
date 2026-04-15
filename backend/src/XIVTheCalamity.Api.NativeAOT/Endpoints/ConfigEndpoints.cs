@@ -105,14 +105,7 @@ public static class ConfigEndpoints
                         currentConfig.Dalamud.PluginRepoUrl = partialConfig.Dalamud.PluginRepoUrl;
                 }
 
-                // Discord RPC configuration
-                if (partialConfig.DiscordRpc != null)
-                {
-                    currentConfig.DiscordRpc.Enabled = partialConfig.DiscordRpc.Enabled;
-                    currentConfig.DiscordRpc.AutoInstall = partialConfig.DiscordRpc.AutoInstall;
-                    if (!string.IsNullOrWhiteSpace(partialConfig.DiscordRpc.BridgeVersion))
-                        currentConfig.DiscordRpc.BridgeVersion = partialConfig.DiscordRpc.BridgeVersion;
-                }
+                // Discord RPC configuration — no fields to update (DiscordRpcConfig is now empty)
                 
                 // Launcher configuration
                 if (partialConfig.Launcher != null)

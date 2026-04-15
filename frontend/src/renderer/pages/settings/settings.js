@@ -243,11 +243,9 @@ function populateForm(config) {
     document.getElementById('imePosY').value = config.wine.imeCandidatePositionY !== undefined ? config.wine.imeCandidatePositionY : 85;
   }
 
-  // Discord RPC bridge settings (macOS only)
-  const discordRpc = config.discordRpc || {};
-  if (document.getElementById('discordRpcEnabled')) {
-    document.getElementById('discordRpcEnabled').checked = discordRpc.enabled || false;
-    updateDiscordRpcInstallButtonState();
+  // Discord RPC bridge settings (macOS only) — no config fields to populate
+  if (document.getElementById('installDiscordRpcButton')) {
+    refreshDiscordRpcStatus();
   }
   
   // Dalamud settings
@@ -307,11 +305,7 @@ function collectFormData() {
       extraEnvironmentVariables: parseExtraEnvVars(document.getElementById('protongeExtraEnvVars')?.value || ''),
       launchOptions: document.getElementById('protongeLaunchOptions')?.value || '%command%'
     },
-    discordRpc: {
-      enabled: document.getElementById('discordRpcEnabled')?.checked || false,
-      autoInstall: currentConfig?.discordRpc?.autoInstall !== false,
-      bridgeVersion: 'latest'
-    },
+    discordRpc: {},
     dalamud: {
       enabled: document.getElementById('dalamudEnabled').checked,
       injectDelay: parseInt(document.getElementById('injectDelay').value),
@@ -622,12 +616,10 @@ function initWineTab() {
   document.getElementById('openCmdButton').addEventListener('click', () => openWineTool('wineconsole'));
 
   const installDiscordRpcButton = document.getElementById('installDiscordRpcButton');
+  const removeDiscordRpcButton = document.getElementById('removeDiscordRpcButton');
   if (installDiscordRpcButton) {
     installDiscordRpcButton.addEventListener('click', installDiscordRpcBridge);
-    document.getElementById('discordRpcEnabled')?.addEventListener('change', () => {
-      updateDiscordRpcInstallButtonState();
-      refreshDiscordRpcStatus();
-    });
+    removeDiscordRpcButton?.addEventListener('click', removeDiscordRpcBridge);
     refreshDiscordRpcStatus();
   }
 }
@@ -700,25 +692,11 @@ function renderDiscordRpcStatus(message, hasError = false) {
   el.style.color = hasError ? '#ef4444' : '';
 }
 
-function updateDiscordRpcInstallButtonState(bridgeStatus = null) {
+function updateDiscordRpcButtonStates(installed) {
   const installButton = document.getElementById('installDiscordRpcButton');
-  const enabledCheckbox = document.getElementById('discordRpcEnabled');
-  if (!installButton || !enabledCheckbox) return;
-
-  const savedEnabled = currentConfig?.discordRpc?.enabled || false;
-  const pendingEnableApply = enabledCheckbox.checked && enabledCheckbox.checked !== savedEnabled;
-
-  if (pendingEnableApply) {
-    installButton.disabled = true;
-    return;
-  }
-
-  if (!bridgeStatus) {
-    installButton.disabled = false;
-    return;
-  }
-
-  installButton.disabled = !bridgeStatus.supported || !enabledCheckbox.checked;
+  const removeButton = document.getElementById('removeDiscordRpcButton');
+  if (installButton) installButton.disabled = installed;
+  if (removeButton) removeButton.disabled = !installed;
 }
 
 async function refreshDiscordRpcStatus() {
@@ -727,7 +705,7 @@ async function refreshDiscordRpcStatus() {
   try {
     const response = await window.electronAPI.backend.call('/api/discord-rpc/status', { method: 'GET' });
     if (!response.ok) {
-      updateDiscordRpcInstallButtonState();
+      updateDiscordRpcButtonStates(false);
       renderDiscordRpcStatus(i18n.t('settings.discord_rpc.status_error'), true);
       return;
     }
@@ -735,41 +713,21 @@ async function refreshDiscordRpcStatus() {
     const payload = response.data?.success ? response.data.data : response.data;
     const status = payload?.status;
     if (!status) {
-      updateDiscordRpcInstallButtonState();
+      updateDiscordRpcButtonStates(false);
       renderDiscordRpcStatus(i18n.t('settings.discord_rpc.status_error'), true);
       return;
     }
 
-    const savedEnabled = currentConfig?.discordRpc?.enabled || false;
-    const uiEnabled = document.getElementById('discordRpcEnabled')?.checked || false;
-    const pendingEnableApply = uiEnabled && uiEnabled !== savedEnabled;
-    if (pendingEnableApply) {
-      updateDiscordRpcInstallButtonState(status);
-      renderDiscordRpcStatus(i18n.t('settings.discord_rpc.status_pending_apply'));
-      return;
-    }
-
-    updateDiscordRpcInstallButtonState(status);
-
-    if (!status.supported) {
-      renderDiscordRpcStatus(i18n.t('settings.discord_rpc.status_unsupported'), true);
-      return;
-    }
-
-    if (!status.enabled) {
-      renderDiscordRpcStatus(i18n.t('settings.discord_rpc.status_disabled'));
-      return;
-    }
+    updateDiscordRpcButtonStates(status.prefixBridgeInstalled);
 
     if (status.prefixBridgeInstalled) {
-      renderDiscordRpcStatus(i18n.t('settings.discord_rpc.status_ready'));
-      return;
+      renderDiscordRpcStatus(i18n.t('settings.discord_rpc.status_installed'));
+    } else {
+      renderDiscordRpcStatus(i18n.t('settings.discord_rpc.status_needs_install'), true);
     }
-
-    renderDiscordRpcStatus(i18n.t('settings.discord_rpc.status_needs_install'), true);
   } catch (error) {
     console.error('[Settings] Failed to refresh Discord RPC status:', error);
-    updateDiscordRpcInstallButtonState();
+    updateDiscordRpcButtonStates(false);
     renderDiscordRpcStatus(i18n.t('settings.discord_rpc.status_error'), true);
   }
 }
@@ -789,6 +747,24 @@ async function installDiscordRpcBridge() {
     console.error('[Settings] Failed to install Discord RPC bridge:', error);
     hideLoadingOverlay();
     showError(i18n.t('settings.discord_rpc.install_failed'));
+  }
+}
+
+async function removeDiscordRpcBridge() {
+  try {
+    showLoadingOverlay(i18n.t('settings.discord_rpc.removing'));
+    const response = await window.electronAPI.backend.call('/api/discord-rpc/remove', { method: 'POST' });
+    if (!response.ok) {
+      throw new Error(response.data?.message || response.statusText || 'Remove failed');
+    }
+
+    await refreshDiscordRpcStatus();
+    hideLoadingOverlay();
+    showSuccess(i18n.t('settings.discord_rpc.remove_success'));
+  } catch (error) {
+    console.error('[Settings] Failed to remove Discord RPC bridge:', error);
+    hideLoadingOverlay();
+    showError(i18n.t('settings.discord_rpc.remove_failed'));
   }
 }
 

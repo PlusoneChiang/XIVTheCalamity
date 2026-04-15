@@ -78,7 +78,7 @@ namespace XIVTheCalamity.Api.NativeAOT;
 [JsonSerializable(typeof(ApiResponse<WineSettingsAppliedResponse>))]
 [JsonSerializable(typeof(ApiResponse<DiscordRpcStatusResponse>))]
 [JsonSerializable(typeof(ApiResponse<DiscordRpcInstallResponse>))]
-[JsonSerializable(typeof(ApiResponse<DiscordRpcProducerStatusResponse>))]
+[JsonSerializable(typeof(ApiResponse<DiscordRpcRemoveResponse>))]
 
 // Game Response Types
 [JsonSerializable(typeof(GameLaunchResponse))]
@@ -115,14 +115,7 @@ public record WineToolLaunchResponse(bool Success, string Message, int? Pid = nu
 public record WineSettingsAppliedResponse(bool Success, string Message);
 public record DiscordRpcStatusResponse(DiscordRpcBridgeStatus Status);
 public record DiscordRpcInstallResponse(bool Success, string Message, DiscordRpcBridgeStatus Status);
-public record DiscordRpcProducerStatusResponse(
-    bool UseInGameProducer,
-    bool BridgeEnabled,
-    bool BridgeSupported,
-    bool BridgeInstalled,
-    bool DalamudEnabled,
-    bool RichPresencePluginInstalled,
-    string Reason);
+public record DiscordRpcRemoveResponse(bool Success, string Message, DiscordRpcBridgeStatus Status);
 
 // Game response types (NativeAOT compatible)
 public record GameLaunchResponse(int ProcessId, int? ExitCode = null);

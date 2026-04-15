@@ -1,5 +1,16 @@
 # Release Notes
 
+## v1.8.6
+#### 🇹🇼 zh-TW
+### 🔧 調整 (Mac版本)
+- Discord Rich Presence功能，改為使用我自行開發的橋接器-xbridge
+- 移除啟動器自帶的DC活動通知功能，改為遊戲內橋接器
+
+#### 🇺🇸 English
+### 🔧 Changes (Mac Version)
+- Discord Rich Presence now uses a self-developed bridge — xbridge.
+- Removed the launcher's built-in Discord activity notification; activity is now handled entirely by the in-game bridge.
+
 ## v1.8.5
 #### 🇹🇼 zh-TW
 ### 🔧 調整 (Mac版本)

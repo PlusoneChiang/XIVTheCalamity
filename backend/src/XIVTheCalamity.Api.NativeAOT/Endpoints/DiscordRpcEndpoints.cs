@@ -23,7 +23,7 @@ public static class DiscordRpcEndpoints
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "[DISCORD-RPC] Failed to get status");
+                logger.LogError(ex, "[XBRIDGE] Failed to get status");
                 return Results.Json(ApiErrorResponse.Create("INTERNAL_ERROR", "Failed to get Discord RPC status", ex.Message),
                     AppJsonContext.Default.ApiErrorResponse, statusCode: 500);
             }
@@ -38,60 +38,37 @@ public static class DiscordRpcEndpoints
             {
                 var result = await bridgeService.EnsureReadyAsync(forceInstall: true, cancellationToken);
                 if (!result.Success)
-                {
                     return Results.BadRequest(ApiErrorResponse.Create("DISCORD_RPC_INSTALL_FAILED", result.Message));
-                }
 
                 return Results.Ok(ApiResponse<DiscordRpcInstallResponse>.Ok(
                     new DiscordRpcInstallResponse(true, result.Message, result.Status)));
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "[DISCORD-RPC] Install failed");
-                return Results.Json(ApiErrorResponse.Create("INTERNAL_ERROR", "Failed to install Discord RPC bridge", ex.Message),
+                logger.LogError(ex, "[XBRIDGE] Install failed");
+                return Results.Json(ApiErrorResponse.Create("INTERNAL_ERROR", "Failed to install xbridge", ex.Message),
                     AppJsonContext.Default.ApiErrorResponse, statusCode: 500);
             }
         });
 
-        group.MapGet("/producer-status", async (
-            ConfigService configService,
-            DalamudPathService dalamudPathService,
+        group.MapPost("/remove", async (
             DiscordRpcBridgeService bridgeService,
             ILogger<Program> logger,
             CancellationToken cancellationToken) =>
         {
             try
             {
-                var config = await configService.LoadConfigAsync();
-                var bridgeStatus = await bridgeService.GetStatusAsync(cancellationToken);
-                var richPresencePluginInstalled = Directory.Exists(
-                    Path.Combine(dalamudPathService.PluginsPath, "Dalamud.RichPresence"));
+                var result = await bridgeService.RemoveAsync(cancellationToken);
+                if (!result.Success)
+                    return Results.BadRequest(ApiErrorResponse.Create("DISCORD_RPC_REMOVE_FAILED", result.Message));
 
-                var useInGameProducer =
-                    bridgeStatus.Enabled &&
-                    bridgeStatus.Supported &&
-                    bridgeStatus.PrefixBridgeInstalled &&
-                    config.Dalamud.Enabled &&
-                    richPresencePluginInstalled;
-
-                var reason = useInGameProducer
-                    ? "In-game DRP producer is ready."
-                    : "Falling back to launcher producer because one or more prerequisites are missing.";
-
-                return Results.Ok(ApiResponse<DiscordRpcProducerStatusResponse>.Ok(
-                    new DiscordRpcProducerStatusResponse(
-                        useInGameProducer,
-                        bridgeStatus.Enabled,
-                        bridgeStatus.Supported,
-                        bridgeStatus.PrefixBridgeInstalled,
-                        config.Dalamud.Enabled,
-                        richPresencePluginInstalled,
-                        reason)));
+                return Results.Ok(ApiResponse<DiscordRpcRemoveResponse>.Ok(
+                    new DiscordRpcRemoveResponse(true, result.Message, result.Status)));
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "[DISCORD-RPC] Failed to evaluate producer status");
-                return Results.Json(ApiErrorResponse.Create("INTERNAL_ERROR", "Failed to evaluate Discord RPC producer status", ex.Message),
+                logger.LogError(ex, "[XBRIDGE] Remove failed");
+                return Results.Json(ApiErrorResponse.Create("INTERNAL_ERROR", "Failed to remove xbridge", ex.Message),
                     AppJsonContext.Default.ApiErrorResponse, statusCode: 500);
             }
         });
