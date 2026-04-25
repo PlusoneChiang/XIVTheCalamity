@@ -1,12 +1,19 @@
 #!/bin/bash
 # Package Wine runtime for GitHub Release distribution.
-# Copies wine/ to a temp directory, removes signatures, strips binaries, and creates a tar.xz archive.
+# Copies wine/ to a temp directory and creates a tar.xz archive.
+# Code signatures from build-winecx-and-signing.sh are PRESERVED intentionally:
+#   - Developer ID signatures allow loading on any macOS (including Apple Silicon via Rosetta 2)
+#   - Hardened Runtime + entitlements (allow-jit, disable-library-validation) travel with the signature
+#   - strip is NOT repeated here; it was already done in build-winecx-and-signing.sh before signing
 #
 # Usage:
 #   ./scripts/package-wine-release.sh [version]
 #
 # Example:
 #   ./scripts/package-wine-release.sh v2026.01.24
+#
+# Prerequisites:
+#   Run scripts/build-winecx-and-signing.sh first to build and sign Wine.
 
 set -e
 
@@ -58,21 +65,31 @@ chmod -R u+w "$TEMP_WINE"
 find "$TEMP_WINE" -name ".DS_Store" -delete 2>/dev/null || true
 find "$TEMP_WINE" -name "._*" -delete 2>/dev/null || true
 
-# Step 2: Remove code signatures
-echo "🔓 Removing code signatures..."
-SIGNED_COUNT=0
-while IFS= read -r -d '' file; do
-  if codesign -dv "$file" 2>/dev/null; then
-    codesign --remove-signature "$file" 2>/dev/null && SIGNED_COUNT=$((SIGNED_COUNT + 1))
+# Step 1.5: Verify Wine binaries are signed before packaging
+echo "🔏 Verifying Wine code signatures..."
+VERIFY_FAILED=0
+for CHECK_FILE in "$TEMP_WINE/bin/wine64" "$TEMP_WINE/bin/wineserver"; do
+  if [ -f "$CHECK_FILE" ]; then
+    CODESIGN_OUT=$(codesign -dv "$CHECK_FILE" 2>&1)
+    # Accept any real certificate signature (TeamIdentifier present and not "not set")
+    # Ad-hoc signatures show "TeamIdentifier=not set"; unsigned show "code object is not signed"
+    if echo "$CODESIGN_OUT" | grep -q "TeamIdentifier=" && \
+       ! echo "$CODESIGN_OUT" | grep -q "TeamIdentifier=not set"; then
+      TEAM=$(echo "$CODESIGN_OUT" | grep "TeamIdentifier=" | head -1)
+      echo "   ✅ Signed: $(basename "$CHECK_FILE") ($TEAM)"
+    else
+      echo "❌ Not signed with a Developer ID certificate: $CHECK_FILE"
+      VERIFY_FAILED=1
+    fi
   fi
-done < <(find "$TEMP_WINE" -type f \( -name "*.dylib" -o -name "*.so" -o -perm -111 \) -print0)
-echo "   Removed signatures from $SIGNED_COUNT files"
-
-# Step 3: Strip debug symbols
-echo "✂️  Stripping debug symbols..."
-find "$TEMP_WINE" -type f -name "*.dylib" -exec strip -x {} \; 2>/dev/null || true
-find "$TEMP_WINE" -type f -name "*.so" -exec strip -x {} \; 2>/dev/null || true
-find "$TEMP_WINE/bin" -type f -perm -111 -exec strip -x {} \; 2>/dev/null || true
+done
+if [ "$VERIFY_FAILED" -eq 1 ]; then
+  echo ""
+  echo "❌ One or more Wine binaries are not signed with a Developer ID."
+  echo "   Please run scripts/build-winecx-and-signing.sh (with CSC_NAME set) first."
+  rm -rf "$TEMP_DIR"
+  exit 1
+fi
 
 # Report size after processing
 PROCESSED_SIZE=$(du -sh "$TEMP_WINE" | cut -f1)

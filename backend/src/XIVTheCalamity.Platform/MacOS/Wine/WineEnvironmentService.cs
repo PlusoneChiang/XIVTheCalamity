@@ -118,6 +118,7 @@ public class WineEnvironmentService(
                 IsComplete = wineProgress.IsComplete,
                 HasError = wineProgress.HasError,
                 ErrorMessageKey = wineProgress.ErrorMessageKey,
+                Params = wineProgress.ErrorParams,
                 ExtraData = wineProgress.ErrorParams
             };
             

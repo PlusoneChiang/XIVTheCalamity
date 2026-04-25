@@ -1,5 +1,16 @@
 # Release Notes
 
+## v1.8.7
+#### 🇹🇼 zh-TW
+### 🐛 修正 (Mac版本)
+- 修正M5使用者啟動失敗問題。
+- 修正錯誤訊息無法正確傳遞問題。
+
+#### 🇺🇸 English
+### 🐛 Bug Fixes (Mac Version)
+- Fixed startup failure for M5 users.
+- Fixed error messages not being passed correctly.
+
 ## v1.8.6
 #### 🇹🇼 zh-TW
 ### 🔧 調整 (Mac版本)

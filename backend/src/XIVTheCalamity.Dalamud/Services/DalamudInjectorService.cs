@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using XIVTheCalamity.Core.Models;
 using XIVTheCalamity.Platform;
+using XIVTheCalamity.Platform.MacOS.Wine;
 
 namespace XIVTheCalamity.Dalamud.Services;
 
@@ -1412,6 +1413,60 @@ public class DalamudInjectorService
         }
     }
     
+    #endregion
+
+    #region Wine prefix helpers
+
+    /// <summary>
+    /// Creates a symlink at <c>C:\Program Files\dotnet</c> inside the Wine prefix pointing to
+    /// the Dalamud runtime directory. This allows processes spawned from within Wine
+    /// (e.g. Browsingway.Renderer.exe) to locate the .NET runtime via the default fallback
+    /// path without relying on DOTNET_ROOT environment variable inheritance.
+    ///
+    /// Wine does NOT propagate HKLM system environment registry keys into child process
+    /// environments, so the registry approach does not work. The .NET apphost falls back to
+    /// <c>C:\Program Files\dotnet</c> when DOTNET_ROOT is not set, making this symlink
+    /// the most reliable cross-process solution.
+    /// </summary>
+    public void EnsureDotnetProgramFilesSymlink(string runtimePath)
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) return;
+
+        try
+        {
+            var winePaths = WinePathService.Instance;
+            var programFiles = Path.Combine(winePaths.PrefixDriveC, "Program Files");
+            var dotnetLink = Path.Combine(programFiles, "dotnet");
+
+            // Already a correct symlink?
+            if (Directory.Exists(dotnetLink) || File.Exists(dotnetLink))
+            {
+                var linkTarget = Directory.ResolveLinkTarget(dotnetLink, true)?.FullName;
+                if (linkTarget is not null &&
+                    Path.GetFullPath(linkTarget) == Path.GetFullPath(runtimePath))
+                {
+                    _logger.LogDebug("[DALAMUD] C:\\Program Files\\dotnet symlink already correct: {Link} -> {Target}", dotnetLink, runtimePath);
+                    return;
+                }
+
+                // Points elsewhere or is a real directory — remove and recreate
+                _logger.LogInformation("[DALAMUD] Removing existing C:\\Program Files\\dotnet entry to update symlink");
+                if (Directory.ResolveLinkTarget(dotnetLink, false) is not null)
+                    Directory.Delete(dotnetLink);
+                else
+                    Directory.Delete(dotnetLink, true);
+            }
+
+            Directory.CreateDirectory(programFiles);
+            Directory.CreateSymbolicLink(dotnetLink, runtimePath);
+            _logger.LogInformation("[DALAMUD] Created C:\\Program Files\\dotnet symlink: {Link} -> {Target}", dotnetLink, runtimePath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[DALAMUD] Failed to create C:\\Program Files\\dotnet symlink (non-fatal)");
+        }
+    }
+
     #endregion
 }
 public class DalamudInjectionOptions

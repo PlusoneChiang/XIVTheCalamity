@@ -139,6 +139,7 @@ public static class GameEndpoints
                 if (config.Dalamud.Enabled)
                 {
                     dalamudRuntimePath = dalamudPathService.RuntimePath;
+                    dalamudInjector.EnsureDotnetProgramFilesSymlink(dalamudPathService.RuntimePath);
                 }
 
                 // EntryPoint mode: Dalamud.Injector launches the game directly

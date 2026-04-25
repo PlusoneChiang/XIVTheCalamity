@@ -1078,7 +1078,10 @@ function startEnvironmentInitialization() {
           console.error('[ENV-INIT] Error data:', data);
           
           const errorMsg = data.errorMessageKey
-            ? (data.errorParams ? i18n.t(data.errorMessageKey, data.errorParams) : i18n.t(data.errorMessageKey))
+            ? ((() => {
+                const errorParams = data.params ?? data.extraData ?? data.errorParams;
+                return errorParams ? i18n.t(data.errorMessageKey, errorParams) : i18n.t(data.errorMessageKey);
+              })())
             : i18n.t('error.unknown');
           
           showError(errorMsg);
