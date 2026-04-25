@@ -5,11 +5,13 @@
 ### 🐛 修正 (Mac版本)
 - 修正M5使用者啟動失敗問題。
 - 修正錯誤訊息無法正確傳遞問題。
+- 更新winecx版本為v2026.04.25，補上開發者簽章。
 
 #### 🇺🇸 English
 ### 🐛 Bug Fixes (Mac Version)
 - Fixed startup failure for M5 users.
 - Fixed error messages not being passed correctly.
+- Updated winecx to v2026.04.25 with Developer ID code signatures applied.
 
 ## v1.8.6
 #### 🇹🇼 zh-TW
