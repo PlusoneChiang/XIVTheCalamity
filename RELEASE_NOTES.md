@@ -1,5 +1,22 @@
 # Release Notes
 
+## v1.8.8
+#### 🇹🇼 zh-TW
+### ✨ 新功能 (Mac版本)
+- 新增 Wine 設定選項：`UseHomeAlias`（UI：**啟用Home目錄相容模式**）。
+- 啟用後會在 `/tmp` 自動建立 Home alias，並於啟動時套用到 Wine 執行環境路徑。
+
+### 🔧 調整 (Mac版本)
+- 強化 Home 路徑一致性處理，降低特殊使用者目錄名稱（例如尾端 `.`）造成的路徑映射問題。
+
+#### 🇺🇸 English
+### ✨ New Features (Mac Version)
+- Added a new Wine setting: `UseHomeAlias` (UI: **Enable Home directory compatibility mode**).
+- When enabled, the launcher automatically creates a Home alias under `/tmp` and applies it to Wine runtime paths.
+
+### 🔧 Changes (Mac Version)
+- Improved Home path consistency handling to reduce path mapping issues caused by special user directory names (e.g., trailing `.`).
+
 ## v1.8.7
 #### 🇹🇼 zh-TW
 ### 🐛 修正 (Mac版本)
