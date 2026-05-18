@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using XIVTheCalamity.Core.Services;
 
 namespace XIVTheCalamity.Core.Models;
 
@@ -27,13 +28,13 @@ public class GameConfig
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
             appSupport = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                HomePathService.GetEffectiveHomePath(),
                 "Library", "Application Support");
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
             appSupport = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                HomePathService.GetEffectiveHomePath(),
                 ".config");
         }
         

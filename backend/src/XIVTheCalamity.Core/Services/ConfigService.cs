@@ -72,7 +72,8 @@ public class ConfigService
                     AudioRouting = false,
                     EsyncEnabled = true,
                     Msync = true,
-                    WineDebug = ""
+                    WineDebug = "",
+                    UseHomeAlias = false
                 };
                 Console.WriteLine("[Config] Initialized Wine config with defaults");
             }
@@ -211,7 +212,8 @@ public class ConfigService
                 AudioRouting = false,
                 EsyncEnabled = true,
                 Msync = true,
-                WineDebug = ""
+                WineDebug = "",
+                UseHomeAlias = false
             };
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))

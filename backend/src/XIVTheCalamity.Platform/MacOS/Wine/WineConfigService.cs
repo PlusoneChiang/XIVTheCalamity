@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using XIVTheCalamity.Core.Models;
+using XIVTheCalamity.Core.Services;
 
 namespace XIVTheCalamity.Platform.MacOS.Wine;
 
@@ -164,13 +165,13 @@ public class WineConfigService
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
             appSupport = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                HomePathService.GetEffectiveHomePath(),
                 "Library", "Application Support");
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
             appSupport = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                HomePathService.GetEffectiveHomePath(),
                 ".config");
         }
         

@@ -62,7 +62,7 @@ public class PlatformPathService
     private PlatformPathService()
     {
         CurrentPlatform = GetCurrentPlatform();
-        var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var homeDir = HomePathService.GetEffectiveHomePath();
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {

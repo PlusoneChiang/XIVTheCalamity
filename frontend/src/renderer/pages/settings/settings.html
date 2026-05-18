@@ -214,6 +214,13 @@
               </label>
               <p class="help-text" data-i18n="settings.wine.msync_help">macOS 同步機制</p>
             </div>
+            <div class="platform-darwin">
+              <label>
+                <input type="checkbox" id="useHomeAlias">
+                <span data-i18n="settings.wine.use_home_alias">啟用Home目錄相容模式</span>
+              </label>
+              <p class="help-text" data-i18n="settings.wine.use_home_alias_help">在 /tmp 建立 Home 目錄別名，改善特殊使用者目錄名稱的路徑相容性</p>
+            </div>
             <div class="full-width">
               <label for="wineDebug" data-i18n="settings.wine.wine_debug">Wine Debug 參數</label>
               <input type="text" id="wineDebug" placeholder="-all,+module">

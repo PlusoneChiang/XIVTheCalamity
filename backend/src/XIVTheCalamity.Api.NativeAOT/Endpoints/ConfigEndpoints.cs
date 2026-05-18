@@ -89,6 +89,7 @@ public static class ConfigEndpoints
                     currentConfig.Wine.EsyncEnabled = partialConfig.Wine.EsyncEnabled;
                     currentConfig.Wine.Msync = partialConfig.Wine.Msync;
                     currentConfig.Wine.WineDebug = partialConfig.Wine.WineDebug;
+                    currentConfig.Wine.UseHomeAlias = partialConfig.Wine.UseHomeAlias;
                     currentConfig.Wine.LeftOptionIsAlt = partialConfig.Wine.LeftOptionIsAlt;
                     currentConfig.Wine.RightOptionIsAlt = partialConfig.Wine.RightOptionIsAlt;
                     currentConfig.Wine.LeftCommandIsCtrl = partialConfig.Wine.LeftCommandIsCtrl;

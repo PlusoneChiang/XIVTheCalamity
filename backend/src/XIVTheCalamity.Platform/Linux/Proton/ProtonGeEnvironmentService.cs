@@ -415,7 +415,7 @@ public class ProtonGeEnvironmentService(
             return baseLauncher;
 
         var tokens = prefix.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var home = HomePathService.GetEffectiveHomePath();
         var wrapperExe = tokens[0].Replace("~", home);
 
         // new PrefixArgs = wrapper extra tokens + original exe + original prefix args

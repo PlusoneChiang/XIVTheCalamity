@@ -229,6 +229,7 @@ function populateForm(config) {
     document.getElementById('esyncEnabled').checked = config.wine.esyncEnabled !== undefined ? config.wine.esyncEnabled : true;
     document.getElementById('fsyncEnabled').checked = config.wine.fsyncEnabled || false;
     document.getElementById('msyncEnabled').checked = config.wine.msync !== undefined ? config.wine.msync : true;
+    document.getElementById('useHomeAlias').checked = config.wine.useHomeAlias || false;
     document.getElementById('wineDebug').value = config.wine.wineDebug || '';
     console.log('[Settings] wineDebug value from config:', config.wine.wineDebug, '-> input set to:', document.getElementById('wineDebug').value);
     
@@ -286,6 +287,7 @@ function collectFormData() {
       esyncEnabled: document.getElementById('esyncEnabled').checked,
       fsyncEnabled: document.getElementById('fsyncEnabled').checked,
       msync: document.getElementById('msyncEnabled').checked,
+      useHomeAlias: document.getElementById('useHomeAlias').checked,
       wineDebug: document.getElementById('wineDebug').value,
       leftOptionIsAlt: document.getElementById('leftOptionMapping').value === 'true',
       rightOptionIsAlt: document.getElementById('rightOptionMapping').value === 'true',

@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using XIVTheCalamity.Core.Services;
 
 namespace XIVTheCalamity.Platform.MacOS.Wine;
 
@@ -50,7 +51,7 @@ public class WinePathService
             throw new PlatformNotSupportedException("Wine is only supported on macOS and Linux");
         }
 
-        var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var homeDir = HomePathService.GetEffectiveHomePath();
         
         AppSupport = Path.Combine(homeDir, "Library", "Application Support", "XIVTheCalamity");
         WinePrefix = Path.Combine(AppSupport, "wineprefix");

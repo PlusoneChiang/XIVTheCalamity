@@ -1,8 +1,11 @@
 using System.Diagnostics;
+using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using XIVTheCalamity.Core.Models;
+using XIVTheCalamity.Core.Services;
 using XIVTheCalamity.Game.Launcher.Encryption;
 using XIVTheCalamity.Platform;
 
@@ -106,6 +109,8 @@ public class GameLaunchService
     {
         try
         {
+            gamePath = HomePathService.MapToEffectiveHomePath(gamePath);
+
             // Validate game path
             var exePath = Path.Combine(gamePath, "game", "ffxiv_dx11.exe");
             if (!File.Exists(exePath))
@@ -174,6 +179,17 @@ public class GameLaunchService
                 
                 // Get environment variables
                 var baseEnvironment = _environmentService.GetEnvironment();
+
+                var consistencyError = ValidateMacPathConsistency(gamePath, ffxivConfigPath, baseEnvironment);
+                if (!string.IsNullOrEmpty(consistencyError))
+                {
+                    _logger.LogError("[GAME] {Error}", consistencyError);
+                    return new GameLaunchResult
+                    {
+                        Success = false,
+                        ErrorMessage = consistencyError
+                    };
+                }
                 
                 // Add Dalamud runtime if provided
                 // CRITICAL: Must convert to Wine Z:\ path format
@@ -253,7 +269,7 @@ public class GameLaunchService
     /// </summary>
     private static string GetFfxivConfigPath()
     {
-        var homeDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var homeDir = HomePathService.GetEffectiveHomePath();
         string appSupport;
         
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
@@ -286,6 +302,64 @@ public class GameLaunchService
         if (string.IsNullOrEmpty(unixPath))
             return unixPath;
         return "Z:" + unixPath.Replace("/", "\\");
+    }
+
+    private static string? ValidateMacPathConsistency(
+        string gamePath,
+        string ffxivConfigPath,
+        IReadOnlyDictionary<string, string> environment)
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            return null;
+        }
+
+        var homeAlias = Environment.GetEnvironmentVariable("XIV_HOME_ALIAS");
+        var realHome = Environment.GetEnvironmentVariable("XIV_REAL_HOME");
+        if (string.IsNullOrWhiteSpace(homeAlias) || string.IsNullOrWhiteSpace(realHome))
+        {
+            return null;
+        }
+
+        var pathsToCheck = new List<string>
+        {
+            gamePath,
+            ffxivConfigPath
+        };
+
+        if (environment.TryGetValue("WINEPREFIX", out var winePrefix) && !string.IsNullOrWhiteSpace(winePrefix))
+        {
+            pathsToCheck.Add(winePrefix);
+        }
+
+        if (environment.TryGetValue("HOME", out var homePath) && !string.IsNullOrWhiteSpace(homePath))
+        {
+            pathsToCheck.Add(homePath);
+        }
+
+        var hasAliasPath = pathsToCheck.Any(p => IsPathUnderRoot(p, homeAlias));
+        var hasRealPath = pathsToCheck.Any(p => IsPathUnderRoot(p, realHome));
+
+        if (hasAliasPath && hasRealPath)
+        {
+            return "Detected mixed Home path roots (alias and real) in launch parameters. Please reopen launcher or disable Home alias compatibility mode.";
+        }
+
+        return null;
+    }
+
+    private static bool IsPathUnderRoot(string path, string root)
+    {
+        if (string.IsNullOrWhiteSpace(path) || string.IsNullOrWhiteSpace(root))
+        {
+            return false;
+        }
+
+        var normalizedPath = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var normalizedRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+        return string.Equals(normalizedPath, normalizedRoot, StringComparison.Ordinal) ||
+               normalizedPath.StartsWith(normalizedRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal);
     }
     
     private async Task<GameLaunchResult> LaunchWindowsAsync(
@@ -418,7 +492,7 @@ public class GameLaunchService
         // Ensure HOME is set
         if (!startInfo.Environment.ContainsKey("HOME"))
         {
-            startInfo.Environment["HOME"] = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            startInfo.Environment["HOME"] = HomePathService.GetEffectiveHomePath();
         }
 
         ApplyLinuxXModifiersEnvironment(startInfo);
@@ -652,6 +726,7 @@ public class GameLaunchService
     /// </summary>
     public (string ExePath, string Arguments) BuildGameLaunchArgs(string gamePath, string sessionId)
     {
+        gamePath = HomePathService.MapToEffectiveHomePath(gamePath);
         var exePath = Path.Combine(gamePath, "game", "ffxiv_dx11.exe");
 
         var argumentBuilder = new ArgumentBuilder()
@@ -753,13 +828,13 @@ public class GameLaunchService
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
             appSupport = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                HomePathService.GetEffectiveHomePath(),
                 "Library", "Application Support");
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
             appSupport = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                HomePathService.GetEffectiveHomePath(),
                 ".config");
         }
         

@@ -651,6 +651,76 @@ function isDevelopmentMode() {
 }
 
 /**
+ * Read Wine Home alias setting from config
+ */
+function isHomeAliasEnabledInConfig() {
+  if (!isMacOS) return false;
+
+  try {
+    const configPath = path.join(app.getPath('appData'), 'XIVTheCalamity', 'config.json');
+    if (!fs.existsSync(configPath)) return false;
+
+    const configData = fs.readFileSync(configPath, 'utf8');
+    const config = JSON.parse(configData);
+    return config?.wine?.useHomeAlias === true;
+  } catch (error) {
+    log.warn('[HomeAlias] Failed to read UseHomeAlias from config:', error.message);
+    return false;
+  }
+}
+
+/**
+ * Ensure /tmp home alias symlink exists and points to current home
+ */
+function ensureHomeAliasSymlink() {
+  if (!isMacOS) return null;
+
+  const realHome = app.getPath('home');
+  const uid = typeof process.getuid === 'function' ? process.getuid() : 'unknown';
+  const aliasPath = path.join('/tmp', `xivtc-home-${uid}`);
+
+  try {
+    let shouldRecreate = true;
+
+    try {
+      const stat = fs.lstatSync(aliasPath);
+      if (stat.isSymbolicLink()) {
+        const target = fs.readlinkSync(aliasPath);
+        const resolvedTarget = path.resolve(path.dirname(aliasPath), target);
+        if (resolvedTarget === path.resolve(realHome)) {
+          shouldRecreate = false;
+        }
+      }
+    } catch {
+      // Path not found, will create it
+    }
+
+    if (shouldRecreate) {
+      try {
+        const existing = fs.lstatSync(aliasPath);
+        if (existing.isSymbolicLink()) {
+          fs.unlinkSync(aliasPath);
+        } else {
+          fs.rmSync(aliasPath, { recursive: true, force: true });
+        }
+      } catch {
+        // Ignore if alias path does not exist
+      }
+
+      fs.symlinkSync(realHome, aliasPath);
+      log.info('[HomeAlias] Created home alias symlink:', `${aliasPath} -> ${realHome}`);
+    } else {
+      log.info('[HomeAlias] Reusing home alias symlink:', `${aliasPath} -> ${realHome}`);
+    }
+
+    return { aliasPath, realHome };
+  } catch (error) {
+    log.error('[HomeAlias] Failed to prepare home alias symlink:', error.message);
+    return null;
+  }
+}
+
+/**
  * Start the backend server
  */
 async function startBackend() {
@@ -674,20 +744,36 @@ async function startBackend() {
   
   // Determine environment based on config file
   const devMode = isDevelopmentMode();
+  const useHomeAlias = isHomeAliasEnabledInConfig();
   const aspnetEnv = devMode ? 'Development' : 'Production';
   log.info(`[Backend] Development mode: ${devMode ? 'ON' : 'OFF'}`);
   log.info(`[Backend] Using ASPNETCORE_ENVIRONMENT: ${aspnetEnv}`);
+  log.info(`[HomeAlias] UseHomeAlias: ${useHomeAlias ? 'ON' : 'OFF'}`);
+
+  const homeAliasInfo = useHomeAlias ? ensureHomeAliasSymlink() : null;
+  if (useHomeAlias && !homeAliasInfo) {
+    log.warn('[HomeAlias] UseHomeAlias enabled but alias setup failed, continuing with default HOME');
+  }
+
+  const backendEnv = {
+    ...process.env,
+    ASPNETCORE_ENVIRONMENT: aspnetEnv,
+    ASPNETCORE_LOGGING__CONSOLE__LOGLEVEL__DEFAULT: devMode ? 'Debug' : 'Information'
+  };
+
+  if (homeAliasInfo) {
+    backendEnv.XIV_HOME_ALIAS = homeAliasInfo.aliasPath;
+    backendEnv.XIV_REAL_HOME = homeAliasInfo.realHome;
+    backendEnv.XIV_USE_HOME_ALIAS = '1';
+    backendEnv.HOME = homeAliasInfo.aliasPath;
+  }
   
   return new Promise((resolve) => {
     backendProcess = spawn(backendExe, [], {
       cwd: backendDir, // Run in backend directory, not frontend
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: false,
-      env: { 
-        ...process.env, 
-        ASPNETCORE_ENVIRONMENT: aspnetEnv,
-        ASPNETCORE_LOGGING__CONSOLE__LOGLEVEL__DEFAULT: devMode ? 'Debug' : 'Information'
-      }
+      env: backendEnv
     });
     
     backendProcess.stdout.on('data', (data) => {

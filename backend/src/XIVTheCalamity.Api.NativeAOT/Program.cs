@@ -176,13 +176,13 @@ static string GetLogFilePath()
     if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
     {
         appSupport = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            HomePathService.GetEffectiveHomePath(),
             "Library", "Application Support");
     }
     else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
     {
         appSupport = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            HomePathService.GetEffectiveHomePath(),
             ".config");
     }
     

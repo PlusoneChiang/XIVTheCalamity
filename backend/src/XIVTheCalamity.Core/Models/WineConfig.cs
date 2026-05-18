@@ -61,6 +61,11 @@ public class WineConfig
     /// Wine debug flags (e.g., "-all,+module" or empty to disable)
     /// </summary>
     public string WineDebug { get; set; } = "";
+
+    /// <summary>
+    /// Enable Home alias compatibility mode on macOS.
+    /// </summary>
+    public bool UseHomeAlias { get; set; } = false;
     
     /// <summary>
     /// Map left Option key to Alt (macOS)
