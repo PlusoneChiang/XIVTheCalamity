@@ -6,11 +6,6 @@ namespace XIVTheCalamity.Core.Models;
 public class WineConfig
 {
     /// <summary>
-    /// Enable DXMT (DirectX to Metal)
-    /// </summary>
-    public bool DxmtEnabled { get; set; } = true;
-    
-    /// <summary>
     /// Enable MetalFX spatial upscaling
     /// </summary>
     public bool MetalFxSpatialEnabled { get; set; } = false;

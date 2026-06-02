@@ -78,7 +78,6 @@ public static class ConfigEndpoints
                 // Wine configuration
                 if (partialConfig.Wine != null)
                 {
-                    currentConfig.Wine.DxmtEnabled = partialConfig.Wine.DxmtEnabled;
                     currentConfig.Wine.MetalFxSpatialEnabled = partialConfig.Wine.MetalFxSpatialEnabled;
                     currentConfig.Wine.MetalFxSpatialFactor = partialConfig.Wine.MetalFxSpatialFactor;
                     currentConfig.Wine.Metal3PerformanceOverlay = partialConfig.Wine.Metal3PerformanceOverlay;

@@ -189,21 +189,13 @@ public class WineEnvironmentService(
             logger?.LogDebug("[WINE-ENV] Msync enabled");
         }
         
-        // DXMT configuration
-        if (config.DxmtEnabled)
-        {
-            env["XL_DXMT_ENABLED"] = "1";
-            env["MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS"] = "1";
-            env["DXMT_CONFIG"] = $"d3d11.metalSpatialUpscaleFactor={config.MetalFxSpatialFactor};d3d11.preferredMaxFrameRate={config.MaxFramerate};";
-            env["DXMT_METALFX_SPATIAL_SWAPCHAIN"] = config.MetalFxSpatialEnabled ? "1" : "0";
-            logger?.LogDebug("[WINE-ENV] DXMT enabled with MetalFX={MetalFx}, Framerate={Framerate}", 
-                config.MetalFxSpatialEnabled, config.MaxFramerate);
-        }
-        else
-        {
-            env["XL_DXMT_ENABLED"] = "0";
-            logger?.LogDebug("[WINE-ENV] DXMT disabled (DXVK mode)");
-        }
+        // Always use native DXMT on macOS.
+        env["XL_DXMT_ENABLED"] = "1";
+        env["MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS"] = "1";
+        env["DXMT_CONFIG"] = $"d3d11.metalSpatialUpscaleFactor={config.MetalFxSpatialFactor};d3d11.preferredMaxFrameRate={config.MaxFramerate};";
+        env["DXMT_METALFX_SPATIAL_SWAPCHAIN"] = config.MetalFxSpatialEnabled ? "1" : "0";
+        logger?.LogDebug("[WINE-ENV] DXMT enabled with MetalFX={MetalFx}, Framerate={Framerate}",
+            config.MetalFxSpatialEnabled, config.MaxFramerate);
         
         // Metal HUD
         if (config.Metal3PerformanceOverlay)
@@ -225,10 +217,8 @@ public class WineEnvironmentService(
         logger?.LogDebug("[WINE-ENV] IME candidate position: {X}%, {Y}%", 
             config.ImeCandidatePositionX, config.ImeCandidatePositionY);
         
-        // DLL Overrides - select based on DXMT setting
-        var dxgiOverride = config.DxmtEnabled ? "n" : "b";  // native for DXMT, builtin for DXVK
-        env["WINEDLLOVERRIDES"] = $"msquic=,mscoree=n,b;d3d9,d3d10core=n;d3d11=n;dxgi={dxgiOverride}";
-        logger?.LogDebug("[WINE-ENV] DLL overrides: dxgi={DxgiOverride}", dxgiOverride);
+        env["WINEDLLOVERRIDES"] = "msquic=,mscoree=n,b;d3d9,d3d10core=n;d3d11=n;dxgi=n";
+        logger?.LogDebug("[WINE-ENV] DLL overrides: d3d9,d3d10core,d3d11,dxgi=n");
     }
 
     public async Task<ProcessResult> ExecuteAsync(string command, string[] args, CancellationToken cancellationToken = default)

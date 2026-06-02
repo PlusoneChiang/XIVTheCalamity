@@ -16,7 +16,6 @@ public class WinePrefixService
 {
     private readonly WinePathService _paths;
     private readonly ILogger<WinePrefixService>? _logger;
-    private readonly GraphicsInstallerService _graphicsInstaller;
     
     // Registry batch mode support (from WineRegistryService)
     private WineRegistryFile? _batchFile;
@@ -26,7 +25,6 @@ public class WinePrefixService
     {
         _paths = WinePathService.Instance;
         _logger = logger;
-        _graphicsInstaller = new GraphicsInstallerService(null); // TODO: inject logger
     }
 
     /// <summary>
@@ -342,43 +340,7 @@ public class WinePrefixService
             yield break;
         }
 
-        // 6. Install graphics backend
-        yield return new WineInitProgress
-        {
-            Stage = WineInitStage.ConfiguringMedia,
-            MessageKey = "progress.installing_graphics"
-        };
-        _logger?.LogInformation("[WINE-INIT] Stage 6: Installing graphics backend");
-        
-        string? graphicsError = null;
-        try
-        {
-            var defaultConfig = new WineConfig
-            {
-                DxmtEnabled = true,
-                NativeResolution = false,
-                LeftOptionIsAlt = true,
-                RightOptionIsAlt = true,
-                LeftCommandIsCtrl = false,
-                RightCommandIsCtrl = false
-            };
-            await ApplyGraphicsSettingsAsync(defaultConfig, cancellationToken);
-        }
-        catch (Exception ex) { graphicsError = ex.Message; }
-        
-        if (graphicsError != null)
-        {
-            _logger?.LogError("[WINE-INIT] Failed to install graphics: {Error}", graphicsError);
-            yield return new WineInitProgress
-            {
-                HasError = true,
-                ErrorMessageKey = "error.init_failed",
-                ErrorParams = new Dictionary<string, object> { { "message", graphicsError } }
-            };
-            yield break;
-        }
-
-        // 7. Complete
+        // 6. Complete
         _logger?.LogInformation("[WINE-INIT] ========== Completed Successfully ==========");
         yield return new WineInitProgress
         {
@@ -390,21 +352,18 @@ public class WinePrefixService
 
     /// <summary>
     /// 套用圖形設定變更
-    /// 當 Wine 設定（如 DXMT 開關）變更時呼叫
+    /// 當 Wine 圖形設定變更時呼叫
     /// </summary>
     public async Task ApplyGraphicsSettingsAsync(WineConfig config, CancellationToken cancellationToken = default)
     {
-        _logger?.LogInformation("[WINE-SETTINGS] Applying graphics settings (DXMT={DxmtEnabled})", config.DxmtEnabled);
+        _logger?.LogInformation("[WINE-SETTINGS] Applying mac driver settings");
         
         try
         {
-            // Install DLLs
-            _graphicsInstaller.EnsureBackend(config.DxmtEnabled);
-            
             // Configure Mac Driver (Retina mode, keyboard mapping)
             await ConfigureMacDriverAsync(config, cancellationToken);
             
-            _logger?.LogInformation("[WINE-SETTINGS] Graphics settings applied successfully");
+            _logger?.LogInformation("[WINE-SETTINGS] Mac driver settings applied successfully");
         }
         catch (Exception ex)
         {

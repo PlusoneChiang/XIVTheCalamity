@@ -62,7 +62,6 @@ public class ConfigService
             {
                 config.Wine = new WineConfig
                 {
-                    DxmtEnabled = Environment.OSVersion.Version.Major >= 14,
                     MetalFxSpatialEnabled = false,
                     MetalFxSpatialFactor = 2.0,
                     Metal3PerformanceOverlay = false,
@@ -201,7 +200,6 @@ public class ConfigService
         {
             config.Wine = new WineConfig
             {
-                DxmtEnabled = Environment.OSVersion.Version.Major >= 14, // macOS 14.0+
                 MetalFxSpatialEnabled = false,
                 MetalFxSpatialFactor = 2.0,
                 Metal3PerformanceOverlay = false,

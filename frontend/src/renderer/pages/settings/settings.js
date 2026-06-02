@@ -215,9 +215,9 @@ function populateForm(config) {
   // Wine settings
   if (config.wine) {
     console.log('[Settings] Populating Wine settings:', JSON.stringify(config.wine));
-    document.getElementById('dxmtEnabled').checked = config.wine.dxmtEnabled || false;
     document.getElementById('metalFxEnabled').checked = config.wine.metalFxSpatialEnabled || false;
     document.getElementById('metalFxFactor').value = config.wine.metalFxSpatialFactor || 2.0;
+    document.getElementById('metalFxFactor').disabled = !document.getElementById('metalFxEnabled').checked;
     updateMetalFxFactorValue(config.wine.metalFxSpatialFactor || 2.0);
     document.getElementById('hudEnabled').checked = config.wine.metal3PerformanceOverlay || false;
     document.getElementById('hudScale').value = config.wine.hudScale || 1.0;
@@ -275,7 +275,6 @@ function collectFormData() {
       gamePath: document.getElementById('gamePath').value
     },
     wine: {
-      dxmtEnabled: document.getElementById('dxmtEnabled').checked,
       metalFxSpatialEnabled: document.getElementById('metalFxEnabled').checked,
       metalFxSpatialFactor: parseFloat(document.getElementById('metalFxFactor').value),
       metal3PerformanceOverlay: document.getElementById('hudEnabled').checked,
@@ -596,13 +595,6 @@ function initWineTab() {
   const hudScaleSlider = document.getElementById('hudScale');
   hudScaleSlider.addEventListener('input', (e) => {
     updateHudScaleValue(parseFloat(e.target.value));
-  });
-  
-  // DXMT toggle affects MetalFX
-  document.getElementById('dxmtEnabled').addEventListener('change', (e) => {
-    const isEnabled = e.target.checked;
-    document.getElementById('metalFxEnabled').disabled = !isEnabled;
-    document.getElementById('metalFxFactor').disabled = !isEnabled;
   });
   
   // MetalFX toggle affects factor slider

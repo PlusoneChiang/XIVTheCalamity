@@ -147,10 +147,8 @@ const translations = {
     
     // Wine settings
     'settings.wine.graphics': '圖形設定',
-    'settings.wine.dxmt': '啟用 DXMT',
-    'settings.wine.dxmt_help': 'macOS Metal 轉譯層，停用時自動切換 DXVK',
     'settings.wine.metalfx': '啟用 MetalFX',
-    'settings.wine.metalfx_help': 'Apple 升頻技術（需要 DXMT）',
+    'settings.wine.metalfx_help': 'Apple 升頻技術',
     'settings.wine.metalfx_factor': 'MetalFX 倍率',
     'settings.wine.metalfx_factor_help': '超解析倍率 (1x-4x，整數倍)',
     'settings.wine.hud': 'HUD 顯示',
@@ -594,10 +592,8 @@ const translations = {
     
     // Wine settings
     'settings.wine.graphics': 'Graphics',
-    'settings.wine.dxmt': 'Enable DXMT',
-    'settings.wine.dxmt_help': 'macOS Metal translation layer, auto-switches to DXVK when disabled',
     'settings.wine.metalfx': 'Enable MetalFX',
-    'settings.wine.metalfx_help': 'Apple upscaling technology (requires DXMT)',
+    'settings.wine.metalfx_help': 'Apple upscaling technology',
     'settings.wine.metalfx_factor': 'MetalFX Factor',
     'settings.wine.metalfx_factor_help': 'Upscaling factor (1x-4x, integer multiples)',
     'settings.wine.hud': 'HUD Display',

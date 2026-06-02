@@ -198,32 +198,17 @@ public class WinePathService
     }
 
     /// <summary>
-    /// Get DXMT/DXVK environment variables
+    /// Get DXMT environment variables
     /// </summary>
     public Dictionary<string, string> GetDxmtEnvironment(WineSettings settings)
     {
         var env = new Dictionary<string, string>();
 
-        // DXMT config
-        if (settings.DxmtEnabled)
-        {
-            env["XL_DXMT_ENABLED"] = "1";
-            env["MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS"] = "1";
-            env["DXMT_CONFIG"] = $"d3d11.metalSpatialUpscaleFactor={settings.MetalFxSpatialFactor};d3d11.preferredMaxFrameRate={settings.MaxFramerate};";
-            env["DXMT_METALFX_SPATIAL_SWAPCHAIN"] = settings.MetalFxSpatialEnabled ? "1" : "0";
-        }
-        else
-        {
-            env["XL_DXMT_ENABLED"] = "0";
-        }
-
-        // DXVK config
-        env["DXVK_HUD"] = settings.DxvkHud ?? "";
-        env["DXVK_ASYNC"] = settings.DxvkAsync ? "1" : "0";
-        env["DXVK_FRAME_RATE"] = settings.MaxFramerate.ToString();
-        env["DXVK_CONFIG_FILE"] = @"C:\dxvk.conf";
-        env["DXVK_STATE_CACHE_PATH"] = @"C:\";
-        env["DXVK_LOG_PATH"] = @"C:\";
+        // Always use native DXMT on macOS.
+        env["XL_DXMT_ENABLED"] = "1";
+        env["MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS"] = "1";
+        env["DXMT_CONFIG"] = $"d3d11.metalSpatialUpscaleFactor={settings.MetalFxSpatialFactor};d3d11.preferredMaxFrameRate={settings.MaxFramerate};";
+        env["DXMT_METALFX_SPATIAL_SWAPCHAIN"] = settings.MetalFxSpatialEnabled ? "1" : "0";
 
         // MSYNC
         env["WINEMSYNC"] = settings.Msync ? "1" : "0";
@@ -240,12 +225,9 @@ public class WinePathService
 /// </summary>
 public class WineSettings
 {
-    public bool DxmtEnabled { get; set; } = true;
     public int MetalFxSpatialFactor { get; set; } = 2;
     public int MaxFramerate { get; set; } = 60;
     public bool MetalFxSpatialEnabled { get; set; } = true;
-    public string? DxvkHud { get; set; }
-    public bool DxvkAsync { get; set; } = true;
     public bool Msync { get; set; } = true;
     public bool Metal3PerformanceOverlay { get; set; } = false;
 }
