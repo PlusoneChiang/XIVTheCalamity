@@ -1,10 +1,7 @@
 #!/bin/bash
 # Package Wine runtime for GitHub Release distribution.
-# Copies wine/ to a temp directory and creates a tar.xz archive.
-# Code signatures from build-winecx-and-signing.sh are PRESERVED intentionally:
-#   - Developer ID signatures allow loading on any macOS (including Apple Silicon via Rosetta 2)
-#   - Hardened Runtime + entitlements (allow-jit, disable-library-validation) travel with the signature
-#   - strip is NOT repeated here; it was already done in build-winecx-and-signing.sh before signing
+# Copies wine/ to a temp directory, applies override DLLs, re-signs binaries,
+# and creates a tar.xz archive.
 #
 # Usage:
 #   ./scripts/package-wine-release.sh [version]
@@ -13,17 +10,30 @@
 #   ./scripts/package-wine-release.sh v2026.01.24
 #
 # Prerequisites:
-#   Run scripts/build-winecx-and-signing.sh first to build and sign Wine.
+#   Run your Wine build script first to produce wine/ runtime.
+#   Set CSC_NAME for Developer ID signing.
 
 set -e
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WINE_DIR="$PROJECT_ROOT/wine"
 OUTPUT_DIR="$PROJECT_ROOT/Release"
+OVERRIDES_DIR="$PROJECT_ROOT/wine-builder/overrides/lib"
+ENTITLEMENTS_PATH="$PROJECT_ROOT/frontend/build/entitlements.mac.plist"
 
 if [ ! -d "$WINE_DIR/bin" ] || [ ! -f "$WINE_DIR/bin/wine" ]; then
   echo "❌ Wine not found at $WINE_DIR"
   echo "   Please build Wine first with wine-builder/build.sh"
+  exit 1
+fi
+
+if [ -z "${CSC_NAME:-}" ]; then
+  echo "❌ CSC_NAME is required for Wine signing in package step."
+  exit 1
+fi
+
+if [ ! -f "$ENTITLEMENTS_PATH" ]; then
+  echo "❌ Entitlements not found at $ENTITLEMENTS_PATH"
   exit 1
 fi
 
@@ -65,7 +75,21 @@ chmod -R u+w "$TEMP_WINE"
 find "$TEMP_WINE" -name ".DS_Store" -delete 2>/dev/null || true
 find "$TEMP_WINE" -name "._*" -delete 2>/dev/null || true
 
-# Step 1.5: Verify Wine binaries are signed before packaging
+# Step 1.5: Apply overrides
+if [ -d "$OVERRIDES_DIR" ]; then
+  echo "🧩 Applying override DLLs from $OVERRIDES_DIR ..."
+  rsync -a "$OVERRIDES_DIR/" "$TEMP_WINE/lib/"
+else
+  echo "⚠️  Override directory not found: $OVERRIDES_DIR (skip)"
+fi
+
+# Step 1.6: Re-sign Wine binaries after overrides
+echo "🔐 Re-signing Wine binaries..."
+CPU_COUNT=$(sysctl -n hw.ncpu 2>/dev/null || echo 4)
+find "$TEMP_WINE" -type f \( -name "*.dylib" -o -name "*.so" -o -perm -111 \) -print0 \
+  | xargs -0 -P "$CPU_COUNT" -n 1 /bin/sh -c 'codesign --force --timestamp=none --options runtime --entitlements "'"$ENTITLEMENTS_PATH"'" --sign "'"$CSC_NAME"'" "$0"'
+
+# Step 1.7: Verify Wine binaries are signed before packaging
 echo "🔏 Verifying Wine code signatures..."
 VERIFY_FAILED=0
 for CHECK_FILE in "$TEMP_WINE/bin/wine" "$TEMP_WINE/bin/wineserver"; do
