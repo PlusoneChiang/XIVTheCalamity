@@ -103,8 +103,8 @@ public class WinePathService
         WineBin = Path.Combine(WineRoot, "bin");
         WineDll = Path.Combine(WineRoot, "lib", "wine");
         
-        WineExecutable = Path.Combine(WineBin, "wine64");
-        Wine = Path.Combine(WineBin, "wine64");
+        WineExecutable = Path.Combine(WineBin, "wine");
+        Wine = Path.Combine(WineBin, "wine");
         Wineboot = Path.Combine(WineBin, "wineboot");
         WineServer = Path.Combine(WineBin, "wineserver");
         Winecfg = Path.Combine(WineBin, "winecfg");

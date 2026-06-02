@@ -17,10 +17,10 @@ public class WineMacOSDownloadService(
     private readonly HttpClient _httpClient = new();
     
     private string WineRoot => Path.Combine(_platformPaths.AppDataDirectory, "wine");
-    private string WinePath => Path.Combine(WineRoot, "bin", "wine64");
+    private string WinePath => Path.Combine(WineRoot, "bin", "wine");
     private string VersionFilePath => Path.Combine(WineRoot, ".wine-version");
     
-    private const string WineVersion = "v2026.04.25";
+    private const string WineVersion = "v2026.06.02.w11";
     private const string GithubRepo = "PlusoneChiang/winecx";
     private const string ArchiveName = $"wine-macos-x86_64-{WineVersion}.tar.xz";
     private const string DownloadUrl = $"https://github.com/{GithubRepo}/releases/download/{WineVersion}/{ArchiveName}";

@@ -21,7 +21,7 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WINE_DIR="$PROJECT_ROOT/wine"
 OUTPUT_DIR="$PROJECT_ROOT/Release"
 
-if [ ! -d "$WINE_DIR/bin" ] || [ ! -f "$WINE_DIR/bin/wine64" ]; then
+if [ ! -d "$WINE_DIR/bin" ] || [ ! -f "$WINE_DIR/bin/wine" ]; then
   echo "❌ Wine not found at $WINE_DIR"
   echo "   Please build Wine first with wine-builder/build.sh"
   exit 1
@@ -39,8 +39,8 @@ else
   fi
 fi
 
-# Detect architecture from wine64 binary
-ARCH=$(file "$WINE_DIR/bin/wine64" | grep -o 'x86_64\|arm64')
+# Detect architecture from wine binary
+ARCH=$(file "$WINE_DIR/bin/wine" | grep -o 'x86_64\|arm64')
 if [ -z "$ARCH" ]; then
   echo "❌ Could not detect Wine architecture"
   exit 1
@@ -68,7 +68,7 @@ find "$TEMP_WINE" -name "._*" -delete 2>/dev/null || true
 # Step 1.5: Verify Wine binaries are signed before packaging
 echo "🔏 Verifying Wine code signatures..."
 VERIFY_FAILED=0
-for CHECK_FILE in "$TEMP_WINE/bin/wine64" "$TEMP_WINE/bin/wineserver"; do
+for CHECK_FILE in "$TEMP_WINE/bin/wine" "$TEMP_WINE/bin/wineserver"; do
   if [ -f "$CHECK_FILE" ]; then
     CODESIGN_OUT=$(codesign -dv "$CHECK_FILE" 2>&1)
     # Accept any real certificate signature (TeamIdentifier present and not "not set")
