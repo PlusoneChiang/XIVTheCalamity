@@ -182,13 +182,6 @@ public class WineEnvironmentService(
             logger?.LogDebug("[WINE-ENV] Setting WINEDEBUG={WineDebug}", config.WineDebug);
         }
         
-        // Esync
-        if (config.EsyncEnabled)
-        {
-            env["WINEESYNC"] = "1";
-            logger?.LogDebug("[WINE-ENV] Esync enabled");
-        }
-        
         // Msync
         if (config.Msync)
         {
@@ -307,7 +300,7 @@ public class WineEnvironmentService(
         }
     }
 
-    public void StartAudioRouter(int gamePid, bool esyncEnabled, bool msyncEnabled)
+    public void StartAudioRouter(int gamePid, bool msyncEnabled)
     {
         if (audioRouterService == null)
         {
@@ -317,12 +310,12 @@ public class WineEnvironmentService(
 
         try
         {
-            logger?.LogInformation("[WINE-ENV] Starting audio router for game PID: {Pid}, Esync: {Esync}, Msync: {Msync}", 
-                gamePid, esyncEnabled, msyncEnabled);
+            logger?.LogInformation("[WINE-ENV] Starting audio router for game PID: {Pid}, Msync: {Msync}", 
+                gamePid, msyncEnabled);
             logger?.LogInformation("[WINE-ENV] Audio router params - WinePath: {WinePath}, WinePrefix: {WinePrefix}", 
                 _paths.Wine, _paths.WinePrefix);
             
-            var result = audioRouterService.StartRouter(gamePid, _paths.WinePrefix, _paths.Wine, esyncEnabled, msyncEnabled);
+            var result = audioRouterService.StartRouter(gamePid, _paths.WinePrefix, _paths.Wine, msyncEnabled);
             
             if (result)
             {

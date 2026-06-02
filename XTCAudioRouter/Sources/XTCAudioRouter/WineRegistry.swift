@@ -16,7 +16,6 @@ class WineRegistry {
     private let winePath: String
     private let winePrefix: String
     private let userRegPath: String
-    private let esync: Bool
     private let msync: Bool
     
     /// Base registry key for Wine CoreAudio driver
@@ -25,11 +24,10 @@ class WineRegistry {
     /// Counter for RescanDevices toggle
     private var rescanCounter: Int = 0
     
-    init(winePath: String, winePrefix: String, esync: Bool = true, msync: Bool = true) {
+    init(winePath: String, winePrefix: String, msync: Bool = true) {
         self.winePath = winePath
         self.winePrefix = winePrefix
         self.userRegPath = (winePrefix as NSString).appendingPathComponent("user.reg")
-        self.esync = esync
         self.msync = msync
     }
     
@@ -147,11 +145,10 @@ class WineRegistry {
         }.joined(separator: " ")
         
         // Build environment variables based on settings
-        let esyncValue = esync ? "1" : "0"
         let msyncValue = msync ? "1" : "0"
         
-        // Include WINEESYNC and WINEMSYNC to match game environment
-        let command = "WINEPREFIX='\(winePrefix)' WINEDEBUG=-all WINEESYNC=\(esyncValue) WINEMSYNC=\(msyncValue) '\(winePath)' \(wineArgs)"
+        // Include WINEMSYNC to match game environment
+        let command = "WINEPREFIX='\(winePrefix)' WINEDEBUG=-all WINEMSYNC=\(msyncValue) '\(winePath)' \(wineArgs)"
         process.arguments = ["-c", command]
         
         // Inherit current environment

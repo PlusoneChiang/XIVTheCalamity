@@ -226,7 +226,6 @@ function populateForm(config) {
     document.getElementById('maxFramerate').value = config.wine.maxFramerate || 60;
     document.getElementById('audioRouting').checked = config.wine.audioRouting || false;
     console.log('[Settings] audioRouting value from config:', config.wine.audioRouting, '-> checkbox set to:', document.getElementById('audioRouting').checked);
-    document.getElementById('esyncEnabled').checked = config.wine.esyncEnabled !== undefined ? config.wine.esyncEnabled : true;
     document.getElementById('fsyncEnabled').checked = config.wine.fsyncEnabled || false;
     document.getElementById('msyncEnabled').checked = config.wine.msync !== undefined ? config.wine.msync : true;
     document.getElementById('useHomeAlias').checked = config.wine.useHomeAlias || false;
@@ -284,7 +283,6 @@ function collectFormData() {
       nativeResolution: document.getElementById('nativeResolution').checked,
       maxFramerate: parseInt(document.getElementById('maxFramerate').value),
       audioRouting: document.getElementById('audioRouting').checked,
-      esyncEnabled: document.getElementById('esyncEnabled').checked,
       fsyncEnabled: document.getElementById('fsyncEnabled').checked,
       msync: document.getElementById('msyncEnabled').checked,
       useHomeAlias: document.getElementById('useHomeAlias').checked,

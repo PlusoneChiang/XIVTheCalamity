@@ -57,7 +57,6 @@ public static class GameEndpoints
                     if (config.Wine?.AudioRouting == true && result.ProcessId.HasValue)
                     {
                         environmentService.StartAudioRouter(result.ProcessId.Value,
-                            config.Wine?.EsyncEnabled ?? false,
                             config.Wine?.Msync ?? false);
                     }
                     
@@ -217,7 +216,6 @@ public static class GameEndpoints
                             if (config.Wine?.AudioRouting == true)
                             {
                                 environmentService.StartAudioRouter(entryResult.InjectorProcess.Id,
-                                    config.Wine?.EsyncEnabled ?? false,
                                     config.Wine?.Msync ?? false);
                             }
 
@@ -249,7 +247,6 @@ public static class GameEndpoints
                     if (config.Wine?.AudioRouting == true && result.ProcessId.HasValue)
                     {
                         environmentService.StartAudioRouter(result.ProcessId.Value,
-                            config.Wine?.EsyncEnabled ?? false,
                             config.Wine?.Msync ?? false);
                     }
                     

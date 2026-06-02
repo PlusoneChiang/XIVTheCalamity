@@ -77,9 +77,8 @@ public interface IEnvironmentService
     /// Start audio routing for game process (macOS only)
     /// </summary>
     /// <param name="gamePid">Game process ID</param>
-    /// <param name="esyncEnabled">Esync enabled</param>
     /// <param name="msyncEnabled">Msync enabled</param>
-    void StartAudioRouter(int gamePid, bool esyncEnabled, bool msyncEnabled);
+    void StartAudioRouter(int gamePid, bool msyncEnabled);
 }
 
 /// <summary>

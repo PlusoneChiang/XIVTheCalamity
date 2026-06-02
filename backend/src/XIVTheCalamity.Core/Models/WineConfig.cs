@@ -48,11 +48,6 @@ public class WineConfig
     public bool AudioRouting { get; set; } = false;
     
     /// <summary>
-    /// Enable Esync synchronization
-    /// </summary>
-    public bool EsyncEnabled { get; set; } = true;
-    
-    /// <summary>
     /// Enable Msync synchronization
     /// </summary>
     public bool Msync { get; set; } = true;

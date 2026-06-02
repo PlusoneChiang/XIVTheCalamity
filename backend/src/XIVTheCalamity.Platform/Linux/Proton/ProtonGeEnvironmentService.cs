@@ -714,7 +714,7 @@ public class ProtonGeEnvironmentService(
         return Task.CompletedTask;
     }
 
-    public void StartAudioRouter(int gamePid, bool esyncEnabled, bool msyncEnabled)
+    public void StartAudioRouter(int gamePid, bool msyncEnabled)
     {
         logger?.LogDebug("[PROTON-GE] StartAudioRouter called (no-op for Linux)");
     }

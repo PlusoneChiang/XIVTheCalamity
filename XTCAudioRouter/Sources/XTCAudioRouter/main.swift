@@ -33,9 +33,6 @@ struct XTCAudioRouter: ParsableCommand {
     @Option(name: .long, help: "Wine executable path")
     var wine: String
     
-    @Flag(name: .long, help: "Enable Wine esync")
-    var esync: Bool = false
-    
     @Flag(name: .long, help: "Enable Wine msync")
     var msync: Bool = false
     
@@ -44,7 +41,7 @@ struct XTCAudioRouter: ParsableCommand {
         logMessage("PID: \(pid)")
         logMessage("Wine Prefix: \(wineprefix)")
         logMessage("Wine: \(wine)")
-        logMessage("Esync: \(esync), Msync: \(msync)")
+        logMessage("Msync: \(msync)")
         
         // Validate paths
         guard FileManager.default.fileExists(atPath: wineprefix) else {
@@ -58,7 +55,7 @@ struct XTCAudioRouter: ParsableCommand {
         }
         
         // Initialize components
-        let wineRegistry = WineRegistry(winePath: wine, winePrefix: wineprefix, esync: esync, msync: msync)
+        let wineRegistry = WineRegistry(winePath: wine, winePrefix: wineprefix, msync: msync)
         let audioRouter = AudioRouter(wineRegistry: wineRegistry)
         let processMonitor = ProcessMonitor(pid: pid)
         

@@ -70,7 +70,6 @@ public class ConfigService
                     NativeResolution = false,
                     MaxFramerate = 60,
                     AudioRouting = false,
-                    EsyncEnabled = true,
                     Msync = true,
                     WineDebug = "",
                     UseHomeAlias = false
@@ -210,7 +209,6 @@ public class ConfigService
                 NativeResolution = false,
                 MaxFramerate = 60,
                 AudioRouting = false,
-                EsyncEnabled = true,
                 Msync = true,
                 WineDebug = "",
                 UseHomeAlias = false

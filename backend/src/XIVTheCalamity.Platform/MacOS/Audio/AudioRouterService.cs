@@ -23,10 +23,9 @@ public class AudioRouterService
     /// <param name="gamePid">Game process PID</param>
     /// <param name="winePrefix">Wine prefix path</param>
     /// <param name="winePath">Wine executable path</param>
-    /// <param name="esync">Enable Esync</param>
     /// <param name="msync">Enable Msync</param>
     /// <returns>Whether startup succeeded</returns>
-    public bool StartRouter(int gamePid, string winePrefix, string winePath, bool esync = true, bool msync = true)
+    public bool StartRouter(int gamePid, string winePrefix, string winePath, bool msync = true)
     {
         try
         {
@@ -39,12 +38,11 @@ public class AudioRouterService
             
             _logger.LogInformation("[AUDIO-ROUTER] Starting XTCAudioRouter...");
             _logger.LogDebug("[AUDIO-ROUTER] Path: {Path}", routerPath);
-            _logger.LogDebug("[AUDIO-ROUTER] PID: {Pid}, Prefix: {Prefix}, Wine: {Wine}, Esync: {Esync}, Msync: {Msync}", 
-                gamePid, winePrefix, winePath, esync, msync);
+            _logger.LogDebug("[AUDIO-ROUTER] PID: {Pid}, Prefix: {Prefix}, Wine: {Wine}, Msync: {Msync}", 
+                gamePid, winePrefix, winePath, msync);
             
-            // Build arguments with esync/msync flags
+            // Build arguments with msync flag
             var args = $"--pid {gamePid} --wineprefix \"{winePrefix}\" --wine \"{winePath}\"";
-            if (esync) args += " --esync";
             if (msync) args += " --msync";
             
             var startInfo = new ProcessStartInfo

@@ -192,12 +192,6 @@ public class WineConfigService
         env["WINEDEBUG"] = string.IsNullOrEmpty(config.WineDebug) ? "-all" : config.WineDebug;
         _logger?.LogDebug("Setting WINEDEBUG={WineDebug}", env["WINEDEBUG"]);
         
-        // Esync
-        if (config.EsyncEnabled)
-        {
-            env["WINEESYNC"] = "1";
-        }
-        
         // Msync
         if (config.Msync)
         {

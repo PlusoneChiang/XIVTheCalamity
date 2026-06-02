@@ -37,8 +37,8 @@ public static class WineEndpoints
                 var config = await configService.LoadConfigAsync();
                 var wineConfig = config.Wine;
                 
-                logger.LogInformation("Launching Wine tool with config: WINEDEBUG={WineDebug}, Esync={Esync}, Msync={Msync}",
-                    wineConfig.WineDebug, wineConfig.EsyncEnabled, wineConfig.Msync);
+                logger.LogInformation("Launching Wine tool with config: WINEDEBUG={WineDebug}, Msync={Msync}",
+                    wineConfig.WineDebug, wineConfig.Msync);
 
                 var pid = await wineConfigService.LaunchToolAsync(tool, wineConfig, cancellationToken);
 
