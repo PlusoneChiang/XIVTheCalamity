@@ -776,24 +776,6 @@ public class ProtonGeEnvironmentService(
         return Task.FromResult(File.Exists(ProtonWine));
     }
 
-    public string GetDebugInfo()
-    {
-        var version = File.Exists(downloadService.ProtonVersionFilePath)
-            ? File.ReadAllText(downloadService.ProtonVersionFilePath).Trim()
-            : "unknown";
-
-        var umuVersion = umuDownloadService.GetInstalledVersionAsync().GetAwaiter().GetResult() ?? "not installed";
-
-        return $"Proton-GE Environment:\n" +
-               $"  Version: {version}\n" +
-               $"  Proton Root: {ProtonRoot}\n" +
-               $"  Wine Prefix: {WinePrefix}\n" +
-               $"  Wine Executable: {ProtonWine}\n" +
-               $"  Installed: {File.Exists(ProtonWine)}\n" +
-               $"  umu-launcher: {umuVersion} ({(umuDownloadService.IsAvailable() ? umuDownloadService.UmuRunPath : "unavailable")})\n" +
-               $"  Launcher Mode: {(umuDownloadService.IsAvailable() ? "umu (pressure-vessel)" : "wine64 (direct)")}";
-    }
-
     public Task ApplyConfigAsync(CancellationToken cancellationToken = default)
     {
         logger?.LogDebug("[PROTON-GE] ApplyConfigAsync called (no-op)");

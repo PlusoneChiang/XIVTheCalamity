@@ -33,28 +33,3 @@ export function fromHex(hexStr) {
   const decoder = new TextDecoder();
   return decoder.decode(bytes);
 }
-
-/**
- * Test function to verify encoding/decoding works correctly
- */
-export function testEncoding() {
-  const testCases = [
-    'test@email.com',
-    'password123',
-    '測試中文',
-    'Special!@#$%^&*()',
-  ];
-  
-  console.group('Encoding Test');
-  testCases.forEach(test => {
-    const encoded = toHex(test);
-    const decoded = fromHex(encoded);
-    const passed = test === decoded;
-    console.log(`Input: ${test}`);
-    console.log(`Encoded: ${encoded}`);
-    console.log(`Decoded: ${decoded}`);
-    console.log(`Passed: ${passed ? '✓' : '✗'}`);
-    console.log('---');
-  });
-  console.groupEnd();
-}

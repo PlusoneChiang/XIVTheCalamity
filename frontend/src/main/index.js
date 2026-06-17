@@ -95,27 +95,16 @@ function updateDevToolsShortcut() {
 // Load version info from package.json
 let versionInfo = { version: '0.1.0', appName: 'XIVTheCalamity', description: 'Final Fantasy XIV Cross-Platform Launcher' };
 try {
-  const possiblePaths = [
-    path.join(__dirname, '../package.json'),
-    path.join(__dirname, '../../package.json'),
-    path.join(process.resourcesPath, 'package.json'),
-  ];
-  
-  for (const packagePath of possiblePaths) {
-    try {
-      if (fs.existsSync(packagePath)) {
-        const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
-        versionInfo = {
-          version: packageJson.version,
-          appName: packageJson.name === 'xivthecalamity' ? 'XIVTheCalamity' : packageJson.name,
-          description: packageJson.description
-        };
-        break;
-      }
-    } catch (e) {
-      // Continue to next path
-    }
-  }
+  // Packaged: resources/package.json; Dev: two levels up from src/main/
+  const packagePath = app.isPackaged
+    ? path.join(process.resourcesPath, 'package.json')
+    : path.join(__dirname, '../../package.json');
+  const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+  versionInfo = {
+    version: packageJson.version,
+    appName: packageJson.name === 'xivthecalamity' ? 'XIVTheCalamity' : packageJson.name,
+    description: packageJson.description
+  };
 } catch (error) {
   console.error('[Main] Failed to load version:', error.message);
 }
@@ -175,25 +164,6 @@ let settingsWindowInstance = null;
 let isDebugModeEnabled = false; // Will be loaded from config
 
 /**
- * Safe logging functions that won't throw EPIPE
- */
-function safeLog(...args) {
-  try {
-    log.info(...args);
-  } catch (error) {
-    // Ignore EPIPE errors
-  }
-}
-
-function safeError(...args) {
-  try {
-    log.error(...args);
-  } catch (error) {
-    // Ignore EPIPE errors
-  }
-}
-
-/**
  * Configure Electron paths before app is ready
  * Uses Electron's default appData paths:
  * - macOS: ~/Library/Application Support
@@ -206,7 +176,7 @@ const userConfigDir = path.join(app.getPath('appData'), 'XIVTheCalamity');
 // Ensure user config directory exists
 if (!fs.existsSync(userConfigDir)) {
   fs.mkdirSync(userConfigDir, { recursive: true });
-  safeLog('[Main] Created user config directory:', userConfigDir);
+  log.info('[Main] Created user config directory:', userConfigDir);
 }
 
 // Set userData to a subdirectory so Electron/Chromium cache files don't clutter the app data root
@@ -272,7 +242,7 @@ function createWindow() {
   // DevTools 開啟時檢查（後備保護）
   mainWindow.webContents.on('devtools-opened', () => {
     if (!isDebugModeEnabled) {
-      safeLog('[Main] DevTools blocked: developmentMode is disabled');
+      log.info('[Main] DevTools blocked: developmentMode is disabled');
       mainWindow.webContents.closeDevTools();
     }
   });
@@ -297,7 +267,7 @@ function createSettingsWindow() {
   // If settings window already exists, focus it instead of creating a new one
   if (settingsWindowInstance) {
     if (!settingsWindowInstance.isDestroyed()) {
-      safeLog('[Settings] Window already exists, bringing to front');
+      log.info('[Settings] Window already exists, bringing to front');
       // Ensure window is visible and on top
       if (settingsWindowInstance.isMinimized()) {
         settingsWindowInstance.restore();
@@ -307,12 +277,12 @@ function createSettingsWindow() {
       settingsWindowInstance.focus();
       return settingsWindowInstance;
     } else {
-      safeLog('[Settings] Window was destroyed, creating new one');
+      log.info('[Settings] Window was destroyed, creating new one');
       settingsWindowInstance = null;
     }
   }
   
-  safeLog('[Settings] Creating new settings window');
+  log.info('[Settings] Creating new settings window');
   
   // Platform-specific settings window configuration
   const settingsConfig = {
@@ -526,19 +496,19 @@ function inlineResources(html, css, js) {
  */
 function loadLoginPageWithVirtualHost(window) {
   try {
-    safeLog('[Main] Loading login page with Virtual Host');
+    log.info('[Main] Loading login page with Virtual Host');
     
     const basePath = path.join(__dirname, '../renderer/pages/login');
-    safeLog('[Main] Base path:', basePath);
+    log.info('[Main] Base path:', basePath);
     
     const htmlPath = path.join(basePath, 'index.html');
     const cssPath = path.join(basePath, 'style.css');
     const globalCssPath = path.join(__dirname, '../renderer/styles.css');
     
-    safeLog('[Main] HTML path:', htmlPath);
-    safeLog('[Main] CSS path:', cssPath);
-    safeLog('[Main] HTML exists:', fs.existsSync(htmlPath));
-    safeLog('[Main] CSS exists:', fs.existsSync(cssPath));
+    log.info('[Main] HTML path:', htmlPath);
+    log.info('[Main] CSS path:', cssPath);
+    log.info('[Main] HTML exists:', fs.existsSync(htmlPath));
+    log.info('[Main] CSS exists:', fs.existsSync(cssPath));
     
     const themesCssPath = path.join(__dirname, '../renderer/styles/themes.css');
     
@@ -548,18 +518,18 @@ function loadLoginPageWithVirtualHost(window) {
     const pageCss = fs.readFileSync(cssPath, 'utf8');
     const css = themesCss + '\n' + globalCss + '\n' + pageCss;
     
-    safeLog('[Main] HTML length:', html.length);
-    safeLog('[Main] CSS length:', css.length);
+    log.info('[Main] HTML length:', html.length);
+    log.info('[Main] CSS length:', css.length);
     
     const jsFiles = loadJavaScriptFiles();
     const combinedJs = combineJavaScriptModules(jsFiles);
-    safeLog('[Main] Combined JS length:', combinedJs.length);
+    log.info('[Main] Combined JS length:', combinedJs.length);
     
     const processedCSS = embedImageInCSS(css);
-    safeLog('[Main] Processed CSS length:', processedCSS.length);
+    log.info('[Main] Processed CSS length:', processedCSS.length);
     
     const finalHTML = inlineResources(html, processedCSS, combinedJs);
-    safeLog('[Main] Final HTML length:', finalHTML.length);
+    log.info('[Main] Final HTML length:', finalHTML.length);
     
     // Check if replacement actually happened
     const hasStylePlaceholder = html.includes('/* CSS will be inlined here by main process */');
@@ -567,18 +537,18 @@ function loadLoginPageWithVirtualHost(window) {
     const hasStyleInFinal = finalHTML.includes('/* CSS will be inlined here by main process */');
     const hasJsInFinal = finalHTML.includes('/* JavaScript will be inlined here by main process */');
     
-    safeLog('[Main] Original has style placeholder:', hasStylePlaceholder);
-    safeLog('[Main] Original has JS placeholder:', hasJsPlaceholder);
-    safeLog('[Main] Final still has style placeholder:', hasStyleInFinal);
-    safeLog('[Main] Final still has JS placeholder:', hasJsInFinal);
+    log.info('[Main] Original has style placeholder:', hasStylePlaceholder);
+    log.info('[Main] Original has JS placeholder:', hasJsPlaceholder);
+    log.info('[Main] Final still has style placeholder:', hasStyleInFinal);
+    log.info('[Main] Final still has JS placeholder:', hasJsInFinal);
     
     const baseURL = 'https://user.ffxiv.com.tw/';
     const dataURL = `data:text/html;charset=utf-8,${encodeURIComponent(finalHTML)}`;
     
     window.loadURL(dataURL, { baseURLForDataURL: baseURL });
-    safeLog('[Main] Login page loaded, origin:', baseURL);
+    log.info('[Main] Login page loaded, origin:', baseURL);
   } catch (error) {
-    safeError('[Main] Failed to load login page:', error);
+    log.error('[Main] Failed to load login page:', error);
     window.loadFile(path.join(__dirname, '../renderer/index.html'));
   }
 }
@@ -885,7 +855,7 @@ ipcMain.handle('backend:call', async (event, endpoint, options = {}) => {
   const backendUrl = 'http://localhost:5050';
   const url = `${backendUrl}${endpoint}`;
   
-  safeLog('[IPC] Backend call:', options.method || 'GET', url);
+  log.info('[IPC] Backend call:', options.method || 'GET', url);
   
   return new Promise((resolve, reject) => {
     const urlObj = new URL(url);
@@ -913,7 +883,7 @@ ipcMain.handle('backend:call', async (event, endpoint, options = {}) => {
       });
       
       res.on('end', () => {
-        safeLog('[IPC] Response:', res.statusCode);
+        log.info('[IPC] Response:', res.statusCode);
         
         let parsedData;
         try {
@@ -934,7 +904,7 @@ ipcMain.handle('backend:call', async (event, endpoint, options = {}) => {
     });
     
     req.on('error', (error) => {
-      safeError('[IPC] Request failed:', error);
+      log.error('[IPC] Request failed:', error);
       reject(error);
     });
     
@@ -962,14 +932,14 @@ const credentialsDir = path.join(userConfigDir, 'credentials');
 // Ensure credentials directory exists
 if (!fs.existsSync(credentialsDir)) {
   fs.mkdirSync(credentialsDir, { recursive: true });
-  safeLog('[Storage] Created credentials directory:', credentialsDir);
+  log.info('[Storage] Created credentials directory:', credentialsDir);
 } else {
   // Directory exists, check what's in it
   try {
     const files = fs.readdirSync(credentialsDir);
-    safeLog('[Storage] Credentials directory exists with files:', files);
+    log.info('[Storage] Credentials directory exists with files:', files);
   } catch (e) {
-    safeLog('[Storage] Credentials directory exists but cannot read:', e.message);
+    log.info('[Storage] Credentials directory exists but cannot read:', e.message);
   }
 }
 
@@ -977,11 +947,11 @@ if (!fs.existsSync(credentialsDir)) {
 if (process.env.NODE_ENV !== 'production') {
   try {
     fs.watch(credentialsDir, (eventType, filename) => {
-      safeLog('[Storage] FILE CHANGE:', eventType, filename, 'at', new Date().toISOString());
+      log.info('[Storage] FILE CHANGE:', eventType, filename, 'at', new Date().toISOString());
     });
-    safeLog('[Storage] Watching credentials directory for changes');
+    log.info('[Storage] Watching credentials directory for changes');
   } catch (e) {
-    safeLog('[Storage] Cannot watch directory:', e.message);
+    log.info('[Storage] Cannot watch directory:', e.message);
   }
 }
 
@@ -993,10 +963,10 @@ ipcMain.handle('storage:save', async (event, filename, data) => {
     const filePath = path.join(credentialsDir, filename);
     const jsonData = JSON.stringify(data, null, 2);
     fs.writeFileSync(filePath, jsonData, 'utf8');
-    safeLog('[Storage] Saved to:', filePath);
+    log.info('[Storage] Saved to:', filePath);
     return { success: true };
   } catch (error) {
-    safeError('[Storage] Save failed:', error);
+    log.error('[Storage] Save failed:', error);
     return { success: false, error: error.message };
   }
 });
@@ -1008,15 +978,15 @@ ipcMain.handle('storage:load', async (event, filename) => {
   try {
     const filePath = path.join(credentialsDir, filename);
     if (!fs.existsSync(filePath)) {
-      safeLog('[Storage] File not found:', filePath);
+      log.info('[Storage] File not found:', filePath);
       return { success: true, data: null };
     }
     const jsonData = fs.readFileSync(filePath, 'utf8');
     const data = JSON.parse(jsonData);
-    safeLog('[Storage] Loaded from:', filePath);
+    log.info('[Storage] Loaded from:', filePath);
     return { success: true, data };
   } catch (error) {
-    safeError('[Storage] Load failed:', error);
+    log.error('[Storage] Load failed:', error);
     return { success: false, error: error.message, data: null };
   }
 });
@@ -1029,11 +999,11 @@ ipcMain.handle('storage:delete', async (event, filename) => {
     const filePath = path.join(credentialsDir, filename);
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
-      safeLog('[Storage] Deleted:', filePath);
+      log.info('[Storage] Deleted:', filePath);
     }
     return { success: true };
   } catch (error) {
-    safeError('[Storage] Delete failed:', error);
+    log.error('[Storage] Delete failed:', error);
     return { success: false, error: error.message };
   }
 });
@@ -1043,11 +1013,11 @@ ipcMain.handle('storage:delete', async (event, filename) => {
  */
 ipcMain.handle('window:open-settings', async () => {
   try {
-    safeLog('[IPC] Opening settings window');
+    log.info('[IPC] Opening settings window');
     createSettingsWindow();
     return { success: true };
   } catch (error) {
-    safeError('[IPC] Failed to open settings:', error);
+    log.error('[IPC] Failed to open settings:', error);
     return { success: false, error: error.message };
   }
 });
@@ -1062,7 +1032,7 @@ ipcMain.handle('dialog:select-directory', async () => {
       properties: ['openDirectory']
     });
   } catch (error) {
-    safeError('[IPC] Dialog failed:', error);
+    log.error('[IPC] Dialog failed:', error);
     return { canceled: true };
   }
 });
@@ -1076,7 +1046,7 @@ ipcMain.handle('shell:open-external', async (event, url) => {
     await shell.openExternal(url);
     return { success: true };
   } catch (error) {
-    safeError('[IPC] Failed to open URL:', error);
+    log.error('[IPC] Failed to open URL:', error);
     return { success: false, error: error.message };
   }
 });
@@ -1097,7 +1067,7 @@ ipcMain.handle('app:open-log-folder', async () => {
     await shell.openPath(logDir);
     return { success: true };
   } catch (error) {
-    safeError('[IPC] Failed to open log folder:', error);
+    log.error('[IPC] Failed to open log folder:', error);
     return { success: false, error: error.message };
   }
 });
@@ -1120,7 +1090,7 @@ ipcMain.handle('app:select-directory', async (event, options = {}) => {
     
     return { success: true, path: result.filePaths[0] };
   } catch (error) {
-    safeError('[IPC] Failed to show directory dialog:', error);
+    log.error('[IPC] Failed to show directory dialog:', error);
     return { success: false, error: error.message };
   }
 });
@@ -1150,7 +1120,7 @@ ipcMain.handle('app:create-directory', async (event, dirPath) => {
     log.info(`[IPC] Created game directory structure at: ${dirPath}`);
     return { success: true, path: dirPath };
   } catch (error) {
-    safeError('[IPC] Failed to create directory:', error);
+    log.error('[IPC] Failed to create directory:', error);
     return { success: false, error: error.message };
   }
 });
@@ -1181,7 +1151,7 @@ ipcMain.handle('app:validate-game-directory', async (event, dirPath) => {
     
     return { valid: true, path: dirPath };
   } catch (error) {
-    safeError('[IPC] Failed to validate directory:', error);
+    log.error('[IPC] Failed to validate directory:', error);
     return { valid: false, error: error.message };
   }
 });
@@ -1214,14 +1184,14 @@ ipcMain.handle('dialog:show-message-box', async (event, options) => {
  * 廣播事件到所有視窗
  */
 ipcMain.on('app:broadcast-event', (event, eventName, data) => {
-  safeLog(`[IPC] Broadcasting event: ${eventName}`);
+  log.info(`[IPC] Broadcasting event: ${eventName}`);
   
   // 設定變更時更新 main process 的 devMode 狀態
   if (eventName === 'config-changed') {
     const newDevMode = isDevelopmentMode();
     if (newDevMode !== isDebugModeEnabled) {
       isDebugModeEnabled = newDevMode;
-      safeLog(`[Main] Debug mode updated: ${isDebugModeEnabled ? 'enabled' : 'disabled'}`);
+      log.info(`[Main] Debug mode updated: ${isDebugModeEnabled ? 'enabled' : 'disabled'}`);
       updateDevToolsShortcut();
       // 關閉 DevTools（如果 dev mode 被關閉且 DevTools 正在開啟）
       if (!isDebugModeEnabled && mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents.isDevToolsOpened()) {

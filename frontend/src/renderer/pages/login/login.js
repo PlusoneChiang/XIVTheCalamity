@@ -8,7 +8,7 @@ import { toHex } from '../../utils/encoding.js';
 import { initAccountManagement, handleAutoFillOTPChange, getOTPSecretInput, cleanupAccountManagement, clearAutoFilledState, isAllAutoFilled, refreshAccountState } from './accountManagement.js';
 import { savePassword, saveOTPSecret, saveAutoFillOTP, hasOTPSecret } from '../../utils/accountStorage.js';
 import i18n from '../../i18n/index.js';
-import { startBackgroundUpdate, startLoginUpdate, cancelBackgroundUpdate, setAppVersionText, isUpdating, handleConfigChanged, setLoggedIn } from './updateManager.js';
+import { startBackgroundUpdate, setAppVersionText, isUpdating, handleConfigChanged } from './updateManager.js';
 import { startDalamudUpdate, cancelDalamudUpdate, handleDalamudConfigChanged, isDalamudUpdating } from './dalamudManager.js';
 import { initAppUpdater } from './appUpdater.js';
 import { handleApiResponse, getErrorMessage } from '../../utils/apiError.js';
@@ -249,63 +249,6 @@ function bindKeyboardNavigation() {
 }
 
 /**
- * Test progress bar functionality
- */
-let progressTestInterval = null;
-let isProgressMode = false;
-
-function testProgressBar() {
-  const card = document.querySelector('.title-bar-card');
-  const text = document.getElementById('titleBarText');
-  const progressFill = document.getElementById('progressFill');
-  
-  if (!isProgressMode) {
-    // Switch to progress mode
-    console.log('[Login] Testing progress bar mode');
-    card.classList.add('progress-mode');
-    isProgressMode = true;
-    
-    // Simulate download progress
-    let progress = 0;
-    progressFill.style.width = '0%';
-    
-    progressTestInterval = setInterval(() => {
-      progress += 5;
-      if (progress > 100) {
-        progress = 100;
-        clearInterval(progressTestInterval);
-        
-        // Return to normal mode after 1 second
-        setTimeout(() => {
-          card.classList.remove('progress-mode');
-          
-          // Reset after shrink animation
-          setTimeout(() => {
-            progressFill.style.width = '0%';
-            text.textContent = appVersionText;
-            isProgressMode = false;
-          }, 2000);
-        }, 1000);
-      }
-      
-      progressFill.style.width = progress + '%';
-      text.textContent = `下載中... ${progress}%`;
-    }, 200);
-  } else {
-    // Cancel progress and return to normal
-    if (progressTestInterval) {
-      clearInterval(progressTestInterval);
-    }
-    card.classList.remove('progress-mode');
-    setTimeout(() => {
-      progressFill.style.width = '0%';
-      text.textContent = appVersionText;
-      isProgressMode = false;
-    }, 2000);
-  }
-}
-
-/**
  * Handle login button click
  */
 async function handleLogin(event) {
@@ -497,9 +440,6 @@ function handleRelogin() {
   // Clear session ID
   localStorage.removeItem('sessionId');
   localStorage.removeItem('sessionObtainedAt');
-  
-  // 重置登入狀態
-  setLoggedIn(false);
   
   // Reset to idle state
   setLoginState('idle');
@@ -694,9 +634,6 @@ function setLoginState(state, sessionId = null, subscriptionType = null, remain 
       if (subscriptionType !== null && remain !== null) {
         updateSubscriptionInfo(subscriptionType, remain);
       }
-      
-      // 標記為已登入狀態（目前不再需要區分，但保留供未來使用）
-      setLoggedIn(true);
       
       // 登入成功後，檢查更新是否仍在進行
       // 更新會在背景持續進行，不需要重新啟動
@@ -1408,9 +1345,7 @@ export {
   setLoginState, 
   validateLoginForm, 
   updateSubscriptionInfo, 
-  startEnvironmentInitialization,
-  showTitleBarProgress,
-  hideTitleBarProgress
+  startEnvironmentInitialization
 };
 
 /**

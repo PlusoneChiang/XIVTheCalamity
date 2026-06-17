@@ -267,15 +267,6 @@ public class WineEnvironmentService(
         return Task.FromResult(available);
     }
 
-    public string GetDebugInfo()
-    {
-        return $"Wine Environment (macOS)\n" +
-               $"Wine Root: {_paths.WineRoot}\n" +
-               $"Wine Prefix: {_paths.WinePrefix}\n" +
-               $"Wine Executable: {_paths.Wine}\n" +
-               $"Prefix Initialized: {_prefixService.IsPrefixInitialized()}";
-    }
-
     public async Task ApplyConfigAsync(CancellationToken cancellationToken = default)
     {
         logger?.LogInformation("[WINE-ENV] Applying Wine configuration");
@@ -322,7 +313,4 @@ public class WineEnvironmentService(
             logger?.LogWarning(ex, "[WINE-ENV] Failed to start audio router");
         }
     }
-
-    // Expose WinePrefixService methods for backward compatibility
-    public WinePrefixService GetPrefixService() => _prefixService;
 }

@@ -58,11 +58,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   
   // Dialog operations
-  selectDirectory: async () => {
-    return await ipcRenderer.invoke('dialog:select-directory');
+  selectDirectory: async (options) => {
+    return await ipcRenderer.invoke('app:select-directory', options);
   },
-  
-  // Shell operations
   openExternal: async (url) => {
     return await ipcRenderer.invoke('shell:open-external', url);
   },
@@ -85,10 +83,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   
   // Directory operations
-  selectDirectory: async (options) => {
-    return await ipcRenderer.invoke('app:select-directory', options);
-  },
-  
   createDirectory: async (path) => {
     return await ipcRenderer.invoke('app:create-directory', path);
   },

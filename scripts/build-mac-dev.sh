@@ -18,14 +18,10 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-# Check if Wine needs to be rebuilt
-check_wine_build() {
-    echo ""
-    echo "🍷 Wine status: Downloaded at runtime (not bundled)"
-    echo -e "   ${GREEN}ℹ️${NC}  Wine will be downloaded from GitHub Release on first launch"
-}
-
-# Clean up old processes
+# Check Wine
+echo ""
+echo "🍷 Wine status: Downloaded at runtime (not bundled)"
+echo -e "   ${GREEN}ℹ️${NC}  Wine will be downloaded from GitHub Release on first launch"
 echo ""
 echo "🧹 Cleaning environment..."
 echo "   Note: Close XIVTheCalamity.app before building to avoid errors"
@@ -50,9 +46,6 @@ if [ -d "$PROJECT_ROOT/Release/temp-backend" ]; then
 fi
 
 echo "   ✅ Cleanup complete"
-
-# Check Wine
-check_wine_build
 
 # Change to frontend directory
 cd "$PROJECT_ROOT/frontend"

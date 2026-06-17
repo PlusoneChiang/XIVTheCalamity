@@ -165,8 +165,6 @@ class AudioRouter {
     }
     
     private func log(_ message: String) {
-        let timestamp = ISO8601DateFormatter().string(from: Date())
-        print("[\(timestamp)] [AudioRouter] \(message)")
-        fflush(stdout)
+        xtcLog(label: "AudioRouter", message)
     }
 }

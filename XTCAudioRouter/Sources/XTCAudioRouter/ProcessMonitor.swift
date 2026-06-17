@@ -90,8 +90,6 @@ class ProcessMonitor {
     }
     
     private func log(_ message: String) {
-        let timestamp = ISO8601DateFormatter().string(from: Date())
-        print("[\(timestamp)] [ProcessMonitor] \(message)")
-        fflush(stdout)
+        xtcLog(label: "ProcessMonitor", message)
     }
 }

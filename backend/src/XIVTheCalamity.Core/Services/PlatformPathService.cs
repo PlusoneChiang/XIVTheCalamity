@@ -122,15 +122,6 @@ public class PlatformPathService
     }
 
     /// <summary>
-    /// Get game installation directory (game subdirectory from configured path)
-    /// Returns the 'game' subdirectory under the configured game path
-    /// </summary>
-    public string GetGameDirectory()
-    {
-        return Path.Combine(UserDataDirectory, "game");
-    }
-
-    /// <summary>
     /// Get Dalamud directory
     /// Includes Dalamud runtime, plugins, and assets
     /// </summary>
@@ -208,18 +199,4 @@ public class PlatformPathService
     /// </summary>
     public bool IsLinux => RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
 
-    /// <summary>
-    /// Get platform-specific information for debugging
-    /// </summary>
-    public string GetDebugInfo()
-    {
-        return $@"Platform Path Service Debug Info:
-Platform: {RuntimeInformation.OSDescription}
-Architecture: {RuntimeInformation.OSArchitecture}
-AppDataDirectory: {AppDataDirectory}
-UserDataDirectory: {UserDataDirectory}
-CacheDirectory: {CacheDirectory}
-LogsDirectory: {LogsDirectory}
-Base Directory: {AppContext.BaseDirectory}";
-    }
 }

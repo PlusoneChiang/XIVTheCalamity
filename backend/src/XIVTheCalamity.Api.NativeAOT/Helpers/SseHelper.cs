@@ -48,4 +48,14 @@ public static class SseHelper
             _sseLock.Release();
         }
     }
+    
+    /// <summary>
+    /// Determine SSE event type based on progress state
+    /// </summary>
+    public static string DetermineEventType(bool hasError, bool isComplete)
+    {
+        if (hasError) return "error";
+        if (isComplete) return "complete";
+        return "progress";
+    }
 }

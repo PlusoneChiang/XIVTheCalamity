@@ -61,42 +61,6 @@ public static class WineEndpoints
             }
         });
 
-        // Legacy endpoints for backward compatibility
-        group.MapPost("/open-winecfg", async (
-            WineConfigService? wineConfigService,
-            ConfigService configService,
-            ILogger<Program> logger,
-            CancellationToken ct) =>
-            await LaunchToolInternal("winecfg", wineConfigService, configService, logger, ct));
-
-        group.MapPost("/open-regedit", async (
-            WineConfigService? wineConfigService,
-            ConfigService configService,
-            ILogger<Program> logger,
-            CancellationToken ct) =>
-            await LaunchToolInternal("regedit", wineConfigService, configService, logger, ct));
-
-        group.MapPost("/open-cmd", async (
-            WineConfigService? wineConfigService,
-            ConfigService configService,
-            ILogger<Program> logger,
-            CancellationToken ct) =>
-            await LaunchToolInternal("wineconsole", wineConfigService, configService, logger, ct));
-
-        group.MapPost("/open-wineconsole", async (
-            WineConfigService? wineConfigService,
-            ConfigService configService,
-            ILogger<Program> logger,
-            CancellationToken ct) =>
-            await LaunchToolInternal("wineconsole", wineConfigService, configService, logger, ct));
-
-        group.MapPost("/config", async (
-            WineConfigService? wineConfigService,
-            ConfigService configService,
-            ILogger<Program> logger,
-            CancellationToken ct) =>
-            await LaunchToolInternal("winecfg", wineConfigService, configService, logger, ct));
-
         // POST /api/wine/apply-settings
         group.MapPost("/apply-settings", async (
             WinePrefixService? winePrefixService,
@@ -171,47 +135,5 @@ public static class WineEndpoints
                     AppJsonContext.Default.ApiErrorResponse, statusCode: 500);
             }
         });
-    }
-    
-    private static async Task<IResult> LaunchToolInternal(
-        string tool,
-        WineConfigService? wineConfigService,
-        ConfigService configService,
-        ILogger<Program> logger,
-        CancellationToken cancellationToken)
-    {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            return Results.BadRequest(ApiErrorResponse.Create("VALIDATION_FAILED", "Wine is not available on Windows"));
-        }
-
-        if (wineConfigService == null)
-        {
-            return Results.Json(ApiErrorResponse.Create("INTERNAL_ERROR", "WineConfigService not available"), 
-                AppJsonContext.Default.ApiErrorResponse, statusCode: 500);
-        }
-
-        try
-        {
-            var config = await configService.LoadConfigAsync();
-            var pid = await wineConfigService.LaunchToolAsync(tool, config.Wine, cancellationToken);
-
-            if (pid.HasValue)
-            {
-                return Results.Ok(ApiResponse<WineToolLaunchResponse>.Ok(
-                    new WineToolLaunchResponse(true, $"{tool} launched successfully", pid.Value)));
-            }
-            else
-            {
-                return Results.Json(ApiErrorResponse.Create("LAUNCH_FAILED", $"Failed to launch {tool}"), 
-                    AppJsonContext.Default.ApiErrorResponse, statusCode: 500);
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to launch {Tool}", tool);
-            return Results.Json(ApiErrorResponse.Create("INTERNAL_ERROR", $"Failed to launch {tool}", ex.Message), 
-                AppJsonContext.Default.ApiErrorResponse, statusCode: 500);
-        }
     }
 }

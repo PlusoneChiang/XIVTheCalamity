@@ -10,14 +10,6 @@ import { handleApiResponse, getErrorMessage } from '../../utils/apiError.js';
 let isDalamudChecking = false;
 let dalamudCheckCancelled = false;
 let dalamudEventSource = null;
-let onDalamudCompleteCallback = null;
-
-/**
- * 設定 Dalamud 更新完成回調（保留向下相容，pipeline 模式下不再需要）
- */
-export function setOnDalamudComplete(callback) {
-  // No-op: sequential pipeline handles ordering now
-}
 
 /**
  * 檢查 Dalamud 是否啟用

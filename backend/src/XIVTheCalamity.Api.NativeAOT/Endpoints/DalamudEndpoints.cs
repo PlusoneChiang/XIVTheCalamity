@@ -45,7 +45,7 @@ public static class DalamudEndpoints
             {
                 await foreach (var progress in updater.UpdateAsync(cancellationToken))
                 {
-                    var eventType = DetermineEventType(progress);
+                    var eventType = SseHelper.DetermineEventType(progress.HasError, progress.IsComplete);
                     await SseHelper.SendEventAsync(context.Response, eventType, progress,
                         AppJsonContext.Default.DalamudUpdateProgress, cancellationToken);
                 }
@@ -93,12 +93,5 @@ public static class DalamudEndpoints
                     AppJsonContext.Default.ApiErrorResponse, statusCode: 500);
             }
         });
-    }
-    
-    private static string DetermineEventType(DalamudUpdateProgress progress)
-    {
-        if (progress.HasError) return "error";
-        if (progress.IsComplete) return "complete";
-        return "progress";
     }
 }

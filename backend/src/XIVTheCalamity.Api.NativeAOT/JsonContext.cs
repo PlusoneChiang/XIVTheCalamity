@@ -37,15 +37,12 @@ namespace XIVTheCalamity.Api.NativeAOT;
 
 // API DTOs
 [JsonSerializable(typeof(LoginRequestDto))]
-[JsonSerializable(typeof(LoginResponseDto))]
 [JsonSerializable(typeof(LoginData))]
 [JsonSerializable(typeof(LaunchRequest))]
-[JsonSerializable(typeof(CheckUpdateRequest))]
 
 // API Response Wrappers
 [JsonSerializable(typeof(ApiResponse<AppConfig>))]
 [JsonSerializable(typeof(ApiResponse<LoginData>))]
-[JsonSerializable(typeof(ApiResponse<LoginResponseDto>))]
 [JsonSerializable(typeof(ApiResponse<string>))]
 [JsonSerializable(typeof(ApiResponse<object>))]
 [JsonSerializable(typeof(ApiErrorResponse))]

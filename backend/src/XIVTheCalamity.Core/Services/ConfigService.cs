@@ -122,7 +122,7 @@ public class ConfigService
     /// <summary>
     /// Save configuration
     /// </summary>
-    public async Task SaveConfigAsync(AppConfig config)
+    public Task SaveConfigAsync(AppConfig config)
     {
         // Force-overwrite managed fields before validation and save
         config.Dalamud.PluginRepoUrl = DalamudConfig.ManagedPluginRepoUrl;
@@ -134,7 +134,7 @@ public class ConfigService
             SaveConfigSync(config);
         }
         
-        await Task.CompletedTask;
+        return Task.CompletedTask;
     }
 
     /// <summary>

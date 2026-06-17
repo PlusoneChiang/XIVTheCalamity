@@ -518,7 +518,7 @@ public class WinePrefixService
     /// </summary>
     public bool IsWineInstalled()
     {
-        return File.Exists(_paths.Wine) && File.Exists(_paths.WineExecutable);
+        return File.Exists(_paths.WineExecutable);
     }
 
     /// <summary>

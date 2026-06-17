@@ -39,7 +39,7 @@ public static class EnvironmentEndpoints
             {
                 await foreach (var progress in environmentService.InitializeAsync(cancellationToken))
                 {
-                    var eventType = DetermineEventType(progress);
+                    var eventType = SseHelper.DetermineEventType(progress.HasError, progress.IsComplete);
                     await SseHelper.SendEventAsync(context.Response, eventType, progress,
                         AppJsonContext.Default.EnvironmentProgressEvent, cancellationToken);
                 }
@@ -100,12 +100,5 @@ public static class EnvironmentEndpoints
                     AppJsonContext.Default.ApiErrorResponse, statusCode: 500);
             }
         });
-    }
-    
-    private static string DetermineEventType(EnvironmentProgressEvent progress)
-    {
-        if (progress.HasError) return "error";
-        if (progress.IsComplete) return "complete";
-        return "progress";
     }
 }

@@ -196,38 +196,4 @@ public class WinePathService
 
         return env;
     }
-
-    /// <summary>
-    /// Get DXMT environment variables
-    /// </summary>
-    public Dictionary<string, string> GetDxmtEnvironment(WineSettings settings)
-    {
-        var env = new Dictionary<string, string>();
-
-        // Always use native DXMT on macOS.
-        env["XL_DXMT_ENABLED"] = "1";
-        env["MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS"] = "1";
-        env["DXMT_CONFIG"] = $"d3d11.metalSpatialUpscaleFactor={settings.MetalFxSpatialFactor};d3d11.preferredMaxFrameRate={settings.MaxFramerate};";
-        env["DXMT_METALFX_SPATIAL_SWAPCHAIN"] = settings.MetalFxSpatialEnabled ? "1" : "0";
-
-        // MSYNC
-        env["WINEMSYNC"] = settings.Msync ? "1" : "0";
-
-        // Metal 3 performance overlay
-        env["MTL_HUD_ENABLED"] = settings.Metal3PerformanceOverlay ? "1" : "0";
-
-        return env;
-    }
-}
-
-/// <summary>
-/// Wine settings
-/// </summary>
-public class WineSettings
-{
-    public int MetalFxSpatialFactor { get; set; } = 2;
-    public int MaxFramerate { get; set; } = 60;
-    public bool MetalFxSpatialEnabled { get; set; } = true;
-    public bool Msync { get; set; } = true;
-    public bool Metal3PerformanceOverlay { get; set; } = false;
 }

@@ -14,13 +14,6 @@ let progressEventSource = null;
 let updateResolve = null;
 
 /**
- * 設定更新完成回調（保留向下相容，但 pipeline 模式下不再需要）
- */
-export function setOnUpdateComplete(callback) {
-  // No-op: sequential pipeline handles ordering now
-}
-
-/**
  * 完成更新，resolve Promise
  */
 function completeUpdate() {
@@ -310,62 +303,6 @@ function handleProgressEvent(progress) {
 }
 
 /**
- * 處理更新檢查完成（舊方法，保留用於向後兼容）
- * 注意：新的 SSE endpoint 不再使用這個方法
- */
-function handleUpdateCheckComplete(result) {
-  console.log('[UPDATE] Update check API returned (legacy)');
-  
-  if (updateCheckCancelled) {
-    console.log('[UPDATE] Update check was cancelled');
-    return;
-  }
-  
-  console.log('[UPDATE] Update check result:', result);
-  
-  // 檢查錯誤訊息
-  if (result.errorMessage) {
-    console.error('[UPDATE] Update check error:', result.errorMessage);
-    stopProgressMonitoring();
-    hideTitleBarProgress();
-    isUpdateChecking = false;
-    completeUpdate();
-    return;
-  }
-  
-  if (result.cancelled) {
-    console.log('[UPDATE] Update was cancelled');
-    stopProgressMonitoring();
-    hideTitleBarProgress();
-    isUpdateChecking = false;
-    return;
-  }
-  
-  if (!result.needsUpdate) {
-    console.log('[UPDATE] Game is up to date!');
-    showTitleBarProgress(100, 'login.update_complete');
-    setTimeout(() => {
-      stopProgressMonitoring();
-      hideTitleBarProgress();
-      isUpdateChecking = false;
-      completeUpdate();
-    }, 2000);
-    return;
-  }
-  
-  console.log('[UPDATE] Update complete!');
-  console.log('[UPDATE] Installed patches:', result.requiredPatches?.length || 0);
-  
-  showTitleBarProgress(100, 'login.update_complete');
-  setTimeout(() => {
-    stopProgressMonitoring();
-    hideTitleBarProgress();
-    isUpdateChecking = false;
-    completeUpdate();
-  }, 2000);
-}
-
-/**
  * 取消更新（遊戲路徑變更時使用）
  */
 export async function cancelUpdate() {
@@ -402,10 +339,6 @@ export function isUpdating() {
 
 // Backward compatibility exports
 export const startBackgroundUpdate = startUpdate;
-export const startLoginUpdate = startUpdate;
-export const cancelBackgroundUpdate = cancelUpdate;
-export function setLoggedIn() {} // No longer needed
-export function setLaunchButtonEnabled() {} // No longer needed
 export function setAppVersionText(versionText) {
   window._appVersionText = versionText;
 }

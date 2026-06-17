@@ -129,30 +129,18 @@ class WineRegistry {
         runWineCommand(args: args)
     }
     
-    /// Execute wine command using shell (more compatible)
-    /// Now runs asynchronously to avoid blocking when wineserver is busy
+    /// Execute wine command directly (no shell, no escaping needed)
     private func runWineCommand(args: [String]) {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.executableURL = URL(fileURLWithPath: winePath)
+        process.arguments = args
         
-        // Build the command string with proper escaping
-        let wineArgs = args.map { arg in
-            // Escape special characters for shell
-            if arg.contains(" ") || arg.contains("\\") || arg.contains("{") || arg.contains("}") {
-                return "'\(arg)'"
-            }
-            return arg
-        }.joined(separator: " ")
-        
-        // Build environment variables based on settings
-        let msyncValue = msync ? "1" : "0"
-        
-        // Include WINEMSYNC to match game environment
-        let command = "WINEPREFIX='\(winePrefix)' WINEDEBUG=-all WINEMSYNC=\(msyncValue) '\(winePath)' \(wineArgs)"
-        process.arguments = ["-c", command]
-        
-        // Inherit current environment
-        process.environment = ProcessInfo.processInfo.environment
+        // Set environment variables directly
+        var env = ProcessInfo.processInfo.environment
+        env["WINEPREFIX"] = winePrefix
+        env["WINEDEBUG"] = "-all"
+        env["WINEMSYNC"] = msync ? "1" : "0"
+        process.environment = env
         
         // Capture output for debugging
         let stdoutPipe = Pipe()
@@ -161,7 +149,7 @@ class WineRegistry {
         process.standardError = stderrPipe
         
         do {
-            log("Running (async): \(command)")
+            log("Running (async): \(winePath) \(args.joined(separator: " "))")
             try process.run()
             
             // Run asynchronously - don't block waiting for completion
@@ -261,8 +249,6 @@ class WineRegistry {
     }
     
     private func log(_ message: String) {
-        let timestamp = ISO8601DateFormatter().string(from: Date())
-        print("[\(timestamp)] [WineRegistry] \(message)")
-        fflush(stdout)
+        xtcLog(label: "WineRegistry", message)
     }
 }

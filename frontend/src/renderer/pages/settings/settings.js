@@ -319,22 +319,20 @@ function collectFormData() {
 }
 
 /**
- * Save configuration
+ * Persist configuration. If closeWindow is true, closes the window on success;
+ * otherwise shows a success notification.
  */
-async function saveConfig() {
+async function persistConfig(closeWindow) {
   try {
-    // Show loading overlay
     showLoadingOverlay(i18n.t('settings.applying'));
     
     const formData = collectFormData();
     
-    // 記錄變更前的設定（用於比較）
     const oldGamePath = currentConfig?.game?.gamePath || '';
     const newGamePath = formData.game?.gamePath || '';
     const oldLocale = currentConfig?.launcher?.language || 'zh-TW';
     const newLocale = formData.launcher.language;
-    const localeChanged = oldLocale !== newLocale;
-    if (localeChanged) {
+    if (oldLocale !== newLocale) {
       i18n.setLocale(newLocale);
     }
     
@@ -381,13 +379,10 @@ async function saveConfig() {
     
     // Step 3: 通知登入頁設定已變更
     const gamePathChanged = oldGamePath !== newGamePath;
-    
-    // 檢查 Dalamud 啟用狀態變更
     const oldDalamudEnabled = currentConfig?.dalamud?.enabled || false;
     const newDalamudEnabled = formData.dalamud?.enabled || false;
     const dalamudEnabledChanged = oldDalamudEnabled !== newDalamudEnabled;
     
-    // 通知登入頁重新讀取設定
     console.log('[Settings] Notifying login page of config change');
     window.electronAPI.events.send('config-changed', {
       gamePathChanged,
@@ -395,9 +390,12 @@ async function saveConfig() {
       newGamePath
     });
     
-    // Hide overlay and close window
     hideLoadingOverlay();
-    window.close();
+    if (closeWindow) {
+      window.close();
+    } else {
+      showNotification(i18n.t('settings.applied'));
+    }
   } catch (error) {
     console.error('[Settings] Failed to save configuration:', error);
     hideLoadingOverlay();
@@ -406,90 +404,17 @@ async function saveConfig() {
 }
 
 /**
+ * Save configuration
+ */
+async function saveConfig() {
+  return persistConfig(true);
+}
+
+/**
  * Apply configuration without closing the window
  */
 async function applyConfig() {
-  try {
-    // Show loading overlay
-    showLoadingOverlay(i18n.t('settings.applying'));
-    
-    const formData = collectFormData();
-    
-    // 記錄變更前的設定（用於比較）
-    const oldGamePath = currentConfig?.game?.gamePath || '';
-    const newGamePath = formData.game?.gamePath || '';
-    const oldLocale = currentConfig?.launcher?.language || 'zh-TW';
-    const newLocale = formData.launcher.language;
-    const localeChanged = oldLocale !== newLocale;
-    if (localeChanged) {
-      i18n.setLocale(newLocale);
-    }
-    
-    applyTheme(formData.launcher.theme || 'dark');
-    
-    console.log('[Settings] Applying configuration:', formData);
-    
-    // Step 1: Save configuration
-    const response = await window.electronAPI.backend.call('/api/config', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: formData
-    });
-    
-    console.log('[Settings] Save response:', response);
-    
-    if (!response.ok) {
-      throw new Error(response.data?.message || response.statusText || 'Save failed');
-    }
-    
-    console.log('[Settings] Configuration saved successfully');
-    currentConfig = formData;
-    
-    // Step 2: Apply Wine settings to registry (macOS only)
-    if (currentPlatform === 'darwin') {
-      console.log('[Settings] Applying Wine settings to registry...');
-      
-      const applyResponse = await window.electronAPI.backend.call('/api/wine/apply-settings', {
-        method: 'POST'
-      });
-      
-      console.log('[Settings] Apply Wine settings response:', applyResponse);
-      
-      if (!applyResponse.ok) {
-        console.error('[Settings] Failed to apply Wine settings:', applyResponse.data?.message);
-        hideLoadingOverlay();
-        showError(i18n.t('settings.apply_wine_failed'));
-        return;
-      }
-      
-      console.log('[Settings] Wine settings applied successfully');
-      await refreshDiscordRpcStatus();
-    }
-    
-    // Step 3: 通知登入頁設定已變更
-    const gamePathChanged = oldGamePath !== newGamePath;
-    
-    // 檢查 Dalamud 啟用狀態變更
-    const oldDalamudEnabled = currentConfig?.dalamud?.enabled || false;
-    const newDalamudEnabled = formData.dalamud?.enabled || false;
-    const dalamudEnabledChanged = oldDalamudEnabled !== newDalamudEnabled;
-    
-    // 通知登入頁重新讀取設定
-    console.log('[Settings] Notifying login page of config change');
-    window.electronAPI.events.send('config-changed', {
-      gamePathChanged,
-      dalamudEnabledChanged: dalamudEnabledChanged ? newDalamudEnabled : undefined,
-      newGamePath
-    });
-    
-    // Hide overlay and show success notification
-    hideLoadingOverlay();
-    showNotification(i18n.t('settings.applied'));
-  } catch (error) {
-    console.error('[Settings] Failed to apply configuration:', error);
-    hideLoadingOverlay();
-    showError(i18n.t('settings.save_failed'));
-  }
+  return persistConfig(false);
 }
 
 /**
@@ -660,7 +585,7 @@ async function openWineTool(tool) {
     showLoadingOverlay(i18n.t('settings.wine.launching_tool'));
     console.log(`[Settings] Launching Wine tool: ${tool}`);
 
-    await window.electronAPI.backend.call(`/api/wine/open-${tool}`, {
+    await window.electronAPI.backend.call(`/api/wine/launch/${tool}`, {
       method: 'POST'
     });
 

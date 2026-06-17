@@ -19,8 +19,6 @@ Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Override("System", Serilog.Events.LogEventLevel.Warning)
     .MinimumLevel.Override("System.Net.Http.HttpClient", Serilog.Events.LogEventLevel.Warning)
     .Enrich.FromLogContext()
-    .Enrich.WithThreadId()
-    .Enrich.WithMachineName()
     .WriteTo.Console()
     .WriteTo.File(
         path: logPath,
@@ -122,8 +120,6 @@ try
             .MinimumLevel.Warning()
             .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
             .Enrich.FromLogContext()
-            .Enrich.WithThreadId()
-            .Enrich.WithMachineName()
             .WriteTo.Console()
             .WriteTo.File(
                 path: logPath,

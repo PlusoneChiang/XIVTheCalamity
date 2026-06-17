@@ -61,11 +61,6 @@ public class WindowsEnvironmentService(
         return Task.FromResult(true);
     }
 
-    public string GetDebugInfo()
-    {
-        return "Windows Native Environment (No emulation)";
-    }
-
     public Task ApplyConfigAsync(CancellationToken cancellationToken = default)
     {
         logger?.LogInformation("[WIN-ENV] Windows native, no config to apply");
