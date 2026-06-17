@@ -41,9 +41,18 @@ public interface IEnvironmentService
     /// Get the launcher command used to execute Windows programs.
     /// For plain wine: returns (wine64, [])
     /// For umu: returns ("python3", ["/path/to/umu-run"])
-    /// The full invocation is: Executable PrefixArgs... windowsExe windowsArgs...
+    /// LaunchOptions (e.g. fgmod wrapper) are applied when set.
+    /// The full invocation is: Executable PrefixArgs... windowsExe windowsArgs... SuffixArgs
+    /// Use this only for actual game launch.
     /// </summary>
     WineLauncher GetLauncherCommand() => new WineLauncher(GetWineExecutablePath(), []);
+
+    /// <summary>
+    /// Get the base launcher command WITHOUT LaunchOptions applied.
+    /// Used for utility Wine operations (winedbg, Dalamud.Injector) that must not
+    /// be wrapped by user-defined launch wrappers such as fgmod.
+    /// </summary>
+    WineLauncher GetBaseLauncherCommand() => new WineLauncher(GetWineExecutablePath(), []);
     
     /// <summary>
     /// Get environment variables configuration
@@ -85,23 +94,31 @@ public interface IEnvironmentService
 /// Represents the launcher command used to execute Windows executables.
 /// For plain Wine: Executable="wine64", PrefixArgs=[]
 /// For umu-launcher: Executable="python3", PrefixArgs=["/path/to/umu-run"]
-/// Full invocation: Executable PrefixArgs... windowsExe windowsArgs...
+/// Full invocation: Executable PrefixArgs... windowsExe windowsArgs... SuffixArgs
 /// </summary>
-public record WineLauncher(string Executable, IReadOnlyList<string> PrefixArgs)
+public record WineLauncher(string Executable, IReadOnlyList<string> PrefixArgs, IReadOnlyList<string>? SuffixArgs = null)
 {
     public bool IsValid => !string.IsNullOrEmpty(Executable) && File.Exists(Executable);
 
     /// <summary>
-    /// Builds an Arguments string that prepends PrefixArgs before the given windowsArgs.
-    /// Example (umu): BuildArguments("\"/path/game.exe\" /arg") → "/path/umu-run \"/path/game.exe\" /arg"
+    /// Builds an Arguments string that wraps windowsArgs with PrefixArgs and SuffixArgs.
+    /// Example (umu):    BuildArguments("\"/path/game.exe\" /arg") → "/path/umu-run \"/path/game.exe\" /arg"
+    /// Example (suffix): BuildArguments("\"/path/game.exe\"")       → "umu-run \"/path/game.exe\" --extra"
     /// </summary>
     public string BuildArguments(string windowsArgs)
     {
-        if (PrefixArgs.Count == 0)
-            return windowsArgs;
+        var parts = new List<string>();
 
-        var prefix = string.Join(" ", PrefixArgs.Select(a => a.Contains(' ') ? $"\"{a}\"" : a));
-        return string.IsNullOrEmpty(windowsArgs) ? prefix : $"{prefix} {windowsArgs}";
+        if (PrefixArgs.Count > 0)
+            parts.Add(string.Join(" ", PrefixArgs.Select(a => a.Contains(' ') ? $"\"{a}\"" : a)));
+
+        if (!string.IsNullOrEmpty(windowsArgs))
+            parts.Add(windowsArgs);
+
+        if (SuffixArgs is { Count: > 0 })
+            parts.Add(string.Join(" ", SuffixArgs.Select(a => a.Contains(' ') ? $"\"{a}\"" : a)));
+
+        return string.Join(" ", parts);
     }
 }
 

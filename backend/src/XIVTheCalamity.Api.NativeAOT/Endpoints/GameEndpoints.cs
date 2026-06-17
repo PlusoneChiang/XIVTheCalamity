@@ -330,8 +330,12 @@ public static class GameEndpoints
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) || RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
-                // macOS/Linux: Wine-based injection
-                var launcher = environmentService.GetLauncherCommand();
+                // macOS/Linux: Wine-based injection.
+                // IMPORTANT: Use GetBaseLauncherCommand() (without LaunchOptions) so that
+                // user-defined wrappers like fgmod are NOT applied to winedbg or Dalamud.Injector.
+                // fgmod detects the last active window; running it for utility processes would
+                // cause it to re-hook the already-running game window.
+                var launcher = environmentService.GetBaseLauncherCommand();
 
                 if (!launcher.IsValid)
                 {

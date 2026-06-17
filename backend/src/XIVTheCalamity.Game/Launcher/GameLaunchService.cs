@@ -473,15 +473,19 @@ public class GameLaunchService
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
-        
-        // Keep inherited environment variables and override with launcher-managed values.
-        // This matches behavior where system GPU/driver-related variables remain available.
+
+        // Sanitize inherited environment FIRST (removes Steam/AppImage-injected vars that
+        // conflict with Wine), then apply our custom environment on top.
+        // Order matters: sanitizing after applying would silently wipe user-defined
+        // ExtraEnvironmentVariables such as MANGOHUD, LD_PRELOAD, VK_LAYER_PATH, etc.
+        SanitizeLinuxLaunchEnvironment(startInfo);
+
+        // Apply launcher-managed environment variables (includes user ExtraEnvironmentVariables).
+        // These are applied after sanitization so they are never silently removed.
         foreach (var (key, value) in environment)
         {
             startInfo.Environment[key] = value;
         }
-
-        SanitizeLinuxLaunchEnvironment(startInfo);
         
         // Ensure PATH is set
         if (!startInfo.Environment.ContainsKey("PATH"))

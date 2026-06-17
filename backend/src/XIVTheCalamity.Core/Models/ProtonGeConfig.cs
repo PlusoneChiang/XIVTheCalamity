@@ -19,9 +19,10 @@ public class ProtonGeConfig
     public bool DxvkAsyncEnabled { get; set; } = false;
     
     /// <summary>
-    /// Maximum framerate (30 - 240)
+    /// Maximum framerate limit. 0 = unlimited (default).
+    /// Mapped to DXVK_FRAME_RATE environment variable.
     /// </summary>
-    public int MaxFramerate { get; set; } = 60;
+    public int MaxFramerate { get; set; } = 0;
     
     /// <summary>
     /// Enable Esync synchronization

@@ -368,33 +368,45 @@ public class ProtonGeEnvironmentService(
     /// Returns umu-based launcher when umu-run is available, falling back to raw wine64.
     /// umu uses pressure-vessel to sandbox the Proton environment, which fixes
     /// FASMX64.dll/Reloaded.Hooks AV crashes on Linux.
+    /// LaunchOptions (e.g. fgmod wrapper) are applied on top.
+    /// Use this only for actual game launch.
     /// </summary>
     public WineLauncher GetLauncherCommand()
     {
-        WineLauncher baseLauncher;
+        var baseLauncher = BuildBaseLauncher();
+        var config = configService.LoadConfigAsync().GetAwaiter().GetResult();
+        var launchOptions = config.ProtonGe?.LaunchOptions ?? "%command%";
+        return ApplyLaunchOptions(baseLauncher, launchOptions);
+    }
+
+    /// <summary>
+    /// Returns the base umu/wine64 launcher WITHOUT LaunchOptions applied.
+    /// Use this for utility Wine operations (winedbg, Dalamud.Injector) that must
+    /// not be wrapped by user-defined launchers such as fgmod.
+    /// </summary>
+    public WineLauncher GetBaseLauncherCommand() => BuildBaseLauncher();
+
+    private WineLauncher BuildBaseLauncher()
+    {
         if (umuDownloadService.IsAvailable())
         {
             var python3Path = ResolvePython3Path();
             if (!string.IsNullOrEmpty(python3Path))
             {
                 logger?.LogDebug("[PROTON-GE] Using umu launcher: {Python3} {UmuRun}", python3Path, umuDownloadService.UmuRunPath);
-                baseLauncher = new WineLauncher(python3Path, [umuDownloadService.UmuRunPath]);
+                return new WineLauncher(python3Path, [umuDownloadService.UmuRunPath]);
             }
             else
             {
                 logger?.LogWarning("[PROTON-GE] python3 not found, falling back to wine64");
-                baseLauncher = new WineLauncher(ProtonWine, []);
+                return new WineLauncher(ProtonWine, []);
             }
         }
         else
         {
             logger?.LogDebug("[PROTON-GE] umu not available, falling back to wine64: {Wine}", ProtonWine);
-            baseLauncher = new WineLauncher(ProtonWine, []);
+            return new WineLauncher(ProtonWine, []);
         }
-
-        var config = configService.LoadConfigAsync().GetAwaiter().GetResult();
-        var launchOptions = config.ProtonGe?.LaunchOptions ?? "%command%";
-        return ApplyLaunchOptions(baseLauncher, launchOptions);
     }
 
     private WineLauncher ApplyLaunchOptions(WineLauncher baseLauncher, string launchOptions)
@@ -411,21 +423,87 @@ public class ProtonGeEnvironmentService(
         }
 
         var prefix = trimmed[..cmdIndex].Trim();
-        if (string.IsNullOrEmpty(prefix))
+        var suffix = trimmed[(cmdIndex + "%command%".Length)..].Trim();
+
+        if (string.IsNullOrEmpty(prefix) && string.IsNullOrEmpty(suffix))
             return baseLauncher;
 
-        var tokens = prefix.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        // Suffix args: split respecting quotes
+        var suffixArgs = string.IsNullOrEmpty(suffix)
+            ? null
+            : (IReadOnlyList<string>)TokenizeShellArgs(suffix);
+
+        if (string.IsNullOrEmpty(prefix))
+        {
+            // Only suffix args, no wrapper executable change
+            return baseLauncher with { SuffixArgs = suffixArgs };
+        }
+
+        var tokens = TokenizeShellArgs(prefix);
+        if (tokens.Count == 0)
+            return baseLauncher with { SuffixArgs = suffixArgs };
+
         var home = HomePathService.GetEffectiveHomePath();
         var wrapperExe = tokens[0].Replace("~", home);
 
         // new PrefixArgs = wrapper extra tokens + original exe + original prefix args
-        var newPrefixArgs = tokens[1..]
+        var newPrefixArgs = tokens.Skip(1)
             .Concat([baseLauncher.Executable])
             .Concat(baseLauncher.PrefixArgs)
             .ToList();
 
-        logger?.LogInformation("[PROTON-GE] Launch wrapper applied: {Exe} [{Prefix}]", wrapperExe, string.Join(", ", newPrefixArgs));
-        return new WineLauncher(wrapperExe, newPrefixArgs);
+        logger?.LogInformation("[PROTON-GE] Launch wrapper applied: {Exe} [{Prefix}]{Suffix}",
+            wrapperExe,
+            string.Join(", ", newPrefixArgs),
+            suffixArgs != null ? $" suffix: [{string.Join(", ", suffixArgs)}]" : "");
+
+        return new WineLauncher(wrapperExe, newPrefixArgs, suffixArgs);
+    }
+
+    /// <summary>
+    /// Tokenizes a shell-like argument string, respecting single and double quoted segments.
+    /// Quotes are stripped from the resulting tokens.
+    /// Example: ["/path/with spaces/exe" --flag] → ["/path/with spaces/exe", "--flag"]
+    /// </summary>
+    private static List<string> TokenizeShellArgs(string input)
+    {
+        var tokens = new List<string>();
+        var current = new System.Text.StringBuilder();
+        var inQuote = false;
+        var quoteChar = '"';
+
+        foreach (var ch in input)
+        {
+            if (inQuote)
+            {
+                if (ch == quoteChar)
+                    inQuote = false;
+                else
+                    current.Append(ch);
+            }
+            else if (ch == '"' || ch == '\'')
+            {
+                inQuote = true;
+                quoteChar = ch;
+            }
+            else if (ch == ' ')
+            {
+                if (current.Length > 0)
+                {
+                    tokens.Add(current.ToString());
+                    current.Clear();
+                }
+            }
+            else
+            {
+                current.Append(ch);
+            }
+        }
+
+        if (current.Length > 0)
+            tokens.Add(current.ToString());
+
+        return tokens;
     }
 
     private static string ResolvePython3Path()
@@ -486,6 +564,10 @@ public class ProtonGeEnvironmentService(
 
         if (wineConfig.GameModeEnabled)
             env["LD_PRELOAD"] = "/usr/lib/libgamemodeauto.so.0";
+
+        // Framerate limit: DXVK_FRAME_RATE=0 means unlimited; only set when user configured a limit.
+        if (wineConfig.MaxFramerate > 0)
+            env["DXVK_FRAME_RATE"] = wineConfig.MaxFramerate.ToString();
 
         // IME (input method) support — detect fcitx5/ibus and set required env vars
         var imeFramework = DetectImeFramework();
@@ -626,6 +708,10 @@ public class ProtonGeEnvironmentService(
 
         if (wineConfig.GameModeEnabled)
             env["LD_PRELOAD"] = "/usr/lib/libgamemodeauto.so.0";
+
+        // Framerate limit: DXVK_FRAME_RATE=0 means unlimited; only set when user configured a limit.
+        if (wineConfig.MaxFramerate > 0)
+            env["DXVK_FRAME_RATE"] = wineConfig.MaxFramerate.ToString();
 
         // Apply extra user-defined environment variables (these override defaults)
         foreach (var (key, value) in wineConfig.ExtraEnvironmentVariables)

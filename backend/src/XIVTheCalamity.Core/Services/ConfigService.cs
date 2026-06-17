@@ -81,7 +81,7 @@ public class ConfigService
                 config.ProtonGe = new ProtonGeConfig
                 {
                     DxvkHudEnabled = false,
-                    MaxFramerate = 60,
+                    MaxFramerate = 0,
                     EsyncEnabled = true,
                     FsyncEnabled = true,
                     GameModeEnabled = true,
@@ -218,7 +218,7 @@ public class ConfigService
             config.ProtonGe = new ProtonGeConfig
             {
                 DxvkHudEnabled = false,
-                MaxFramerate = 60,
+                MaxFramerate = 0,
                 EsyncEnabled = true,
                 FsyncEnabled = true,
                 GameModeEnabled = true,
