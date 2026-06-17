@@ -93,13 +93,11 @@ function updateDevToolsShortcut() {
 }
 
 // Load version info from package.json
+// __dirname = frontend/src/main/ → ../../package.json = frontend/package.json
+// Works in dev mode and inside ASAR (Node's ASAR fs patch handles the path)
 let versionInfo = { version: '0.1.0', appName: 'XIVTheCalamity', description: 'Final Fantasy XIV Cross-Platform Launcher' };
 try {
-  // Packaged: resources/package.json; Dev: two levels up from src/main/
-  const packagePath = app.isPackaged
-    ? path.join(process.resourcesPath, 'package.json')
-    : path.join(__dirname, '../../package.json');
-  const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+  const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '../../package.json'), 'utf8'));
   versionInfo = {
     version: packageJson.version,
     appName: packageJson.name === 'xivthecalamity' ? 'XIVTheCalamity' : packageJson.name,
