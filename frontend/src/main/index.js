@@ -41,6 +41,17 @@ if (isLinux && !app.commandLine.hasSwitch('no-sandbox')) {
     } catch {}
   }
 
+  // Steam / pressure-vessel: Steam launches apps inside a bubblewrap (bwrap) container
+  // which already occupies a user namespace. Chromium's sandbox then tries to create a
+  // nested user namespace, which the kernel disallows. Detect via Steam's own env vars.
+  // SteamEnv=1 is set by the Steam client for every launch;
+  // PRESSURE_VESSEL_APP_LD_LIBRARY_PATH is set specifically inside a pressure-vessel container.
+  if (!needsNoSandbox) {
+    if (process.env.SteamEnv === '1' || process.env.PRESSURE_VESSEL_APP_LD_LIBRARY_PATH) {
+      needsNoSandbox = true;
+    }
+  }
+
   if (needsNoSandbox) {
     log.info('[Sandbox] Kernel sandbox restriction detected, applying --no-sandbox');
     app.commandLine.appendSwitch('no-sandbox');
