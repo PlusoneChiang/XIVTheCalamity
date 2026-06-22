@@ -6,13 +6,16 @@
 /**
  * Derive encryption key from password/seed
  * @param {string} password - Master password or device ID
- * @param {string} salt - Salt for key derivation
+ * @param {Uint8Array} salt - Salt for key derivation
  * @returns {Promise<CryptoKey>}
  */
 async function deriveKey(password, salt) {
   const encoder = new TextEncoder();
   const passwordBuffer = encoder.encode(password);
-  const saltBuffer = encoder.encode(salt);
+  
+  if (!(salt instanceof Uint8Array)) {
+    throw new TypeError('Salt must be a Uint8Array');
+  }
   
   // Import password as key material
   const keyMaterial = await crypto.subtle.importKey(
@@ -27,7 +30,7 @@ async function deriveKey(password, salt) {
   return crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt: saltBuffer,
+      salt: salt,
       iterations: 100000,
       hash: 'SHA-256'
     },
@@ -49,12 +52,12 @@ export async function encryptText(text, password = 'default-key') {
     const encoder = new TextEncoder();
     const data = encoder.encode(text);
     
-    // Generate random IV
+    // Generate random IV and Salt
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const salt = crypto.getRandomValues(new Uint8Array(16));
     
-    // Derive key
-    const key = await deriveKey(password, Array.from(salt).map(b => String.fromCharCode(b)).join(''));
+    // Derive key using Uint8Array salt directly
+    const key = await deriveKey(password, salt);
     
     // Encrypt
     const encrypted = await crypto.subtle.encrypt(
@@ -93,8 +96,8 @@ export async function decryptText(encryptedBase64, password = 'default-key') {
     const iv = combined.slice(16, 28);
     const encrypted = combined.slice(28);
     
-    // Derive key
-    const key = await deriveKey(password, Array.from(salt).map(b => String.fromCharCode(b)).join(''));
+    // Derive key using Uint8Array salt directly
+    const key = await deriveKey(password, salt);
     
     // Decrypt
     const decrypted = await crypto.subtle.decrypt(

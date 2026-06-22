@@ -7,7 +7,7 @@
 import '../../utils/polyfill.js';
 import { toHex } from '../../utils/encoding.js';
 import { initAccountManagement, handleAutoFillOTPChange, getOTPSecretInput, cleanupAccountManagement, clearAutoFilledState, isAllAutoFilled, refreshAccountState } from './accountManagement.js';
-import { savePassword, saveOTPSecret, saveAutoFillOTP, hasOTPSecret } from '../../utils/accountStorage.js';
+import { savePassword, saveOTPSecret, saveAutoFillOTP, hasOTPSecret } from '../../utils/credentialsStore.js';
 import i18n from '../../i18n/index.js';
 import { startBackgroundUpdate, setAppVersionText, isUpdating, handleConfigChanged } from './updateManager.js';
 import { startDalamudUpdate, cancelDalamudUpdate, handleDalamudConfigChanged, isDalamudUpdating } from './dalamudManager.js';

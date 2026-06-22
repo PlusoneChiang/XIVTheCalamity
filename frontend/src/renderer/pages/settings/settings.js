@@ -4,7 +4,7 @@
 
 import i18n from '../../i18n/index.js';
 import { applyTheme } from '../../utils/theme.js';
-import { getLastUsedAccount, deleteOTPSecret } from '../../utils/accountStorage.js';
+import { getLastUsedAccount, deleteOTPSecret } from '../../utils/credentialsStore.js';
 
 let currentConfig = null;
 let currentPlatform = 'win32';

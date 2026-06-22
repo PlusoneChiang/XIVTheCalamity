@@ -3,7 +3,7 @@
  * Handles account dropdown, password toggle, and OTP management
  */
 
-import { getSavedAccounts, getAccount, deleteAccount, getDecryptedPassword, hasOTPSecret, getDecryptedOTPSecret, saveOTPSecret, getAutoFillOTP, saveAutoFillOTP, getLastUsedAccount } from '../../utils/accountStorage.js';
+import { getSavedAccounts, getAccount, deleteAccount, getDecryptedPassword, hasOTPSecret, getDecryptedOTPSecret, saveOTPSecret, getAutoFillOTP, saveAutoFillOTP, getLastUsedAccount } from '../../utils/credentialsStore.js';
 import { generateTOTP, getRemainingSeconds, isValidTOTPSecret } from '../../utils/totp.js';
 import i18n from '../../i18n/index.js';
 
