@@ -15,6 +15,9 @@ namespace XIVTheCalamity.Api.NativeAOT;
 [JsonSerializable(typeof(DiscordRpcConfig))]
 [JsonSerializable(typeof(LauncherConfig))]
 [JsonSerializable(typeof(WineConfig))]
+[JsonSerializable(typeof(WineGraphicsConfig))]
+[JsonSerializable(typeof(WinePerformanceConfig))]
+[JsonSerializable(typeof(WineCompatConfig))]
 [JsonSerializable(typeof(ProtonGeConfig))]
 [JsonSerializable(typeof(LoginResult))]
 [JsonSerializable(typeof(WineInitProgress))]
@@ -42,6 +45,9 @@ namespace XIVTheCalamity.Api.NativeAOT;
 
 // API Response Wrappers
 [JsonSerializable(typeof(ApiResponse<AppConfig>))]
+[JsonSerializable(typeof(ApiResponse<WineGraphicsConfig>))]
+[JsonSerializable(typeof(ApiResponse<WinePerformanceConfig>))]
+[JsonSerializable(typeof(ApiResponse<WineCompatConfig>))]
 [JsonSerializable(typeof(ApiResponse<LoginData>))]
 [JsonSerializable(typeof(ApiResponse<string>))]
 [JsonSerializable(typeof(ApiResponse<object>))]

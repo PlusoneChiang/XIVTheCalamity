@@ -39,10 +39,11 @@ try
     // Use Serilog
     builder.Host.UseSerilog();
     
-    // Configure JSON with Source Generator
+    // Configure JSON with Source Generator (with reflection fallback in development)
     builder.Services.ConfigureHttpJsonOptions(options =>
     {
         options.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonContext.Default);
+        options.SerializerOptions.TypeInfoResolverChain.Add(new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver());
     });
 
     // Register ConfigService

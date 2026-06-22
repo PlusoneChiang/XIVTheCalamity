@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using XIVTheCalamity.Core.Json;
 using XIVTheCalamity.Core.Models;
 
@@ -12,10 +13,27 @@ public class ConfigService
 {
     private static readonly object _lock = new();
     private readonly string _configPath;
+    private readonly IEnumerable<IPlatformConfigProvider> _platformProviders;
 
-    public ConfigService()
+    private static readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        TypeInfoResolver = System.Text.Json.Serialization.Metadata.JsonTypeInfoResolver.Combine(
+            CoreJsonContext.Default,
+            new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver()
+        ),
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
+    public ConfigService() : this(new IPlatformConfigProvider[] { new MacOSConfigProvider(), new LinuxConfigProvider() })
+    {
+    }
+
+    public ConfigService(IEnumerable<IPlatformConfigProvider> platformProviders)
     {
         _configPath = GetConfigFilePath();
+        _platformProviders = platformProviders;
         
         // Ensure config directory exists
         var configDir = Path.GetDirectoryName(_configPath);
@@ -49,7 +67,7 @@ public class ConfigService
         try
         {
             var json = await File.ReadAllTextAsync(_configPath);
-            var config = JsonSerializer.Deserialize(json, CoreJsonContext.Default.AppConfig);
+            var config = JsonSerializer.Deserialize<AppConfig>(json, _jsonOptions);
             
             if (config is null)
             {
@@ -57,37 +75,38 @@ public class ConfigService
                 return CreateDefaultConfig();
             }
             
-            // Ensure platform-specific config exists with defaults
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) && config.Wine == null)
+            // Apply platform strategy default values (e.g. initial creation of sub-config objects)
+            var provider = _platformProviders.FirstOrDefault(p => p.MatchesPlatform());
+            provider?.ApplyPlatformDefaults(config);
+            
+            // Always sync Wine configuration fields to split config fields if not already populated
+            if (config.Wine != null)
             {
-                config.Wine = new WineConfig
+                config.WineGraphics ??= new WineGraphicsConfig
                 {
-                    MetalFxSpatialEnabled = false,
-                    MetalFxSpatialFactor = 2.0,
-                    Metal3PerformanceOverlay = false,
-                    HudScale = 1.0,
-                    NativeResolution = false,
-                    MaxFramerate = 60,
-                    AudioRouting = false,
-                    Msync = true,
-                    WineDebug = "",
-                    UseHomeAlias = false
+                    MetalFxSpatialEnabled = config.Wine.MetalFxSpatialEnabled,
+                    MetalFxSpatialFactor = config.Wine.MetalFxSpatialFactor,
+                    Metal3PerformanceOverlay = config.Wine.Metal3PerformanceOverlay,
+                    HudScale = config.Wine.HudScale,
+                    NativeResolution = config.Wine.NativeResolution,
+                    MaxFramerate = config.Wine.MaxFramerate
                 };
-                Console.WriteLine("[Config] Initialized Wine config with defaults");
-            }
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && config.ProtonGe == null)
-            {
-                // Linux uses Wine-XIV
-                config.ProtonGe = new ProtonGeConfig
+                config.WinePerformance ??= new WinePerformanceConfig
                 {
-                    DxvkHudEnabled = false,
-                    MaxFramerate = 0,
-                    EsyncEnabled = true,
-                    FsyncEnabled = true,
-                    GameModeEnabled = true,
-                    WineDebug = ""
+                    Msync = config.Wine.Msync,
+                    WineDebug = config.Wine.WineDebug
                 };
-                Console.WriteLine("[Config] Initialized ProtonGe config with defaults");
+                config.WineCompat ??= new WineCompatConfig
+                {
+                    AudioRouting = config.Wine.AudioRouting,
+                    UseHomeAlias = config.Wine.UseHomeAlias,
+                    LeftOptionIsAlt = config.Wine.LeftOptionIsAlt,
+                    RightOptionIsAlt = config.Wine.RightOptionIsAlt,
+                    LeftCommandIsCtrl = config.Wine.LeftCommandIsCtrl,
+                    RightCommandIsCtrl = config.Wine.RightCommandIsCtrl,
+                    ImeCandidatePositionX = config.Wine.ImeCandidatePositionX,
+                    ImeCandidatePositionY = config.Wine.ImeCandidatePositionY
+                };
             }
 
             config.DiscordRpc ??= new DiscordRpcConfig();
@@ -124,6 +143,35 @@ public class ConfigService
     /// </summary>
     public Task SaveConfigAsync(AppConfig config)
     {
+        // Sync split config properties back to the main Wine wrapper object before save and validation
+        if (config.WineGraphics != null || config.WinePerformance != null || config.WineCompat != null)
+        {
+            config.Wine = new WineConfig
+            {
+                // Graphics
+                MetalFxSpatialEnabled = config.WineGraphics?.MetalFxSpatialEnabled ?? false,
+                MetalFxSpatialFactor = config.WineGraphics?.MetalFxSpatialFactor ?? 2.0,
+                Metal3PerformanceOverlay = config.WineGraphics?.Metal3PerformanceOverlay ?? false,
+                HudScale = config.WineGraphics?.HudScale ?? 1.0,
+                NativeResolution = config.WineGraphics?.NativeResolution ?? false,
+                MaxFramerate = config.WineGraphics?.MaxFramerate ?? 60,
+                
+                // Performance
+                Msync = config.WinePerformance?.Msync ?? true,
+                WineDebug = config.WinePerformance?.WineDebug ?? "",
+                
+                // Compat
+                AudioRouting = config.WineCompat?.AudioRouting ?? false,
+                UseHomeAlias = config.WineCompat?.UseHomeAlias ?? false,
+                LeftOptionIsAlt = config.WineCompat?.LeftOptionIsAlt ?? true,
+                RightOptionIsAlt = config.WineCompat?.RightOptionIsAlt ?? true,
+                LeftCommandIsCtrl = config.WineCompat?.LeftCommandIsCtrl ?? true,
+                RightCommandIsCtrl = config.WineCompat?.RightCommandIsCtrl ?? true,
+                ImeCandidatePositionX = config.WineCompat?.ImeCandidatePositionX ?? 25,
+                ImeCandidatePositionY = config.WineCompat?.ImeCandidatePositionY ?? 85
+            };
+        }
+
         // Force-overwrite managed fields before validation and save
         config.Dalamud.PluginRepoUrl = DalamudConfig.ManagedPluginRepoUrl;
 
@@ -144,7 +192,7 @@ public class ConfigService
     {
         try
         {
-            var json = JsonSerializer.Serialize(config, CoreJsonContext.Default.AppConfig);
+            var json = JsonSerializer.Serialize(config, _jsonOptions);
             File.WriteAllText(_configPath, json);
             Console.WriteLine("[Config] Config saved successfully");
         }
@@ -167,64 +215,15 @@ public class ConfigService
     }
 
     /// <summary>
-    /// Create default configuration
+    /// Create default configuration using static factory and platform provider defaults
     /// </summary>
     private AppConfig CreateDefaultConfig()
     {
-        var config = new AppConfig
-        {
-            Game = new GameConfig
-            {
-                GamePath = "",
-                Region = "TraditionalChinese"
-            },
-            Dalamud = new DalamudConfig
-            {
-                Enabled = false,
-                InjectDelay = 5000,
-                SafeMode = false,
-                PluginRepoUrl = DalamudConfig.ManagedPluginRepoUrl
-            },
-            DiscordRpc = new DiscordRpcConfig(),
-            Launcher = new LauncherConfig
-            {
-                EncryptedArguments = true,
-                ExitWithGame = true,
-                NonZeroExitError = true,
-                DevelopmentMode = false
-            }
-        };
+        var config = AppConfig.CreateDefault();
 
-        // Platform-specific defaults
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-        {
-            config.Wine = new WineConfig
-            {
-                MetalFxSpatialEnabled = false,
-                MetalFxSpatialFactor = 2.0,
-                Metal3PerformanceOverlay = false,
-                HudScale = 1.0,
-                NativeResolution = false,
-                MaxFramerate = 60,
-                AudioRouting = false,
-                Msync = true,
-                WineDebug = "",
-                UseHomeAlias = false
-            };
-        }
-        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-        {
-            // Linux uses Wine-XIV
-            config.ProtonGe = new ProtonGeConfig
-            {
-                DxvkHudEnabled = false,
-                MaxFramerate = 0,
-                EsyncEnabled = true,
-                FsyncEnabled = true,
-                GameModeEnabled = true,
-                WineDebug = ""
-            };
-        }
+        // Apply platform-specific strategy defaults
+        var provider = _platformProviders.FirstOrDefault(p => p.MatchesPlatform());
+        provider?.ApplyPlatformDefaults(config);
 
         return config;
     }
@@ -246,31 +245,9 @@ public class ConfigService
             throw new ArgumentException("Region must be 'TraditionalChinese'");
         }
 
-        // Validate Wine config (macOS only)
-        if (config.Wine != null)
-        {
-            // Validate metalFxSpatialFactor
-            if (config.Wine.MetalFxSpatialFactor < 1.0 || config.Wine.MetalFxSpatialFactor > 4.0)
-            {
-                throw new ArgumentException("MetalFxSpatialFactor must be between 1.0 and 4.0");
-            }
-
-            // Validate maxFramerate
-            if (config.Wine.MaxFramerate < 30 || config.Wine.MaxFramerate > 240)
-            {
-                throw new ArgumentException("MaxFramerate must be between 30 and 240");
-            }
-            
-            // Validate IME candidate position
-            if (config.Wine.ImeCandidatePositionX < 0 || config.Wine.ImeCandidatePositionX > 100)
-            {
-                throw new ArgumentException("ImeCandidatePositionX must be between 0 and 100");
-            }
-            if (config.Wine.ImeCandidatePositionY < 0 || config.Wine.ImeCandidatePositionY > 100)
-            {
-                throw new ArgumentException("ImeCandidatePositionY must be between 0 and 100");
-            }
-        }
+        // Delegate platform config validation to strategy provider
+        var provider = _platformProviders.FirstOrDefault(p => p.MatchesPlatform());
+        provider?.ValidatePlatformConfig(config);
 
         // Validate injectDelay (milliseconds)
         if (config.Dalamud.InjectDelay < 0 || config.Dalamud.InjectDelay > 30000)

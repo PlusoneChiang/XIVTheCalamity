@@ -17,6 +17,9 @@ namespace XIVTheCalamity.Core.Json;
 [JsonSerializable(typeof(DiscordRpcConfig))]
 [JsonSerializable(typeof(LauncherConfig))]
 [JsonSerializable(typeof(WineConfig))]
+[JsonSerializable(typeof(WineGraphicsConfig))]
+[JsonSerializable(typeof(WinePerformanceConfig))]
+[JsonSerializable(typeof(WineCompatConfig))]
 [JsonSerializable(typeof(ProtonGeConfig))]
 [JsonSerializable(typeof(LoginResult))]
 public partial class CoreJsonContext : JsonSerializerContext
