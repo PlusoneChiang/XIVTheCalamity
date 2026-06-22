@@ -261,6 +261,9 @@ try {
     # Build without code signing
     $env:CSC_IDENTITY_AUTO_DISCOVERY = "false"
     
+    Write-Host "   Building renderer (Vite)..." -ForegroundColor Gray
+    npm run build:renderer
+    
     npx electron-builder --win --x64 --config electron-builder.config.js
     
     if ($LASTEXITCODE -eq 0) {

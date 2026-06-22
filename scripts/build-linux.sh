@@ -104,6 +104,10 @@ echo "📦 Building AppImage (version $VERSION)..."
 echo "   (This may take 5-10 minutes...)"
 echo ""
 
+# Build renderer (Vite)
+echo "   Build renderer..."
+npm run build:renderer
+
 # Use npx electron-builder (linux extraResources is already configured in package.json)
 npx electron-builder --linux --x64
 

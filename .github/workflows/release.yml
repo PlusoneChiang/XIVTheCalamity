@@ -109,6 +109,7 @@ jobs:
           NOTARIZE: ${{ inputs.skip_notarize && '0' || '1' }}
         run: |
           npm ci
+          npm run build:renderer
           npx electron-builder --mac --arm64 --publish always
 
       # Notarize
@@ -172,6 +173,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           npm ci
+          npm run build:renderer
           npx electron-builder --linux --x64 --publish always
 
   # ==================== Windows ====================
@@ -211,6 +213,7 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: |
           npm ci
+          npm run build:renderer
           
           # Create Windows-specific electron-builder config
           node -e "

@@ -4,7 +4,7 @@
   "description": "Final Fantasy XIV Cross-Platform Launcher",
   "main": "src/main/index.js",
   "scripts": {
-    "start": "electron .",
+    "start": "npm run build:renderer && electron .",
     "build:renderer": "node scripts/build-renderer.js",
     "build": "npm run build:renderer && npm run build:cli && npm run build:backend && electron-builder",
     "build:cli": "node -e \"if(process.platform==='darwin'){require('child_process').execSync('cd ../XTCAudioRouter && ./build.sh release',{stdio:'inherit'})}else{console.log('Skipping XTCAudioRouter (macOS only)')}\"",
