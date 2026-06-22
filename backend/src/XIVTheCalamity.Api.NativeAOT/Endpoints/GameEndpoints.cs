@@ -2,6 +2,8 @@ using System.Runtime.InteropServices;
 using XIVTheCalamity.Api.NativeAOT.DTOs;
 using XIVTheCalamity.Core.Models;
 using XIVTheCalamity.Core.Services;
+using XIVTheCalamity.Dalamud.Interfaces;
+using XIVTheCalamity.Dalamud.Models;
 using XIVTheCalamity.Dalamud.Services;
 using XIVTheCalamity.Game.Launcher;
 using XIVTheCalamity.Platform;
@@ -19,7 +21,7 @@ public static class GameEndpoints
         group.MapPost("/fake-launch", async (
             GameLaunchService gameLaunchService,
             ConfigService configService,
-            DalamudInjectorService dalamudInjector,
+            IDalamudInjector dalamudInjector,
             DalamudPathService dalamudPathService,
             IEnvironmentService environmentService,
             ILogger<Program> logger,
@@ -109,7 +111,7 @@ public static class GameEndpoints
             LaunchRequest request,
             GameLaunchService gameLaunchService,
             ConfigService configService,
-            DalamudInjectorService dalamudInjector,
+            IDalamudInjector dalamudInjector,
             DalamudPathService dalamudPathService,
             DiscordRpcBridgeService discordRpcBridgeService,
             IEnvironmentService environmentService,
@@ -158,14 +160,12 @@ public static class GameEndpoints
 
                     DalamudInjectionResult entryResult;
 
-                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    WineLauncher? launcher = null;
+                    Dictionary<string, string>? environment = null;
+
+                    if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     {
-                        entryResult = await dalamudInjector.LaunchWithEntryPointNativeAsync(
-                            exePath, gameArgs, options, cancellationToken);
-                    }
-                    else
-                    {
-                        var launcher = environmentService.GetLauncherCommand();
+                        launcher = environmentService.GetLauncherCommand();
 
                         if (!launcher.IsValid)
                         {
@@ -174,10 +174,11 @@ public static class GameEndpoints
                                 "WINE_NOT_AVAILABLE", "Wine executable not found"));
                         }
 
-                        var environment = environmentService.GetEnvironment();
-                        entryResult = await dalamudInjector.LaunchWithEntryPointAsync(
-                            launcher, exePath, gameArgs, environment, options, cancellationToken);
+                        environment = environmentService.GetEnvironment();
                     }
+
+                    entryResult = await dalamudInjector.LaunchWithEntryPointAsync(
+                        launcher, exePath, gameArgs, environment, options, cancellationToken);
 
                     if (!entryResult.Success)
                     {
@@ -305,7 +306,7 @@ public static class GameEndpoints
         object? emulatorConfig,
         Dictionary<string, string>? launchEnvironment,
         IEnvironmentService environmentService,
-        DalamudInjectorService dalamudInjector,
+        IDalamudInjector dalamudInjector,
         ILogger<Program> logger,
         CancellationToken cancellationToken)
     {
@@ -322,11 +323,12 @@ public static class GameEndpoints
             
             DalamudInjectionResult result;
             
+            WineLauncher? launcher = null;
+            Dictionary<string, string>? environment = null;
+
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                // Windows: native injection (no Wine needed)
                 logger.LogInformation("[GAME] Using Windows native Dalamud injection");
-                result = await dalamudInjector.InjectNativeAsync(options, cancellationToken);
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) || RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
@@ -335,7 +337,7 @@ public static class GameEndpoints
                 // user-defined wrappers like fgmod are NOT applied to winedbg or Dalamud.Injector.
                 // fgmod detects the last active window; running it for utility processes would
                 // cause it to re-hook the already-running game window.
-                var launcher = environmentService.GetBaseLauncherCommand();
+                launcher = environmentService.GetBaseLauncherCommand();
 
                 if (!launcher.IsValid)
                 {
@@ -343,7 +345,6 @@ public static class GameEndpoints
                     return;
                 }
 
-                Dictionary<string, string> environment;
                 if (launchEnvironment is { Count: > 0 })
                 {
                     environment = new Dictionary<string, string>(launchEnvironment);
@@ -356,13 +357,14 @@ public static class GameEndpoints
                 }
 
                 logger.LogInformation("[GAME] Using Wine Dalamud injection");
-                result = await dalamudInjector.InjectAsync(launcher, environment, options, cancellationToken);
             }
             else
             {
                 logger.LogWarning("[GAME] Dalamud injection not supported on this platform");
                 return;
             }
+
+            result = await dalamudInjector.InjectAsync(launcher, environment, options, cancellationToken);
             
             if (result.Success)
             {

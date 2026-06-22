@@ -9,6 +9,7 @@ using XIVTheCalamity.Game.Services;
 using XIVTheCalamity.Game.Launcher;
 using XIVTheCalamity.Game.Authentication;
 using XIVTheCalamity.Dalamud.Services;
+using XIVTheCalamity.Dalamud.Interfaces;
 
 // Configure Serilog
 var logPath = GetLogFilePath();
@@ -96,7 +97,18 @@ try
     // Dalamud services
     builder.Services.AddSingleton<DalamudPathService>();
     builder.Services.AddSingleton<DalamudUpdater>();
-    builder.Services.AddSingleton<DalamudInjectorService>();
+    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+    {
+        builder.Services.AddSingleton<IDalamudInjector, WindowsDalamudInjector>();
+    }
+    else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+    {
+        builder.Services.AddSingleton<IDalamudInjector, LinuxDalamudInjector>();
+    }
+    else
+    {
+        builder.Services.AddSingleton<IDalamudInjector, WineDalamudInjector>();
+    }
 
     // CORS
     builder.Services.AddCors(options =>
