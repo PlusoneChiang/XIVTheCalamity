@@ -25,35 +25,29 @@ class WineRegistry {
         self.winePrefix = winePrefix
         self.userRegPath = (winePrefix as NSString).appendingPathComponent("user.reg")
         self.msync = msync
-        xtcLog(label: "WineRegistry", "Initialized. Prefix: \(winePrefix), Wine: \(winePath)")
     }
     
     func setDefaultOutput(guid: String) {
         let deviceID = "{0.0.0.00000000}.{\(guid)}"
-        xtcLog(label: "WineRegistry", "Preparing to queue DefaultOutput = \(deviceID)")
-        runWineReg(key: wineDriverKey, value: "DefaultOutput", data: deviceID)
+        xtcLog(label: "WineRegistry", "Set DefaultOutput = \(deviceID)")
+        runWineCommand(args: ["reg", "add", wineDriverKey, "/v", "DefaultOutput", "/d", deviceID, "/f"])
     }
     
     func rescanDevices() {
         rescanCounter = (rescanCounter == 0) ? 1 : 0
-        xtcLog(label: "WineRegistry", "Preparing to queue RescanDevices with value \(rescanCounter)")
-        runWineRegDword(key: wineDriverKey, value: "RescanDevices", data: rescanCounter)
+        xtcLog(label: "WineRegistry", "Trigger RescanDevices = \(rescanCounter)")
+        runWineCommand(args: ["reg", "add", wineDriverKey, "/v", "RescanDevices", "/t", "REG_DWORD", "/d", String(rescanCounter), "/f"])
     }
     
     func createDeviceMapping(coreAudioUID: String, guid: String) {
         let deviceKey = "\(wineDriverKey)\\devices\\0,\(coreAudioUID)"
         let hexData = guidToHexString(guid)
-        xtcLog(label: "WineRegistry", "Writing device mapping (sync): \(coreAudioUID) -> \(guid)")
-        let args = ["reg", "add", deviceKey, "/v", "guid", "/t", "REG_BINARY", "/d", hexData, "/f"]
-        runWineCommandSync(args: args)
+        xtcLog(label: "WineRegistry", "Create device mapping: \(coreAudioUID) -> \(guid)")
+        runWineCommand(args: ["reg", "add", deviceKey, "/v", "guid", "/t", "REG_BINARY", "/d", hexData, "/f"], sync: true)
     }
     
     func readExistingGUID(for coreAudioUID: String) -> String? {
-        xtcLog(label: "WineRegistry", "Reading existing GUID for \(coreAudioUID) from file...")
-        guard let content = try? String(contentsOfFile: userRegPath, encoding: .utf8) else {
-            xtcLog(label: "WineRegistry", "Warning: failed to read user.reg file at \(userRegPath)")
-            return nil
-        }
+        guard let content = try? String(contentsOfFile: userRegPath, encoding: .utf8) else { return nil }
         
         let escapedUID = coreAudioUID
             .replacingOccurrences(of: "\\", with: "\\\\\\\\")
@@ -61,144 +55,62 @@ class WineRegistry {
             .replacingOccurrences(of: "-", with: "\\-")
         let sectionPattern = "\\[Software\\\\\\\\Wine\\\\\\\\Drivers\\\\\\\\winecoreaudio\\.drv\\\\\\\\devices\\\\\\\\0,\(escapedUID)\\]"
         
-        guard let sectionRange = content.range(of: sectionPattern, options: .regularExpression) else {
-            xtcLog(label: "WineRegistry", "No existing file section found for \(coreAudioUID)")
-            return nil
-        }
+        guard let sectionRange = content.range(of: sectionPattern, options: .regularExpression) else { return nil }
         
         let sectionStart = sectionRange.upperBound
         let remainingContent = String(content[sectionStart...])
         
         let nextSectionRange = remainingContent.range(of: "\n[", options: [])
-        let sectionContent: String
-        if let nextRange = nextSectionRange {
-            sectionContent = String(remainingContent[..<nextRange.lowerBound])
-        } else {
-            sectionContent = remainingContent
-        }
+        let sectionContent = nextSectionRange.map { String(remainingContent[..<$0.lowerBound]) } ?? remainingContent
         
         let guidPattern = #""guid"=hex:([0-9a-fA-F,]+)"#
-        guard let guidMatch = sectionContent.range(of: guidPattern, options: .regularExpression) else {
-            xtcLog(label: "WineRegistry", "No GUID value found in section for \(coreAudioUID)")
-            return nil
-        }
+        guard let guidMatch = sectionContent.range(of: guidPattern, options: .regularExpression) else { return nil }
         
         let matchedString = String(sectionContent[guidMatch])
-        guard let hexStart = matchedString.range(of: "hex:")?.upperBound else {
-            return nil
-        }
+        guard let hexStart = matchedString.range(of: "hex:")?.upperBound else { return nil }
         let hexData = String(matchedString[hexStart...]).replacingOccurrences(of: ",", with: "")
         
-        let guid = hexStringToGUID(hexData)
-        xtcLog(label: "WineRegistry", "Parsed existing GUID for \(coreAudioUID) from user.reg: \(guid ?? "nil")")
-        return guid
+        return hexStringToGUID(hexData)
     }
     
-    private func runWineReg(key: String, value: String, data: String) {
-        let args = ["reg", "add", key, "/v", value, "/d", data, "/f"]
-        runWineCommand(args: args)
-    }
-    
-    private func runWineRegDword(key: String, value: String, data: Int) {
-        let args = ["reg", "add", key, "/v", value, "/t", "REG_DWORD", "/d", String(data), "/f"]
-        runWineCommand(args: args)
-    }
-    
-    private func runWineCommandSync(args: [String]) {
-        let commandString = "\(self.winePath) \(args.joined(separator: " "))"
-        xtcLog(label: "WineRegistry", "[EXEC] Starting process (sync): \(commandString)")
-        
+    private func runWineCommand(args: [String], sync: Bool = false) {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: self.winePath)
+        process.executableURL = URL(fileURLWithPath: winePath)
         process.arguments = args
         
         var env = ProcessInfo.processInfo.environment
-        env["WINEPREFIX"] = self.winePrefix
+        env["WINEPREFIX"] = winePrefix
         env["WINEDEBUG"] = "-all"
-        env["WINEMSYNC"] = self.msync ? "1" : "0"
+        env["WINEMSYNC"] = msync ? "1" : "0"
         process.environment = env
         
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-        
-        do {
-            try process.run()
-            process.waitUntilExit()
-            
-            let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-            let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-            let stdoutStr = String(data: stdoutData, encoding: .utf8) ?? ""
-            let stderrStr = String(data: stderrData, encoding: .utf8) ?? ""
-            
-            if process.terminationStatus != 0 {
-                xtcLog(label: "WineRegistry", "[ERROR] Wine command failed. Exit code: \(process.terminationStatus)")
-                if !stdoutStr.isEmpty {
-                    xtcLog(label: "WineRegistry", "[ERROR] stdout: \(stdoutStr.trimmingCharacters(in: .whitespacesAndNewlines))")
-                }
-                if !stderrStr.isEmpty {
-                    xtcLog(label: "WineRegistry", "[ERROR] stderr: \(stderrStr.trimmingCharacters(in: .whitespacesAndNewlines))")
-                }
-            } else {
-                xtcLog(label: "WineRegistry", "[SUCCESS] Command completed successfully: \(commandString)")
-            }
-        } catch {
-            xtcLog(label: "WineRegistry", "[CRITICAL] Failed to run wine command: \(error)")
-        }
-    }
-    
-    private func runWineCommand(args: [String]) {
-        let commandString = "\(self.winePath) \(args.joined(separator: " "))"
-        xtcLog(label: "WineRegistry", "[EXEC] Starting process (async): \(commandString)")
-        
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: self.winePath)
-        process.arguments = args
-        
-        var env = ProcessInfo.processInfo.environment
-        env["WINEPREFIX"] = self.winePrefix
-        env["WINEDEBUG"] = "-all"
-        env["WINEMSYNC"] = self.msync ? "1" : "0"
-        process.environment = env
-        
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-        
-        do {
-            try process.run()
-            
-            // Wait for exit in background thread to avoid blocking
-            DispatchQueue.global(qos: .utility).async {
+        if sync {
+            do {
+                try process.run()
                 process.waitUntilExit()
-                
-                let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-                let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-                let stdoutStr = String(data: stdoutData, encoding: .utf8) ?? ""
-                let stderrStr = String(data: stderrData, encoding: .utf8) ?? ""
-                
                 if process.terminationStatus != 0 {
-                    xtcLog(label: "WineRegistry", "[ERROR] Wine command failed. Exit code: \(process.terminationStatus)")
-                    if !stdoutStr.isEmpty {
-                        xtcLog(label: "WineRegistry", "[ERROR] stdout: \(stdoutStr.trimmingCharacters(in: .whitespacesAndNewlines))")
+                    xtcLog(label: "WineRegistry", "[ERROR] Command failed with code \(process.terminationStatus)")
+                }
+            } catch {
+                xtcLog(label: "WineRegistry", "[CRITICAL] Command error: \(error)")
+            }
+        } else {
+            DispatchQueue.global(qos: .utility).async {
+                do {
+                    try process.run()
+                    process.waitUntilExit()
+                    if process.terminationStatus != 0 {
+                        xtcLog(label: "WineRegistry", "[ERROR] Command failed with code \(process.terminationStatus)")
                     }
-                    if !stderrStr.isEmpty {
-                        xtcLog(label: "WineRegistry", "[ERROR] stderr: \(stderrStr.trimmingCharacters(in: .whitespacesAndNewlines))")
-                    }
-                } else {
-                    xtcLog(label: "WineRegistry", "[SUCCESS] Command completed successfully: \(commandString)")
+                } catch {
+                    xtcLog(label: "WineRegistry", "[CRITICAL] Command error: \(error)")
                 }
             }
-        } catch {
-            xtcLog(label: "WineRegistry", "[CRITICAL] Failed to run wine command: \(error)")
         }
     }
     
     private func guidToHexString(_ guid: String) -> String {
         let clean = guid.replacingOccurrences(of: "-", with: "").uppercased()
-        
         let data1 = String(clean.prefix(8))
         let data1Reversed = stride(from: 6, through: 0, by: -2).map {
             let start = data1.index(data1.startIndex, offsetBy: $0)
@@ -217,7 +129,6 @@ class WineRegistry {
         let data3Reversed = String(data3.suffix(2)) + String(data3.prefix(2))
         
         let data4 = String(clean.suffix(16))
-        
         return data1Reversed + data2Reversed + data3Reversed + data4
     }
     
@@ -406,17 +317,15 @@ class AudioRouter {
     
     @discardableResult
     func start() -> Bool {
-        xtcLog(label: "AudioRouter", "start() called. Current run state isRunning=\(isRunning)")
+        xtcLog(label: "AudioRouter", "Starting audio router...")
         guard !isRunning else { return true }
         
-        // Record current known devices and default device UID on start
         knownDeviceUIDs = Set(AudioDeviceManager.getAllOutputDeviceUIDs())
         let defaultDevice = AudioDeviceManager.getDefaultOutputDevice()
         if let uid = AudioDeviceManager.getDeviceUID(deviceID: defaultDevice) {
             currentOutputDeviceUID = uid
         }
         
-        xtcLog(label: "AudioRouter", "Registering default output and devices list listeners...")
         AudioDeviceManager.registerDefaultOutputListener { [weak self] newDeviceID in
             self?.onDefaultOutputChanged(newDeviceID: newDeviceID)
         }
@@ -425,25 +334,15 @@ class AudioRouter {
         }
         
         isRunning = true
-        xtcLog(label: "AudioRouter", "Listeners registered successfully. Triggering initial performRoutingUpdate().")
-        
-        // Trigger initial routing update immediately
         performRoutingUpdate()
-        
         return true
     }
     
     func stop() {
-        xtcLog(label: "AudioRouter", "stop() called. Current run state isRunning=\(isRunning)")
         guard isRunning else { return }
+        pendingRouteWorkItem?.cancel()
+        pendingRouteWorkItem = nil
         
-        if pendingRouteWorkItem != nil {
-            xtcLog(label: "AudioRouter", "Cancelling pending routing work item.")
-            pendingRouteWorkItem?.cancel()
-            pendingRouteWorkItem = nil
-        }
-        
-        xtcLog(label: "AudioRouter", "Removing listeners...")
         AudioDeviceManager.removeDefaultOutputListener()
         AudioDeviceManager.removeDevicesListener()
         isRunning = false
@@ -452,53 +351,36 @@ class AudioRouter {
     }
     
     func forceRescan() {
-        xtcLog(label: "AudioRouter", "forceRescan() manually triggered by ProcessMonitor.")
         wineRegistry.rescanDevices()
     }
     
     private func queueRoutingUpdate() {
-        xtcLog(label: "AudioRouter", "queueRoutingUpdate() requested. Checking for pending tasks...")
-        if pendingRouteWorkItem != nil {
-            xtcLog(label: "AudioRouter", "Cancelling previous queued update.")
-            pendingRouteWorkItem?.cancel()
-        }
-        
+        pendingRouteWorkItem?.cancel()
         let workItem = DispatchWorkItem { [weak self] in
-            xtcLog(label: "AudioRouter", "[QUEUE] Running scheduled performRoutingUpdate now.")
             self?.performRoutingUpdate()
         }
-        
         pendingRouteWorkItem = workItem
-        xtcLog(label: "AudioRouter", "Queued new routing update to run in 800ms.")
         workQueue.asyncAfter(deadline: .now() + 0.8, execute: workItem)
     }
     
     private func performRoutingUpdate() {
-        xtcLog(label: "AudioRouter", "performRoutingUpdate() - Starting synchronization...")
-        
         let defaultDevice = AudioDeviceManager.getDefaultOutputDevice()
         guard let uid = AudioDeviceManager.getDeviceUID(deviceID: defaultDevice) else {
-            xtcLog(label: "AudioRouter", "[ERROR] performRoutingUpdate: Failed to get default output device UID")
+            xtcLog(label: "AudioRouter", "[ERROR] Failed to get default output device UID")
             return
         }
         
         let allDeviceUIDs = AudioDeviceManager.getAllOutputDeviceUIDs()
         let deviceName = AudioDeviceManager.getDeviceName(deviceID: defaultDevice) ?? "Unknown"
-        xtcLog(label: "AudioRouter", "[SYNC] Current macOS Default Device Name: '\(deviceName)', UID: '\(uid)'")
-        xtcLog(label: "AudioRouter", "[SYNC] All available output device UIDs: \(allDeviceUIDs)")
+        xtcLog(label: "AudioRouter", "Sync default device: '\(deviceName)', UID: '\(uid)'")
         
-        // Update known devices set
         knownDeviceUIDs = Set(allDeviceUIDs)
         
-        let isFirst = isFirstRoute
-        if isFirst {
+        if isFirstRoute {
             isFirstRoute = false
-            xtcLog(label: "AudioRouter", "[SYNC] Starting first-time routing sequence for device UID: \(uid)")
+            xtcLog(label: "AudioRouter", "Initial routing sequence...")
             
-            // Step 1: Rescan first
             wineRegistry.rescanDevices()
-            
-            // Step 2: Set default device after 800ms
             workQueue.asyncAfter(deadline: .now() + 0.8) { [weak self] in
                 guard let self = self else { return }
                 let guid = self.getOrCreateWineGUID(for: uid)
@@ -506,53 +388,38 @@ class AudioRouter {
                 self.currentOutputDeviceUID = uid
                 self.currentWineGUID = guid
                 
-                // Step 3: Rescan again after 800ms
-                self.workQueue.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+                workQueue.asyncAfter(deadline: .now() + 0.8) { [weak self] in
                     guard let self = self else { return }
                     self.wineRegistry.rescanDevices()
                     
-                    // Step 4: Set default device again after 800ms
-                    self.workQueue.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+                    workQueue.asyncAfter(deadline: .now() + 0.8) { [weak self] in
                         guard let self = self else { return }
                         let finalGuid = self.getOrCreateWineGUID(for: uid)
                         self.wineRegistry.setDefaultOutput(guid: finalGuid)
-                        xtcLog(label: "AudioRouter", "[SYNC] First-time routing sequence complete.")
                     }
                 }
             }
         } else {
-            xtcLog(label: "AudioRouter", "[SYNC] Starting standard routing sequence for device UID: \(uid)")
-            
-            // Step 1: Rescan first
             wineRegistry.rescanDevices()
-            
-            // Step 2: Set default device after 800ms
             workQueue.asyncAfter(deadline: .now() + 0.8) { [weak self] in
                 guard let self = self else { return }
                 let guid = self.getOrCreateWineGUID(for: uid)
                 self.wineRegistry.setDefaultOutput(guid: guid)
                 self.currentOutputDeviceUID = uid
                 self.currentWineGUID = guid
-                xtcLog(label: "AudioRouter", "[SYNC] Standard routing sequence complete.")
             }
         }
     }
     
     private func getOrCreateWineGUID(for coreAudioUID: String) -> String {
         if let cachedGUID = deviceGUIDCache[coreAudioUID] {
-            xtcLog(label: "AudioRouter", "getOrCreateWineGUID: Cache HIT for \(coreAudioUID) -> \(cachedGUID)")
             return cachedGUID
         }
-        
-        xtcLog(label: "AudioRouter", "getOrCreateWineGUID: Cache MISS for \(coreAudioUID). Querying user.reg file...")
         if let existingGUID = wineRegistry.readExistingGUID(for: coreAudioUID) {
-            xtcLog(label: "AudioRouter", "getOrCreateWineGUID: Found existing GUID in file: \(coreAudioUID) -> \(existingGUID)")
             deviceGUIDCache[coreAudioUID] = existingGUID
             return existingGUID
         }
-        
         let guid = UUID().uuidString.uppercased()
-        xtcLog(label: "AudioRouter", "getOrCreateWineGUID: No existing GUID. Generated new GUID: \(coreAudioUID) -> \(guid)")
         deviceGUIDCache[coreAudioUID] = guid
         wineRegistry.createDeviceMapping(coreAudioUID: coreAudioUID, guid: guid)
         return guid
@@ -562,19 +429,17 @@ class AudioRouter {
         let currentSet = Set(currentUIDs)
         let newDevices = currentSet.subtracting(knownDeviceUIDs)
         if !newDevices.isEmpty {
-            xtcLog(label: "AudioRouter", "[EVENT] New device(s) detected: \(newDevices). Triggering Wine rescan.")
+            xtcLog(label: "AudioRouter", "New device detected: \(newDevices). Rescanning Wine.")
             wineRegistry.rescanDevices()
         }
         knownDeviceUIDs = currentSet
     }
     
     private func onDefaultOutputChanged(newDeviceID: AudioDeviceID) {
-        if let newUID = AudioDeviceManager.getDeviceUID(deviceID: newDeviceID) {
+        if AudioDeviceManager.getDeviceUID(deviceID: newDeviceID) != nil {
             let name = AudioDeviceManager.getDeviceName(deviceID: newDeviceID) ?? "Unknown"
-            xtcLog(label: "AudioRouter", "[EVENT] Default Output changed in macOS: \(name) (\(newUID))")
+            xtcLog(label: "AudioRouter", "Default Output changed in macOS to: \(name)")
             queueRoutingUpdate()
-        } else {
-            xtcLog(label: "AudioRouter", "[EVENT] Default Output changed in macOS, but failed to retrieve device UID.")
         }
     }
 }

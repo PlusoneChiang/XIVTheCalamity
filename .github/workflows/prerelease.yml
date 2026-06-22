@@ -79,6 +79,7 @@ jobs:
       # Build XTCAudioRouter
       - name: Build XTCAudioRouter
         run: |
+          mkdir -p shared/resources/bin
           swiftc XTCAudioRouter/AudioRouter.swift -framework CoreAudio -framework AudioToolbox -o shared/resources/bin/XTCAudioRouter
 
       # Build backend (NativeAOT)
