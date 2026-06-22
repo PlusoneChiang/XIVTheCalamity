@@ -1,13 +1,13 @@
 {
   "name": "xivthecalamity",
-  "version": "1.9.2",
+  "version": "1.9.3",
   "description": "Final Fantasy XIV Cross-Platform Launcher",
   "main": "src/main/index.js",
   "scripts": {
     "start": "npm run build:renderer && electron .",
     "build:renderer": "node scripts/build-renderer.js",
     "build": "npm run build:renderer && npm run build:cli && npm run build:backend && electron-builder",
-    "build:cli": "node -e \"if(process.platform==='darwin'){require('child_process').execSync('cd ../XTCAudioRouter && ./build.sh release',{stdio:'inherit'})}else{console.log('Skipping XTCAudioRouter (macOS only)')}\"",
+    "build:cli": "node -e \"if(process.platform==='darwin'){require('child_process').execSync('swiftc ../XTCAudioRouter/AudioRouter.swift -framework CoreAudio -framework AudioToolbox -o ../shared/resources/bin/XTCAudioRouter',{stdio:'inherit'})}else{console.log('Skipping XTCAudioRouter (macOS only)')}\"",
     "build:backend": "cd ../backend && dotnet publish src/XIVTheCalamity.Api.NativeAOT/XIVTheCalamity.Api.NativeAOT.csproj -c Release -r osx-arm64 -o ../Release/temp-backend",
     "build:dev": "npm run build:renderer && npm run build:cli && npm run build:backend && electron-builder --dir",
     "build:prod": "npm run build:renderer && npm run build:cli && npm run build:backend && electron-builder --dir",
@@ -38,7 +38,6 @@
       "resources/**/*",
       "package.json"
     ],
-    "afterPack": "./electron-builder-afterpack.js",
     "afterSign": "./electron-builder-aftersign.js",
     "mac": {
       "category": "public.app-category.games",
@@ -69,6 +68,10 @@
       "notarize": false,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
+      "binaries": [
+        "Contents/Resources/resources/bin/XTCAudioRouter",
+        "Contents/Resources/backend/XIVTheCalamity.Api.NativeAOT"
+      ],
       "extraResources": [
         {
           "from": "../Release/temp-backend",
