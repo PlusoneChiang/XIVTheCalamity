@@ -329,8 +329,7 @@ function createSettingsWindow() {
     settingsWindowInstance.setPosition(x, y);
   }
   
-  // Load settings page
-  const settingsPath = path.join(__dirname, '../renderer/pages/settings/settings.html');
+  const settingsPath = path.join(__dirname, '../../dist/settings.html');
   settingsWindowInstance.loadFile(settingsPath);
 
   // Clean up reference when window is closed
@@ -342,203 +341,13 @@ function createSettingsWindow() {
 }
 
 /**
- * Remove ES module syntax from JavaScript code
- */
-function stripModuleSyntax(code) {
-  return code
-    .replace(/import.*from.*;/g, '')
-    .replace(/export default /g, '')
-    .replace(/export async function/g, 'async function')
-    .replace(/export function/g, 'function')
-    .replace(/export const /g, 'const ')
-    .replace(/export \{[^}]+\}/g, '');
-}
-
-/**
- * Load and read all required JavaScript files
- */
-function loadJavaScriptFiles() {
-  const basePath = path.join(__dirname, '../renderer');
-  const files = {
-    i18n: path.join(basePath, 'i18n/index.js'),
-    theme: path.join(basePath, 'utils/theme.js'),
-    encoding: path.join(basePath, 'utils/encoding.js'),
-    crypto: path.join(basePath, 'utils/crypto.js'),
-    totp: path.join(basePath, 'utils/totp.js'),
-    keyManager: path.join(basePath, 'utils/keyManager.js'),
-    accountStorage: path.join(basePath, 'utils/accountStorage.js'),
-    apiError: path.join(basePath, 'utils/apiError.js'),
-    accountManagement: path.join(basePath, 'pages/login/accountManagement.js'),
-    appUpdater: path.join(basePath, 'pages/login/appUpdater.js'),
-    updateManager: path.join(basePath, 'pages/login/updateManager.js'),
-    dalamudManager: path.join(basePath, 'pages/login/dalamudManager.js'),
-    login: path.join(basePath, 'pages/login/login.js')
-  };
-
-  return Object.entries(files).reduce((acc, [key, filePath]) => {
-    acc[key] = fs.readFileSync(filePath, 'utf8');
-    return acc;
-  }, {});
-}
-
-/**
- * Combine JavaScript modules in dependency order
- */
-function combineJavaScriptModules(jsFiles) {
-  return [
-    '// i18n module',
-    stripModuleSyntax(jsFiles.i18n),
-    '// Theme utilities',
-    stripModuleSyntax(jsFiles.theme),
-    '// Encoding utilities',
-    stripModuleSyntax(jsFiles.encoding),
-    '// Crypto utilities',
-    stripModuleSyntax(jsFiles.crypto),
-    '// TOTP utilities',
-    stripModuleSyntax(jsFiles.totp),
-    '// Key manager',
-    stripModuleSyntax(jsFiles.keyManager),
-    '// Account storage',
-    stripModuleSyntax(jsFiles.accountStorage),
-    '// API error handling',
-    stripModuleSyntax(jsFiles.apiError),
-    '// Account management UI',
-    stripModuleSyntax(jsFiles.accountManagement),
-    '// App auto-updater',
-    stripModuleSyntax(jsFiles.appUpdater),
-    '// Update manager',
-    stripModuleSyntax(jsFiles.updateManager),
-    '// Dalamud manager',
-    stripModuleSyntax(jsFiles.dalamudManager),
-    '// Login logic',
-    stripModuleSyntax(jsFiles.login)
-  ].join('\n\n');
-}
-
-/**
- * Embed mask image as base64 data URL in CSS.
- * Set MASK_OVERLAY_ENABLED to true to enable decorative mask overlay (e.g., holiday themes).
- */
-const MASK_OVERLAY_ENABLED = false;
-
-function embedImageInCSS(css) {
-  const resourcesPath = path.join(__dirname, '../../resources');
-  
-  if (!MASK_OVERLAY_ENABLED) {
-    // Replace mask.png URL with 'none' to disable mask effect
-    let result = css.replace(/url\(['"]?.*?resources\/mask\.png['"]?\)/g, 'none');
-    // Embed valentine.png as base64 (used by valentine theme override)
-    const valentinePath = path.join(resourcesPath, 'valentine.png');
-    if (fs.existsSync(valentinePath)) {
-      const valentineBase64 = fs.readFileSync(valentinePath).toString('base64');
-      const valentineDataUrl = `data:image/png;base64,${valentineBase64}`;
-      result = result.replace(/url\(['"]?.*?resources\/valentine\.png['"]?\)/g, `url('${valentineDataUrl}')`);
-    }
-    return result;
-  }
-  const maskPath = path.join(resourcesPath, 'mask.png');
-  const maskBase64 = fs.readFileSync(maskPath).toString('base64');
-  const dataUrl = `data:image/png;base64,${maskBase64}`;
-  let result = css.replace(/url\(['"]?.*?resources\/mask\.png['"]?\)/g, `url('${dataUrl}')`);
-  const valentinePath = path.join(resourcesPath, 'valentine.png');
-  if (fs.existsSync(valentinePath)) {
-    const valentineBase64 = fs.readFileSync(valentinePath).toString('base64');
-    const valentineDataUrl = `data:image/png;base64,${valentineBase64}`;
-    result = result.replace(/url\(['"]?.*?resources\/valentine\.png['"]?\)/g, `url('${valentineDataUrl}')`);
-  }
-  return result;
-}
-
-/**
- * Inline CSS and JavaScript into HTML
- */
-function inlineResources(html, css, js) {
-  // Normalize line endings to handle both Unix (\n) and Windows (\r\n)
-  const stylePlaceholder = '<style>\n        /* CSS will be inlined here by main process */\n    </style>';
-  const scriptPlaceholder = '<script>\n        /* JavaScript will be inlined here by main process */\n    </script>';
-  
-  // Try Windows CRLF first, then Unix LF
-  let result = html
-    .replace(
-      stylePlaceholder.replace(/\n/g, '\r\n'),
-      `<style>\r\n${css}\r\n    </style>`
-    )
-    .replace(
-      scriptPlaceholder.replace(/\n/g, '\r\n'),
-      `<script>\r\n${js}\r\n    </script>`
-    );
-  
-  // If Windows replacement didn't work, try Unix
-  if (result.includes('/* CSS will be inlined here by main process */')) {
-    result = result
-      .replace(
-        stylePlaceholder,
-        `<style>\n${css}\n    </style>`
-      )
-      .replace(
-        scriptPlaceholder,
-        `<script>\n${js}\n    </script>`
-      );
-  }
-  
-  // Inject platform-specific CSS class to body
-  const platformClass = isMacOS ? 'platform-darwin' : (isWindows ? 'platform-windows' : 'platform-linux');
-  result = result.replace(/<body([^>]*)>/, `<body$1 class="${platformClass}">`);
-  
-  return result;
-}
-
-/**
- * Load login page with Virtual Host implementation
- * Inlines all resources and loads with HTTPS baseURL for reCAPTCHA compatibility
+ * Load login page with Virtual Host implementation using Vite built login.html
  */
 function loadLoginPageWithVirtualHost(window) {
   try {
-    log.info('[Main] Loading login page with Virtual Host');
-    
-    const basePath = path.join(__dirname, '../renderer/pages/login');
-    log.info('[Main] Base path:', basePath);
-    
-    const htmlPath = path.join(basePath, 'index.html');
-    const cssPath = path.join(basePath, 'style.css');
-    const globalCssPath = path.join(__dirname, '../renderer/styles.css');
-    
-    log.info('[Main] HTML path:', htmlPath);
-    log.info('[Main] CSS path:', cssPath);
-    log.info('[Main] HTML exists:', fs.existsSync(htmlPath));
-    log.info('[Main] CSS exists:', fs.existsSync(cssPath));
-    
-    const themesCssPath = path.join(__dirname, '../renderer/styles/themes.css');
-    
-    const html = fs.readFileSync(htmlPath, 'utf8');
-    const themesCss = fs.existsSync(themesCssPath) ? fs.readFileSync(themesCssPath, 'utf8') : '';
-    const globalCss = fs.existsSync(globalCssPath) ? fs.readFileSync(globalCssPath, 'utf8') : '';
-    const pageCss = fs.readFileSync(cssPath, 'utf8');
-    const css = themesCss + '\n' + globalCss + '\n' + pageCss;
-    
-    log.info('[Main] HTML length:', html.length);
-    log.info('[Main] CSS length:', css.length);
-    
-    const jsFiles = loadJavaScriptFiles();
-    const combinedJs = combineJavaScriptModules(jsFiles);
-    log.info('[Main] Combined JS length:', combinedJs.length);
-    
-    const processedCSS = embedImageInCSS(css);
-    log.info('[Main] Processed CSS length:', processedCSS.length);
-    
-    const finalHTML = inlineResources(html, processedCSS, combinedJs);
-    log.info('[Main] Final HTML length:', finalHTML.length);
-    
-    // Check if replacement actually happened
-    const hasStylePlaceholder = html.includes('/* CSS will be inlined here by main process */');
-    const hasJsPlaceholder = html.includes('/* JavaScript will be inlined here by main process */');
-    const hasStyleInFinal = finalHTML.includes('/* CSS will be inlined here by main process */');
-    const hasJsInFinal = finalHTML.includes('/* JavaScript will be inlined here by main process */');
-    
-    log.info('[Main] Original has style placeholder:', hasStylePlaceholder);
-    log.info('[Main] Original has JS placeholder:', hasJsPlaceholder);
-    log.info('[Main] Final still has style placeholder:', hasStyleInFinal);
-    log.info('[Main] Final still has JS placeholder:', hasJsInFinal);
+    log.info('[Main] Loading Vite built login page with Virtual Host');
+    const htmlPath = path.join(__dirname, '../../dist/login.html');
+    const finalHTML = fs.readFileSync(htmlPath, 'utf8');
     
     const baseURL = 'https://user.ffxiv.com.tw/';
     const dataURL = `data:text/html;charset=utf-8,${encodeURIComponent(finalHTML)}`;
@@ -547,7 +356,7 @@ function loadLoginPageWithVirtualHost(window) {
     log.info('[Main] Login page loaded, origin:', baseURL);
   } catch (error) {
     log.error('[Main] Failed to load login page:', error);
-    window.loadFile(path.join(__dirname, '../renderer/index.html'));
+    window.loadFile(path.join(__dirname, '../../dist/login.html'));
   }
 }
 

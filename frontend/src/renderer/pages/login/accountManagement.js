@@ -5,6 +5,7 @@
 
 import { getSavedAccounts, getAccount, deleteAccount, getDecryptedPassword, hasOTPSecret, getDecryptedOTPSecret, saveOTPSecret, getAutoFillOTP, saveAutoFillOTP, getLastUsedAccount } from '../../utils/accountStorage.js';
 import { generateTOTP, getRemainingSeconds, isValidTOTPSecret } from '../../utils/totp.js';
+import i18n from '../../i18n/index.js';
 
 // State
 let otpInterval = null;

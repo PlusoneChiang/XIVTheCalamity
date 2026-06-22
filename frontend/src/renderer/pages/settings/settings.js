@@ -4,6 +4,7 @@
 
 import i18n from '../../i18n/index.js';
 import { applyTheme } from '../../utils/theme.js';
+import { getLastUsedAccount, deleteOTPSecret } from '../../utils/accountStorage.js';
 
 let currentConfig = null;
 let currentPlatform = 'win32';
@@ -473,7 +474,6 @@ function initGeneralTab() {
   // Clear OTP key
   document.getElementById('clearOtpButton').addEventListener('click', async () => {
     try {
-      const { getLastUsedAccount, deleteOTPSecret } = await import('../../utils/accountStorage.js');
       
       // Get current/last used account
       const email = await getLastUsedAccount();

@@ -11,7 +11,7 @@ import i18n from '../../i18n/index.js';
 import { startBackgroundUpdate, setAppVersionText, isUpdating, handleConfigChanged } from './updateManager.js';
 import { startDalamudUpdate, cancelDalamudUpdate, handleDalamudConfigChanged, isDalamudUpdating } from './dalamudManager.js';
 import { initAppUpdater } from './appUpdater.js';
-import { handleApiResponse, getErrorMessage } from '../../utils/apiError.js';
+import { handleApiResponse, getErrorMessage as getApiErrorMessage } from '../../utils/apiError.js';
 import { applyTheme } from '../../utils/theme.js';
 
 // Constants
@@ -55,6 +55,12 @@ async function init() {
     alert(i18n.t('login.system_error'));
     return;
   }
+  
+  // Set platform-specific class on body
+  const platform = window.electronAPI.getPlatform();
+  const platformClass = platform === 'darwin' ? 'platform-darwin' : (platform === 'win32' ? 'platform-windows' : 'platform-linux');
+  document.body.classList.add(platformClass);
+
   console.log('[Login] electronAPI is available');
   
   // Load config for language and dev mode
@@ -100,7 +106,6 @@ async function init() {
   settingsBtn.addEventListener('click', handleOpenSettings);
   
   // Disable settings button on macOS/Linux until Wine is ready
-  const platform = window.electronAPI?.getPlatform ? window.electronAPI.getPlatform() : 'unknown';
   if (platform === 'darwin' || platform === 'linux') {
     settingsBtn.disabled = true;
     console.log('[Login] Settings button disabled until Wine initialization completes');
@@ -311,8 +316,8 @@ async function handleLogin(event) {
     try {
       data = await handleApiResponse(response);
     } catch (error) {
-      console.error('[Login] API error:', getErrorMessage(error, i18n));
-      throw new Error(getErrorMessage(error, i18n));
+      console.error('[Login] API error:', getApiErrorMessage(error, i18n));
+      throw new Error(getApiErrorMessage(error, i18n));
     }
     
     console.log('[Login] Response received - success');
@@ -510,8 +515,8 @@ async function handleLaunchGame() {
     try {
       data = await handleApiResponse(response);
     } catch (error) {
-      console.error('[Login] Failed to launch game:', getErrorMessage(error, i18n));
-      showError(i18n.t('login.launch_failed', { message: getErrorMessage(error, i18n) }));
+      console.error('[Login] Failed to launch game:', getApiErrorMessage(error, i18n));
+      showError(i18n.t('login.launch_failed', { message: getApiErrorMessage(error, i18n) }));
       launchButton.disabled = false;
       setButtonI18n(launchButton, 'button.launch');
       return;
@@ -549,7 +554,7 @@ async function waitForGameExit() {
     try {
       data = await handleApiResponse(response);
     } catch (error) {
-      console.error('[Login] Wait for exit error:', getErrorMessage(error, i18n));
+      console.error('[Login] Wait for exit error:', getApiErrorMessage(error, i18n));
       return;
     }
     
@@ -1156,7 +1161,7 @@ async function checkGameDirectorySetup() {
     try {
       config = await handleApiResponse(response);
     } catch (error) {
-      console.error('[GameSetup] Failed to load config:', getErrorMessage(error, i18n));
+      console.error('[GameSetup] Failed to load config:', getApiErrorMessage(error, i18n));
       await showGameSetupDialog();
       return;
     }
@@ -1299,8 +1304,8 @@ async function saveGamePath(gamePath) {
     try {
       config = await handleApiResponse(response);
     } catch (error) {
-      console.error('[GameSetup] Failed to load config:', getErrorMessage(error, i18n));
-      throw new Error(`Failed to load config: ${getErrorMessage(error, i18n)}`);
+      console.error('[GameSetup] Failed to load config:', getApiErrorMessage(error, i18n));
+      throw new Error(`Failed to load config: ${getApiErrorMessage(error, i18n)}`);
     }
     
     // Ensure game object exists
@@ -1320,8 +1325,8 @@ async function saveGamePath(gamePath) {
     try {
       await handleApiResponse(saveResponse);
     } catch (error) {
-      console.error('[GameSetup] Failed to save config:', getErrorMessage(error, i18n));
-      throw new Error(`Failed to save config: ${getErrorMessage(error, i18n)}`);
+      console.error('[GameSetup] Failed to save config:', getApiErrorMessage(error, i18n));
+      throw new Error(`Failed to save config: ${getApiErrorMessage(error, i18n)}`);
     }
     
     console.log('[GameSetup] Game path saved successfully');

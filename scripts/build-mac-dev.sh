@@ -53,9 +53,10 @@ cd "$PROJECT_ROOT/frontend"
 # Build
 echo ""
 echo "📦 Starting build..."
-echo "   1. Build backend (Release)"
-echo "   2. Package frontend (no signing)"
-echo "   3. Copy resources"
+echo "   1. Build renderer (Vite)"
+echo "   2. Build backend (Release)"
+echo "   3. Package frontend (no signing)"
+echo "   4. Copy resources"
 echo ""
 
 # Disable code signing for development builds

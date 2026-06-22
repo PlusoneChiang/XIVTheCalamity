@@ -5,13 +5,14 @@
   "main": "src/main/index.js",
   "scripts": {
     "start": "electron .",
-    "build": "npm run build:cli && npm run build:backend && electron-builder",
+    "build:renderer": "node scripts/build-renderer.js",
+    "build": "npm run build:renderer && npm run build:cli && npm run build:backend && electron-builder",
     "build:cli": "node -e \"if(process.platform==='darwin'){require('child_process').execSync('cd ../XTCAudioRouter && ./build.sh release',{stdio:'inherit'})}else{console.log('Skipping XTCAudioRouter (macOS only)')}\"",
     "build:backend": "cd ../backend && dotnet publish src/XIVTheCalamity.Api.NativeAOT/XIVTheCalamity.Api.NativeAOT.csproj -c Release -r osx-arm64 -o ../Release/temp-backend",
-    "build:dev": "npm run build:cli && npm run build:backend && electron-builder --dir",
-    "build:prod": "npm run build:cli && npm run build:backend && electron-builder --dir",
-    "pack": "npm run build:cli && npm run build:backend && electron-builder --dir",
-    "dist": "npm run build:cli && npm run build:backend && electron-builder",
+    "build:dev": "npm run build:renderer && npm run build:cli && npm run build:backend && electron-builder --dir",
+    "build:prod": "npm run build:renderer && npm run build:cli && npm run build:backend && electron-builder --dir",
+    "pack": "npm run build:renderer && npm run build:cli && npm run build:backend && electron-builder --dir",
+    "dist": "npm run build:renderer && npm run build:cli && npm run build:backend && electron-builder",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "build": {
@@ -33,6 +34,7 @@
     },
     "files": [
       "src/**/*",
+      "dist/**/*",
       "resources/**/*",
       "package.json"
     ],
@@ -121,7 +123,9 @@
   "license": "GPL-3.0-or-later",
   "devDependencies": {
     "electron": "^40.0.0",
-    "electron-builder": "^26.4.0"
+    "electron-builder": "^26.4.0",
+    "vite": "^5.4.21",
+    "vite-plugin-singlefile": "^2.3.3"
   },
   "dependencies": {
     "electron-log": "^5.4.3",
