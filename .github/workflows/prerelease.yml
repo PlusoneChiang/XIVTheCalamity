@@ -1,57 +1,50 @@
-name: Build & Release
+name: Build & Pre-release (Manual)
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       skip_notarize:
         description: 'Skip macOS notarization'
         type: boolean
-        default: false
+        default: true
 
 permissions:
   contents: write
 
 jobs:
-  # ==================== Check Branch Reachability ====================
-  check-branch:
+  # ==================== Check Version Existence ====================
+  check-version:
     runs-on: ubuntu-latest
     outputs:
       should_run: ${{ steps.check.outputs.should_run }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Check if tag is on the default branch
+      - name: Check if pre-release version already exists
         id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "✅ Manual trigger: Proceeding with build."
-            echo "should_run=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
+          # Read canonical version from package.json
+          VERSION=$(node -p "require('./frontend/package.json').version")
           
-          # Fetch default branch to check reachability
-          DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
-          echo "Default branch is: $DEFAULT_BRANCH"
-          git fetch origin "$DEFAULT_BRANCH"
+          # Formulate the target pre-release tag
+          TAG="v${VERSION}-pre"
+          echo "Target Pre-release Tag: $TAG"
           
-          # Check if the tag commit is reachable from origin/$DEFAULT_BRANCH
-          if git merge-base --is-ancestor ${{ github.sha }} "origin/$DEFAULT_BRANCH"; then
-            echo "✅ Tag is on default branch ($DEFAULT_BRANCH). Proceeding with build."
-            echo "should_run=true" >> $GITHUB_OUTPUT
-          else
-            echo "❌ Tag is NOT on default branch ($DEFAULT_BRANCH). Skipping build."
+          # Check if a GitHub Release with this tag already exists
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "❌ Pre-release $TAG already exists on GitHub. Version has not changed! Skipping build."
             echo "should_run=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Pre-release $TAG does not exist. Proceeding with build."
+            echo "should_run=true" >> $GITHUB_OUTPUT
           fi
 
   # ==================== macOS ====================
   build-macos:
-    needs: check-branch
-    if: needs.check-branch.outputs.should_run == 'true'
+    needs: check-version
+    if: needs.check-version.outputs.should_run == 'true'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -65,6 +58,20 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
+
+      # Suffix version in package.json with -pre to align electron-builder release tagging
+      - name: Suffix version for pre-release
+        working-directory: frontend
+        run: |
+          node -e "
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          if (!pkg.version.endsWith('-pre')) {
+            pkg.version = pkg.version + '-pre';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+            console.log('Version updated to: ' + pkg.version);
+          }
+          "
 
       # Build XTCAudioRouter
       - name: Build XTCAudioRouter
@@ -86,7 +93,6 @@ jobs:
           MAC_CERTIFICATE: ${{ secrets.MAC_CERTIFICATE }}
           MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
         run: |
-          # Create temporary keychain
           KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain
           KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
           
@@ -94,19 +100,16 @@ jobs:
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           
-          # Import certificate
           CERT_PATH=$RUNNER_TEMP/certificate.p12
           echo "$MAC_CERTIFICATE" | base64 --decode > "$CERT_PATH"
           security import "$CERT_PATH" -k "$KEYCHAIN_PATH" -P "$MAC_CERTIFICATE_PASSWORD" \
             -T /usr/bin/codesign -T /usr/bin/security
           rm "$CERT_PATH"
           
-          # Allow codesign to access keychain
           security set-key-partition-list -S apple-tool:,apple:,codesign: \
             -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
           
-          # Extract signing identity name for afterPack/afterSign hooks
           IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep "Developer ID" | head -1 | sed 's/.*"Developer ID Application: \(.*\)".*/\1/')
           echo "CSC_NAME=$IDENTITY" >> $GITHUB_ENV
           echo "Signing identity: $IDENTITY"
@@ -156,21 +159,17 @@ jobs:
           APP_PATH="Release/mac-arm64/XIVTheCalamity.app"
           ZIP_PATH="Release/XIVTheCalamity-mac-arm64.zip"
           
-          # Clean extended attributes and create zip
           xattr -cr "$APP_PATH"
           COPYFILE_DISABLE=1 ditto -c -k --keepParent "$APP_PATH" "$ZIP_PATH"
           
-          # Submit for notarization
           xcrun notarytool submit "$ZIP_PATH" \
             --key "$APPLE_API_KEY_PATH" \
             --key-id "$APPLE_API_KEY_ID" \
             --issuer "$APPLE_API_ISSUER" \
             --wait
           
-          # Staple
           xcrun stapler staple "$APP_PATH"
           
-          # Staple DMG if exists
           DMG_PATH=$(ls -1 Release/XIVTheCalamity-*-darwin-arm64.dmg 2>/dev/null | tail -1) || true
           if [ -n "$DMG_PATH" ] && [ -f "$DMG_PATH" ]; then
             xcrun stapler staple "$DMG_PATH"
@@ -178,8 +177,8 @@ jobs:
 
   # ==================== Linux ====================
   build-linux:
-    needs: check-branch
-    if: needs.check-branch.outputs.should_run == 'true'
+    needs: check-version
+    if: needs.check-version.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -193,6 +192,20 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
+
+      # Suffix version in package.json with -pre to align electron-builder release tagging
+      - name: Suffix version for pre-release
+        working-directory: frontend
+        run: |
+          node -e "
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          if (!pkg.version.endsWith('-pre')) {
+            pkg.version = pkg.version + '-pre';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+            console.log('Version updated to: ' + pkg.version);
+          }
+          "
 
       # Build backend (NativeAOT)
       - name: Build backend
@@ -214,8 +227,8 @@ jobs:
 
   # ==================== Windows ====================
   build-windows:
-    needs: check-branch
-    if: needs.check-branch.outputs.should_run == 'true'
+    needs: check-version
+    if: needs.check-version.outputs.should_run == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -230,9 +243,23 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
-      # Pre-install NSIS to avoid electron-builder auto-download failures
+      # Pre-install NSIS
       - name: Install NSIS
         run: choco install nsis --no-progress -y
+
+      # Suffix version in package.json with -pre to align electron-builder release tagging
+      - name: Suffix version for pre-release
+        working-directory: frontend
+        run: |
+          node -e "
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          if (!pkg.version.endsWith('-pre')) {
+            pkg.version = pkg.version + '-pre';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+            console.log('Version updated to: ' + pkg.version);
+          }
+          "
 
       # Build backend (NativeAOT)
       - name: Build backend
@@ -268,25 +295,27 @@ jobs:
 
   # ==================== Publish Release ====================
   publish-release:
-    needs: [check-branch, build-macos, build-linux, build-windows]
-    if: needs.check-branch.outputs.should_run == 'true' && startsWith(github.ref, 'refs/tags/v')
+    needs: [build-macos, build-linux, build-windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Publish release with download guide
+      - name: Publish pre-release with download guide
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="${GITHUB_REF#refs/tags/}"
-          VERSION="${TAG#v}"
-          echo "Publishing release for tag: $TAG"
+          # Read canonical version and append -pre to match electron-builder output
+          VERSION=$(node -p "require('./frontend/package.json').version")
+          if [[ ! "$VERSION" == *-pre ]]; then
+            VERSION="${VERSION}-pre"
+          fi
+          TAG="v${VERSION}"
+          echo "Publishing pre-release for tag: $TAG"
           
           # Extract release notes for current version from RELEASE_NOTES.md
           RELEASE_NOTES=""
           if [ -f "RELEASE_NOTES.md" ]; then
             RELEASE_NOTES=$(awk -v tag="## ${TAG}" 'BEGIN{f=0} $0==tag{f=1;next} f && /^## v/{exit} f{print}' RELEASE_NOTES.md)
-            # Trim leading/trailing blank lines
             RELEASE_NOTES=$(echo "$RELEASE_NOTES" | sed '/./,$!d' | sed -e :a -e '/^\n*$/{$d;N;ba;}')
           fi
           
@@ -296,7 +325,7 @@ jobs:
             echo "No release notes found for $TAG in RELEASE_NOTES.md"
           fi
           
-          # Generate auto-generated notes via GitHub API
+          # Generate changelog notes
           PREVIOUS_TAG=$(gh api repos/$GITHUB_REPOSITORY/releases/latest --jq '.tag_name' 2>/dev/null || echo "")
           GENERATE_BODY=""
           if [ -n "$PREVIOUS_TAG" ] && [ "$PREVIOUS_TAG" != "$TAG" ]; then
@@ -313,7 +342,7 @@ jobs:
           # Download guide
           GUIDE=$(cat << 'GUIDE_EOF'
           
-          ## 📥 下載指南 / Download Guide
+          ## 📥 下載指南 / Download Guide (Pre-release)
           
           | 平台 Platform | 檔案 File | 說明 Description |
           |---|---|---|
@@ -342,7 +371,7 @@ jobs:
           )
           GUIDE="${GUIDE//VERSION/$VERSION}"
           
-          # Compose full body: changelog + --- + auto-gen + --- + guide
+          # Compose full body
           FULL_BODY=""
           SEP=$'\n---\n'
           if [ -n "$RELEASE_NOTES" ]; then
@@ -353,9 +382,9 @@ jobs:
           fi
           FULL_BODY="${FULL_BODY}${GUIDE}"
           
-          # Create release if it doesn't exist, or edit existing one
+          # Create release if it doesn't exist, or edit existing one. Always mark as Pre-release.
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-            gh release edit "$TAG" --draft=false --notes "$FULL_BODY" --repo "$GITHUB_REPOSITORY"
+            gh release edit "$TAG" --draft=false --prerelease --notes "$FULL_BODY" --repo "$GITHUB_REPOSITORY"
           else
-            gh release create "$TAG" --title "$VERSION" --notes "$FULL_BODY" --repo "$GITHUB_REPOSITORY"
+            gh release create "$TAG" --title "${VERSION} (Pre-release)" --prerelease --notes "$FULL_BODY" --repo "$GITHUB_REPOSITORY"
           fi
