@@ -4,7 +4,6 @@
   "description": "Final Fantasy XIV Cross-Platform Launcher",
   "main": "src/main/index.js",
   "scripts": {
-    "postinstall": "patch-package",
     "start": "electron .",
     "build": "npm run build:cli && npm run build:backend && electron-builder",
     "build:cli": "node -e \"if(process.platform==='darwin'){require('child_process').execSync('cd ../XTCAudioRouter && ./build.sh release',{stdio:'inherit'})}else{console.log('Skipping XTCAudioRouter (macOS only)')}\"",
@@ -61,7 +60,7 @@
           ]
         }
       ],
-      "icon": "build/XIVTC.icon",
+      "icon": "build/XIVTC.icns",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "strictVerify": false,
@@ -122,8 +121,7 @@
   "license": "GPL-3.0-or-later",
   "devDependencies": {
     "electron": "^40.0.0",
-    "electron-builder": "^26.4.0",
-    "patch-package": "^8.0.1"
+    "electron-builder": "^26.4.0"
   },
   "dependencies": {
     "electron-log": "^5.4.3",
