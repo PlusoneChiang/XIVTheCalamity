@@ -1,6 +1,7 @@
 using Serilog;
 using System;
 using System.IO;
+using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
@@ -69,6 +70,13 @@ public class Program
             else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
                 platformStr = "win32";
 
+            // VirtualHost：使用自訂 scheme "xivtc" 模擬 Electron 的 baseURLForDataURL 功能
+            // macOS WKWebView 禁止攔截 https 等內建 scheme，必須使用自訂 scheme
+            // 載入 xivtc://user.ffxiv.com.tw/login.html 使 window.location.hostname = "user.ffxiv.com.tw"
+            // 讓 reCAPTCHA 驗證正確通過（與 Electron 版本行為完全相同）
+            // API 呼叫由 polyfill 直接使用 http://localhost:{port}，不透過此 handler
+            var virtualHostClient = new HttpClient { BaseAddress = new Uri($"http://localhost:{port}") };
+
             var window = new PhotinoWindow()
                 .SetTitle("XIV The Calamity")
                 .SetSize(910, 714) // 910 width, 682 content size + 32px macOS titlebar height
@@ -77,8 +85,30 @@ public class Program
                 .SetDevToolsEnabled(true)
                 .SetContextMenuEnabled(true)
                 .SetWebSecurityEnabled(false)
+                .RegisterCustomSchemeHandler("xivtc", (object sender, string scheme, string request, out string contentType) =>
+                {
+                    // 將 xivtc://user.ffxiv.com.tw/{path} 代理到 Kestrel 的靜態檔案
+                    // 只處理靜態頁面資源（HTML/CSS/JS），API 請求由 polyfill 直接走 http://localhost
+                    try
+                    {
+                        var uri = new Uri(request);
+                        var pathAndQuery = uri.PathAndQuery; // e.g. "/login.html?platform=darwin"
+
+                        Log.Debug("[VirtualHost] xivtc:// proxy: {PathAndQuery} -> Kestrel", pathAndQuery);
+
+                        var response = virtualHostClient.GetAsync(pathAndQuery).GetAwaiter().GetResult();
+                        contentType = response.Content.Headers.ContentType?.MediaType ?? "text/html";
+                        return response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warning(ex, "[VirtualHost] Failed to proxy xivtc request: {Request}", request);
+                        contentType = "text/html";
+                        return System.IO.Stream.Null;
+                    }
+                })
                 .Center()
-                .Load(new Uri($"http://localhost:{port}/login.html?platform={platformStr}"));
+                .Load(new Uri($"xivtc://user.ffxiv.com.tw/login.html?platform={platformStr}"));
 
             MainWindowContainer.MainWindow = window;
 

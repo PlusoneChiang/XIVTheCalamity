@@ -3,7 +3,7 @@ window.Buffer = Buffer;
 console.log('[Polyfill] Global Buffer initialized');
 
 if (!window.xivtc) {
-  const backendUrl = ''; // Relative path (resolves to same host/port serving the page)
+  const backendUrl = 'http://localhost:5050'; // Absolute URL required when page is served via custom scheme (xivtc://)
 
   async function apiCall(path, method = 'POST', body = null) {
     const options = {
@@ -138,7 +138,7 @@ if (!window.xivtc) {
       },
       on: (eventName, callback) => {
         if (!window.__photinoEventSource) {
-          window.__photinoEventSource = new EventSource(`/api/events/stream`);
+          window.__photinoEventSource = new EventSource(`http://localhost:5050/api/events/stream`);
           window.__photinoEventListeners = {};
           window.__photinoEventSource.onmessage = (e) => {
             try {
