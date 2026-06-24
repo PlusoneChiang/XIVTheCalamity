@@ -139,8 +139,8 @@ public class AppUpdaterService
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
-            return Array.Find(release.Assets, a => a.Name.EndsWith(".dmg", StringComparison.OrdinalIgnoreCase))
-                ?? Array.Find(release.Assets, a => a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+            return Array.Find(release.Assets, a => a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                ?? Array.Find(release.Assets, a => a.Name.EndsWith(".dmg", StringComparison.OrdinalIgnoreCase))
                 ?? Array.Find(release.Assets, a => a.Name.EndsWith(".tar.xz", StringComparison.OrdinalIgnoreCase));
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
@@ -268,6 +268,42 @@ public class AppUpdaterService
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
+                if (path.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        var tempExtractPath = Path.Combine(Path.GetTempPath(), "xivtc-update-" + Guid.NewGuid().ToString("N"));
+                        Directory.CreateDirectory(tempExtractPath);
+                        
+                        System.IO.Compression.ZipFile.ExtractToDirectory(path, tempExtractPath);
+                        
+                        var newAppFolder = Path.Combine(tempExtractPath, "XIVTheCalamity.app");
+                        var currentAppPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", ".."));
+                        
+                        if (Directory.Exists(newAppFolder) && currentAppPath.EndsWith(".app", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var scriptPath = Path.Combine(Path.GetTempPath(), "update-mac.sh");
+                            var scriptContent = $@"#!/bin/bash
+sleep 1
+rm -rf ""{currentAppPath}""
+mv ""{newAppFolder}"" ""{currentAppPath}""
+open ""{currentAppPath}""
+rm -rf ""{tempExtractPath}""
+rm -- ""$0""
+";
+                            File.WriteAllText(scriptPath, scriptContent);
+                            Process.Start("chmod", $"+x \"{scriptPath}\"")?.WaitForExit();
+                            Process.Start("/bin/bash", $"\"{scriptPath}\"");
+                            Environment.Exit(0);
+                            return;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error(ex, "[AppUpdater] Failed silent OSX zip update, falling back to open");
+                    }
+                }
+                
                 Process.Start("open", path);
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))

@@ -210,12 +210,19 @@ jobs:
             codesign --force --sign "Developer ID Application: $IDENTITY" "$DMG_PATH"
           fi
 
+          # Also package a ZIP of the notarized/stapled App Bundle for silent update
+          ZIP_PATH="Release/XIVTheCalamity-${VERSION}-mac-arm64.zip"
+          xattr -cr "Release/mac-arm64/XIVTheCalamity.app"
+          COPYFILE_DISABLE=1 ditto -c -k --keepParent "Release/mac-arm64/XIVTheCalamity.app" "$ZIP_PATH"
+
       # Upload macOS artifact
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: macos-artifact
-          path: Release/XIVTheCalamity-*-mac-arm64.dmg
+          path: |
+            Release/XIVTheCalamity-*-mac-arm64.dmg
+            Release/XIVTheCalamity-*-mac-arm64.zip
 
   # ==================== Linux ====================
   build-linux:
@@ -356,12 +363,28 @@ jobs:
           $zipPath = "Release/XIVTheCalamity-$version-win-x64.zip"
           Compress-Archive -Path $packageDir -DestinationPath $zipPath -Force
 
+      # Build Windows Installer (Inno Setup)
+      - name: Build Windows Installer
+        shell: pwsh
+        run: |
+          $version = node -e "console.log(require('fs').readFileSync('backend/src/XIVTheCalamity/XIVTheCalamity.csproj', 'utf8').match(/<Version>(.*?)<\/Version>/)[1])"
+          if (!(Get-Command iscc -ErrorAction SilentlyContinue)) {
+            choco install innosetup --no-progress
+          }
+          if (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe") {
+            & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=$version scripts/windows-installer.iss
+          } else {
+            iscc /DAppVersion=$version scripts/windows-installer.iss
+          }
+
       # Upload Windows artifact
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-artifact
-          path: Release/XIVTheCalamity-*-win-x64.zip
+          path: |
+            Release/XIVTheCalamity-*-win-x64.zip
+            Release/XIVTheCalamity-*-win-x64-installer.exe
 
   # ==================== Publish Release ====================
   publish-release:
@@ -385,27 +408,27 @@ jobs:
         run: |
           VERSION=$(node -p "require('fs').readFileSync('backend/src/XIVTheCalamity/XIVTheCalamity.csproj', 'utf8').match(/<Version>(.*?)<\/Version>/)[1]")
           
-          # Windows metadata
-          WIN_ZIP=$(ls -1 Release/binaries/XIVTheCalamity-*-win-x64.zip 2>/dev/null | tail -1)
-          if [ -n "$WIN_ZIP" ] && [ -f "$WIN_ZIP" ]; then
-            WIN_ZIP_NAME=$(basename "$WIN_ZIP")
-            WIN_SHA=$(sha512sum "$WIN_ZIP" | cut -d' ' -f1)
-            WIN_SIZE=$(wc -c < "$WIN_ZIP" | tr -d ' ')
+          # Windows metadata (installer exe)
+          WIN_EXE=$(ls -1 Release/binaries/XIVTheCalamity-*-win-x64-installer.exe 2>/dev/null | tail -1)
+          if [ -n "$WIN_EXE" ] && [ -f "$WIN_EXE" ]; then
+            WIN_EXE_NAME=$(basename "$WIN_EXE")
+            WIN_SHA=$(sha512sum "$WIN_EXE" | cut -d' ' -f1)
+            WIN_SIZE=$(wc -c < "$WIN_EXE" | tr -d ' ')
             
             cat <<EOF > Release/binaries/latest.yml
           version: ${VERSION}
           files:
-            - url: ${WIN_ZIP_NAME}
+            - url: ${WIN_EXE_NAME}
               sha512: ${WIN_SHA}
               size: ${WIN_SIZE}
-          path: ${WIN_ZIP_NAME}
+          path: ${WIN_EXE_NAME}
           sha512: ${WIN_SHA}
           releaseDate: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
           EOF
           fi
           
-          # macOS metadata
-          MAC_ZIP=$(ls -1 Release/binaries/XIVTheCalamity-*-mac-arm64.dmg 2>/dev/null | tail -1)
+          # macOS metadata (zip for auto-update)
+          MAC_ZIP=$(ls -1 Release/binaries/XIVTheCalamity-*-mac-arm64.zip 2>/dev/null | tail -1)
           if [ -n "$MAC_ZIP" ] && [ -f "$MAC_ZIP" ]; then
             MAC_ZIP_NAME=$(basename "$MAC_ZIP")
             MAC_SHA=$(sha512sum "$MAC_ZIP" | cut -d' ' -f1)
@@ -479,7 +502,8 @@ jobs:
           |---|---|---|
           | **macOS** (Apple Silicon) | `XIVTheCalamity-VERSION-mac-arm64.dmg` | 安裝檔，雙擊後將 `XIVTheCalamity.app` 拖曳至 Applications 即可使用 |
           | **Linux** (x64) | `XIVTheCalamity-VERSION-linux-x64.AppImage` | 執行前需加上執行權限：`chmod +x *.AppImage`</br> 如果在Steam App中使用或是透過Game Mode執行，需額外加上 `--no-sandbox` 執行參數 |
-          | **Windows** (x64) | `XIVTheCalamity-VERSION-win-x64.zip` | 免安裝壓縮檔，解壓後執行 `XIVTheCalamity.exe` 即可 |
+          | **Windows** (x64) Installer | `XIVTheCalamity-VERSION-win-x64-installer.exe` | 安裝檔，雙擊執行即可安裝 |
+          | **Windows** (x64) Portable | `XIVTheCalamity-VERSION-win-x64.zip` | 免安裝壓縮檔，解壓後執行 `XIVTheCalamity.exe` 即可 |
           
           > ⚠️ 以下檔案為自動更新系統使用，一般使用者請勿下載：
           > - `*.yml` — 自動更新元資料（`latest-mac.yml`、`latest-linux.yml`、`latest.yml`）
