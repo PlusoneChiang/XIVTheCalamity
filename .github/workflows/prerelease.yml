@@ -122,10 +122,10 @@ jobs:
         run: |
           APP_DIR="Release/mac-arm64/XIVTheCalamity.app"
           mkdir -p "$APP_DIR/Contents/MacOS"
-          mkdir -p "$APP_DIR/Contents/Resources/bin"
           mkdir -p "$APP_DIR/Contents/Resources/resources"
           
           cp Release/mac-out/XIVTheCalamity "$APP_DIR/Contents/MacOS/XIVTheCalamity"
+          cp Release/mac-out/*.dylib "$APP_DIR/Contents/MacOS/" 2>/dev/null || true
           cp -R Release/mac-out/wwwroot "$APP_DIR/Contents/Resources/"
           
           # Get version from csproj
@@ -160,7 +160,6 @@ jobs:
           EOF
           
           cp frontend/build/XIVTC.icns "$APP_DIR/Contents/Resources/"
-          cp shared/resources/bin/XTCAudioRouter "$APP_DIR/Contents/Resources/bin/"
           cp -R shared/resources/ "$APP_DIR/Contents/Resources/resources/"
 
       # Codesign App Bundle
@@ -169,7 +168,8 @@ jobs:
           IDENTITY="${{ env.CSC_NAME }}"
           if [ -n "$IDENTITY" ]; then
             echo "Signing with identity: $IDENTITY"
-            codesign --force --options runtime --sign "Developer ID Application: $IDENTITY" "Release/mac-arm64/XIVTheCalamity.app/Contents/Resources/bin/XTCAudioRouter"
+            find "Release/mac-arm64/XIVTheCalamity.app/Contents/MacOS" -name "*.dylib" -exec codesign --force --options runtime --sign "Developer ID Application: $IDENTITY" {} \;
+            codesign --force --options runtime --sign "Developer ID Application: $IDENTITY" "Release/mac-arm64/XIVTheCalamity.app/Contents/Resources/resources/bin/XTCAudioRouter"
             codesign --force --options runtime --sign "Developer ID Application: $IDENTITY" "Release/mac-arm64/XIVTheCalamity.app/Contents/MacOS/XIVTheCalamity"
             codesign --force --options runtime --sign "Developer ID Application: $IDENTITY" "Release/mac-arm64/XIVTheCalamity.app"
           else
