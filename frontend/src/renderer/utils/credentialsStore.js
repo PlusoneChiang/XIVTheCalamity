@@ -68,10 +68,10 @@ async function migrateCredentials() {
     const otpSecretsFile = 'otp_secrets.json';
     
     // Check if legacy passwords.json exists
-    const passwordsResult = await window.electronAPI.storage.load(passwordsFile);
+    const passwordsResult = await window.xivtc.storage.load(passwordsFile);
     if (!passwordsResult.success || !passwordsResult.data) {
       // No legacy passwords.json found, check if legacy otp_secrets.json exists alone
-      const otpCheck = await window.electronAPI.storage.load(otpSecretsFile);
+      const otpCheck = await window.xivtc.storage.load(otpSecretsFile);
       if (!otpCheck.success || !otpCheck.data) {
         return; // No legacy files exist, skip migration
       }
@@ -82,15 +82,15 @@ async function migrateCredentials() {
     const legacyPasswords = passwordsResult.data || {};
     
     let legacyOtpSecrets = {};
-    const otpResult = await window.electronAPI.storage.load(otpSecretsFile);
+    const otpResult = await window.xivtc.storage.load(otpSecretsFile);
     if (otpResult.success && otpResult.data) {
       legacyOtpSecrets = otpResult.data;
     }
     
     // Create backup copies of the legacy files first
-    await window.electronAPI.storage.save('passwords.json.bak', legacyPasswords);
+    await window.xivtc.storage.save('passwords.json.bak', legacyPasswords);
     if (Object.keys(legacyOtpSecrets).length > 0) {
-      await window.electronAPI.storage.save('otp_secrets.json.bak', legacyOtpSecrets);
+      await window.xivtc.storage.save('otp_secrets.json.bak', legacyOtpSecrets);
     }
     
     const masterPassword = await getEncryptionKey();
@@ -171,7 +171,7 @@ async function migrateCredentials() {
     
     // Load and merge with any existing credentials.json
     const credentialsFile = CREDENTIALS_FILE;
-    const existingResult = await window.electronAPI.storage.load(credentialsFile);
+    const existingResult = await window.xivtc.storage.load(credentialsFile);
     let finalStore = {};
     if (existingResult.success && existingResult.data) {
       finalStore = existingResult.data;
@@ -179,11 +179,11 @@ async function migrateCredentials() {
     
     finalStore = { ...migratedStore, ...finalStore };
     
-    const saveResult = await window.electronAPI.storage.save(credentialsFile, finalStore);
+    const saveResult = await window.xivtc.storage.save(credentialsFile, finalStore);
     if (saveResult.success) {
       console.log('[CredentialsStore] Migration successful. Cleaning up legacy files...');
-      await window.electronAPI.storage.delete(passwordsFile);
-      await window.electronAPI.storage.delete(otpSecretsFile);
+      await window.xivtc.storage.delete(passwordsFile);
+      await window.xivtc.storage.delete(otpSecretsFile);
       console.log('[CredentialsStore] Cleanup complete.');
     } else {
       console.error('[CredentialsStore] Migration failed to save new store.');
@@ -217,7 +217,7 @@ async function loadStore() {
   }
   
   try {
-    const result = await window.electronAPI.storage.load(CREDENTIALS_FILE);
+    const result = await window.xivtc.storage.load(CREDENTIALS_FILE);
     if (result.success && result.data) {
       storeCache = result.data;
     } else {
@@ -236,7 +236,7 @@ async function loadStore() {
 async function saveStore(store) {
   storeCache = store;
   try {
-    const result = await window.electronAPI.storage.save(CREDENTIALS_FILE, store);
+    const result = await window.xivtc.storage.save(CREDENTIALS_FILE, store);
     return result.success;
   } catch (error) {
     console.error('[CredentialsStore] Save store failed:', error);

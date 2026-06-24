@@ -45,28 +45,80 @@ let remainExpireTime = null;
 let sessionObtainedAt = null;
 
 /**
+ * Setup news iframe link click interception to open external links in default browser
+ */
+function setupIframeInterception() {
+  const newsFrame = document.getElementById('newsFrame');
+  if (!newsFrame) return;
+
+  const attachListener = () => {
+    try {
+      const iframeDoc = newsFrame.contentDocument || newsFrame.contentWindow.document;
+      if (iframeDoc) {
+        // Prevent duplicate listeners
+        if (iframeDoc.dataset && iframeDoc.dataset.clickIntercepted) return;
+        if (iframeDoc.dataset) {
+          iframeDoc.dataset.clickIntercepted = "true";
+        } else {
+          if (iframeDoc.documentElement && iframeDoc.documentElement.getAttribute('data-click-intercepted')) return;
+          iframeDoc.documentElement.setAttribute('data-click-intercepted', 'true');
+        }
+
+        console.log('[Login] Attaching click listener to news iframe');
+        iframeDoc.addEventListener('click', (e) => {
+          const anchor = e.target.closest('a');
+          if (anchor && anchor.href) {
+            e.preventDefault();
+            console.log('[Login] Intercepted link click in news iframe:', anchor.href);
+            window.xivtc.openExternal(anchor.href);
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('[Login] newsFrame contentDocument is not accessible:', e.message);
+    }
+  };
+
+  newsFrame.addEventListener('load', attachListener);
+  attachListener();
+  
+  // Poll to handle dynamic navigation within the iframe
+  let attempts = 0;
+  const interval = setInterval(() => {
+    attempts++;
+    attachListener();
+    if (attempts >= 20) {
+      clearInterval(interval);
+    }
+  }, 1000);
+}
+
+/**
  * Initialize the login page
  */
 async function init() {
   console.log('[Login] Initializing login page');
   
-  if (!window.electronAPI) {
-    console.error('[Login] ERROR: window.electronAPI is not available!');
+  if (!window.xivtc) {
+    console.error('[Login] ERROR: window.xivtc is not available!');
     console.error('[Login] Preload script may not be loaded correctly.');
     alert(i18n.t('login.system_error'));
     return;
   }
+
+  // Intercept clicks in the news iframe
+  setupIframeInterception();
   
   // Set platform-specific class on body
-  const platform = window.electronAPI.getPlatform();
+  const platform = window.xivtc.getPlatform();
   const platformClass = platform === 'darwin' ? 'platform-darwin' : (platform === 'win32' ? 'platform-windows' : 'platform-linux');
   document.body.classList.add(platformClass);
 
-  console.log('[Login] electronAPI is available');
+  console.log('[Login] xivtc is available');
   
   // Load config for language and dev mode
   try {
-    const configResp = await window.electronAPI.backend.call('/api/config');
+    const configResp = await window.xivtc.backend.call('/api/config');
     const rawData = configResp?.data;
     const config = rawData?.success ? rawData.data : rawData;
     if (config?.launcher?.language) {
@@ -102,15 +154,12 @@ async function init() {
   // Bind keyboard navigation and auto-fill state tracking
   bindKeyboardNavigation();
   
-  // Settings button (initially disabled until Wine initialization completes)
+  // Settings button
   const settingsBtn = document.getElementById('settingsBtn');
   settingsBtn.addEventListener('click', handleOpenSettings);
-  
-  // Disable settings button on macOS/Linux until Wine is ready
-  if (platform === 'darwin' || platform === 'linux') {
-    settingsBtn.disabled = true;
-    console.log('[Login] Settings button disabled until Wine initialization completes');
-  }
+
+  // Settings modal close actions
+  document.getElementById('settingsModalOverlay').addEventListener('click', closeSettingsModal);
   
   // Close button (Linux only)
   const closeBtn = document.getElementById('closeBtn');
@@ -118,13 +167,15 @@ async function init() {
     closeBtn.style.display = 'flex';  // Show close button on Linux
     closeBtn.addEventListener('click', () => {
       console.log('[Login] Close button clicked');
-      window.electronAPI.closeWindow();
+      window.xivtc.closeWindow();
     });
+  } else {
+    closeBtn.style.display = 'none';  // Hide close button on other platforms
   }
   
   // 監聽設定變更事件
-  if (window.electronAPI.events) {
-    window.electronAPI.events.on('config-changed', async (data) => {
+  if (window.xivtc.events) {
+    window.xivtc.events.on('config-changed', async (data) => {
       console.log('[Login] Received config-changed event:', data);
       handleConfigChanged(data);
       // 處理 Dalamud 設定變更
@@ -133,7 +184,7 @@ async function init() {
       }
       // 重新讀取設定檔以更新頁面
       try {
-        const configResp = await window.electronAPI.backend.call('/api/config');
+        const configResp = await window.xivtc.backend.call('/api/config');
         const rawData = configResp?.data;
         const config = rawData?.success ? rawData.data : rawData;
         if (config?.launcher?.language) {
@@ -201,8 +252,8 @@ async function init() {
   window.addEventListener('beforeunload', () => {
     cleanupAccountManagement();
     // 移除事件監聽
-    if (window.electronAPI.events) {
-      window.electronAPI.events.off('config-changed');
+    if (window.xivtc.events) {
+      window.xivtc.events.off('config-changed');
     }
   });
   
@@ -300,7 +351,7 @@ async function handleLogin(event) {
       recaptchaToken: recaptchaToken ? recaptchaToken.substring(0, 20) + '...' : 'none'
     });
     
-    const response = await window.electronAPI.backend.call('/api/auth/login', {
+    const response = await window.xivtc.backend.call('/api/auth/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -454,30 +505,57 @@ function handleRelogin() {
   document.getElementById('otp').value = '';
 }
 
-let isOpeningSettings = false;
-
 /**
  * Handle open settings button click
  */
-async function handleOpenSettings() {
-  // Prevent multiple rapid clicks
-  if (isOpeningSettings) {
-    console.log('[Login] Settings window is already opening, ignoring click');
-    return;
-  }
+function handleOpenSettings() {
+  console.log('[Login] Opening settings modal overlay');
+  openSettingsModal();
+}
+
+/**
+ * Open the settings page inside iframe modal
+ */
+function openSettingsModal() {
+  const modal = document.getElementById('settingsModal');
+  const iframe = document.getElementById('settingsFrame');
+  if (!modal || !iframe) return;
+
+  const platform = window.xivtc.getPlatform();
+  // Load settings.html directly into iframe
+  iframe.src = `settings.html?platform=${platform}`;
   
-  isOpeningSettings = true;
-  console.log('[Login] Opening settings window');
-  try {
-    await window.electronAPI.openSettings();
-  } catch (error) {
-    console.error('[Login] Failed to open settings:', error);
-  } finally {
-    // Reset after a short delay
-    setTimeout(() => {
-      isOpeningSettings = false;
-    }, 500);
-  }
+  modal.style.display = 'flex';
+  
+  // Attach window.close override when settings page loads
+  iframe.onload = () => {
+    try {
+      const iframeWindow = iframe.contentWindow;
+      if (iframeWindow) {
+        // Redefine window.close() inside the settings iframe to close the modal
+        iframeWindow.close = () => {
+          console.log('[Login] iframeWindow.close() called, closing settings modal');
+          closeSettingsModal();
+        };
+        console.log('[Login] Settings iframe loaded and window.close() overrode');
+      }
+    } catch (e) {
+      console.error('[Login] Failed to override settings iframe window.close:', e);
+    }
+  };
+}
+
+/**
+ * Close the settings modal overlay
+ */
+function closeSettingsModal() {
+  const modal = document.getElementById('settingsModal');
+  const iframe = document.getElementById('settingsFrame');
+  if (!modal || !iframe) return;
+
+  modal.style.display = 'none';
+  iframe.src = ''; // Unload settings frame
+  console.log('[Login] Closed settings modal');
 }
 
 /**
@@ -504,7 +582,7 @@ async function handleLaunchGame() {
   
   try {
     // Launch game via IPC
-    const response = await window.electronAPI.backend.call('/api/game/launch', {
+    const response = await window.xivtc.backend.call('/api/game/launch', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -547,7 +625,7 @@ async function waitForGameExit() {
   try {
     console.log('[Login] Waiting for game exit...');
     
-    const response = await window.electronAPI.backend.call('/api/game/wait-exit', {
+    const response = await window.xivtc.backend.call('/api/game/wait-exit', {
       method: 'GET'
     });
     
@@ -582,8 +660,8 @@ function showGameExitWarning(exitCode) {
   const message = i18n.t('login.game_exit_abnormal', { exitCode });
   
   // Use native dialog if available, otherwise alert
-  if (window.electronAPI && window.electronAPI.showMessageBox) {
-    window.electronAPI.showMessageBox({
+  if (window.xivtc && window.xivtc.showMessageBox) {
+    window.xivtc.showMessageBox({
       type: 'warning',
       title: i18n.t('login.game_exit_warning_title'),
       message: message
@@ -860,7 +938,7 @@ function startEnvironmentInitialization() {
     console.log('[ENV-INIT] isEnvironmentInitialized:', isEnvironmentInitialized);
     
     // Check platform first
-    const platform = window.electronAPI?.getPlatform ? window.electronAPI.getPlatform() : 'unknown';
+    const platform = window.xivtc?.getPlatform ? window.xivtc.getPlatform() : 'unknown';
     console.log('[ENV-INIT] Platform:', platform);
     
     // Windows doesn't need Wine initialization
@@ -906,7 +984,6 @@ function startEnvironmentInitialization() {
   // Keep launch button and settings button disabled
   launchButton.disabled = true;
   setButtonI18n(launchButton, 'login.preparing');
-  settingsBtn.disabled = true;
   
   // Switch to progress mode
   titleBarCard.classList.add('progress-mode');
@@ -1117,7 +1194,7 @@ function showTitleMessage(message) {
  */
 async function loadVersion() {
   try {
-    const versionData = await window.electronAPI.getVersion();
+    const versionData = await window.xivtc.getVersion();
     appVersionText = `${versionData.appName} v${versionData.version}`;
     updateTitleBarDevMode();
     console.log('[Login] Version loaded:', appVersionText);
@@ -1155,7 +1232,7 @@ async function checkGameDirectorySetup() {
     console.log('[GameSetup] Checking game directory configuration...');
     
     // Get current config
-    const response = await window.electronAPI.backend.call('/api/config');
+    const response = await window.xivtc.backend.call('/api/config');
     console.log('[GameSetup] API response:', JSON.stringify(response, null, 2));
     
     let config;
@@ -1178,7 +1255,7 @@ async function checkGameDirectorySetup() {
     console.log('[GameSetup] Game path found:', config.game.gamePath);
     
     // Validate game directory
-    const validation = await window.electronAPI.validateGameDirectory(config.game.gamePath);
+    const validation = await window.xivtc.validateGameDirectory(config.game.gamePath);
     console.log('[GameSetup] Validation result:', JSON.stringify(validation, null, 2));
     
     if (!validation.valid) {
@@ -1209,7 +1286,7 @@ function showGameSetupDialog() {
     // Existing game - select directory
     existingBtn.onclick = async () => {
       try {
-        const result = await window.electronAPI.selectDirectory({
+        const result = await window.xivtc.selectDirectory({
           title: i18n.t('login.game_setup.select_existing'),
           buttonLabel: i18n.t('button.select')
         });
@@ -1224,7 +1301,7 @@ function showGameSetupDialog() {
         }
         
         // Validate selected directory
-        const validation = await window.electronAPI.validateGameDirectory(result.path);
+        const validation = await window.xivtc.validateGameDirectory(result.path);
         console.log('[GameSetup] Validation result:', validation);
         
         if (!validation.valid) {
@@ -1255,7 +1332,7 @@ function showGameSetupDialog() {
     // Install new game - create directory
     installBtn.onclick = async () => {
       try {
-        const result = await window.electronAPI.selectDirectory({
+        const result = await window.xivtc.selectDirectory({
           title: i18n.t('login.game_setup.select_install'),
           buttonLabel: i18n.t('button.create')
         });
@@ -1270,7 +1347,7 @@ function showGameSetupDialog() {
         }
         
         // Create game directory structure
-        const createResult = await window.electronAPI.createDirectory(result.path);
+        const createResult = await window.xivtc.createDirectory(result.path);
         
         if (!createResult.success) {
           alert(i18n.t('login.game_setup.error_create'));
@@ -1299,7 +1376,7 @@ async function saveGamePath(gamePath) {
     console.log('[GameSetup] Saving game path:', gamePath);
     
     // Get current config
-    const response = await window.electronAPI.backend.call('/api/config');
+    const response = await window.xivtc.backend.call('/api/config');
     
     let config;
     try {
@@ -1318,7 +1395,7 @@ async function saveGamePath(gamePath) {
     config.game.gamePath = gamePath;
     
     // Save config
-    const saveResponse = await window.electronAPI.backend.call('/api/config', {
+    const saveResponse = await window.xivtc.backend.call('/api/config', {
       method: 'PUT',
       body: JSON.stringify(config)
     });

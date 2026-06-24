@@ -16,7 +16,7 @@ let dalamudEventSource = null;
  */
 async function isDalamudEnabled() {
   try {
-    const configResponse = await window.electronAPI.backend.call('/api/config', {
+    const configResponse = await window.xivtc.backend.call('/api/config', {
       method: 'GET'
     });
     let config;
@@ -38,7 +38,7 @@ async function isDalamudEnabled() {
  */
 export async function getDalamudStatus() {
   try {
-    const response = await window.electronAPI.backend.call('/api/dalamud/status', {
+    const response = await window.xivtc.backend.call('/api/dalamud/status', {
       method: 'GET'
     });
     let data;
@@ -245,7 +245,7 @@ export async function cancelDalamudUpdate() {
   closeDalamudSSE();
   
   try {
-    await window.electronAPI.backend.call('/api/dalamud/cancel', {
+    await window.xivtc.backend.call('/api/dalamud/cancel', {
       method: 'POST'
     });
     console.log('[DALAMUD] Update cancelled');

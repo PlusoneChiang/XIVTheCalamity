@@ -1,0 +1,158 @@
+using System.Text.Json.Serialization;
+using XIVTheCalamity.Core.Models;
+using XIVTheCalamity.Core.Models.Progress;
+using XIVTheCalamity.Dalamud.Models;
+using XIVTheCalamity.DTOs;
+using XIVTheCalamity.Platform.MacOS.Wine;
+using XIVTheCalamity.Platform.MacOS.Discord;
+
+namespace XIVTheCalamity;
+
+// Core Models
+[JsonSerializable(typeof(AppConfig))]
+[JsonSerializable(typeof(GameConfig))]
+[JsonSerializable(typeof(DalamudConfig))]
+[JsonSerializable(typeof(DiscordRpcConfig))]
+[JsonSerializable(typeof(LauncherConfig))]
+[JsonSerializable(typeof(WineConfig))]
+[JsonSerializable(typeof(WineGraphicsConfig))]
+[JsonSerializable(typeof(WinePerformanceConfig))]
+[JsonSerializable(typeof(WineCompatConfig))]
+[JsonSerializable(typeof(ProtonGeConfig))]
+[JsonSerializable(typeof(LoginResult))]
+[JsonSerializable(typeof(WineInitProgress))]
+
+// Wine Services (needed for DI parameter resolution on Windows)
+[JsonSerializable(typeof(WineConfigService))]
+[JsonSerializable(typeof(WinePrefixService))]
+
+// Progress Events
+[JsonSerializable(typeof(DownloadProgressEvent))]
+[JsonSerializable(typeof(PatchProgressEvent))]
+[JsonSerializable(typeof(EnvironmentProgressEvent))]
+
+// Dalamud Models
+[JsonSerializable(typeof(DalamudVersionInfo))]
+[JsonSerializable(typeof(DalamudAssetManifest))]
+[JsonSerializable(typeof(DalamudAssetEntry))]
+[JsonSerializable(typeof(DalamudStatus))]
+[JsonSerializable(typeof(DalamudUpdateProgress))]
+
+// API DTOs
+[JsonSerializable(typeof(LoginRequestDto))]
+[JsonSerializable(typeof(LoginData))]
+[JsonSerializable(typeof(LaunchRequest))]
+[JsonSerializable(typeof(System.Text.Json.JsonElement))]
+[JsonSerializable(typeof(StorageSaveRequest))]
+[JsonSerializable(typeof(StorageLoadRequest))]
+[JsonSerializable(typeof(StorageResponse))]
+[JsonSerializable(typeof(VersionInfoResponse))]
+[JsonSerializable(typeof(OpenExternalRequest))]
+[JsonSerializable(typeof(MessageDialogRequest))]
+[JsonSerializable(typeof(MessageDialogResponse))]
+[JsonSerializable(typeof(BroadcastEventRequest))]
+[JsonSerializable(typeof(EventStreamItem))]
+
+// API Response Wrappers
+[JsonSerializable(typeof(ApiResponse<AppConfig>))]
+[JsonSerializable(typeof(ApiResponse<WineGraphicsConfig>))]
+[JsonSerializable(typeof(ApiResponse<WinePerformanceConfig>))]
+[JsonSerializable(typeof(ApiResponse<WineCompatConfig>))]
+[JsonSerializable(typeof(ApiResponse<LoginData>))]
+[JsonSerializable(typeof(ApiResponse<string>))]
+[JsonSerializable(typeof(ApiResponse<object>))]
+[JsonSerializable(typeof(ApiResponse<StorageResponse>))]
+[JsonSerializable(typeof(ApiResponse<VersionInfoResponse>))]
+[JsonSerializable(typeof(ApiResponse<MessageDialogResponse>))]
+[JsonSerializable(typeof(ApiResponse<GenericActionResponse>))]
+[JsonSerializable(typeof(ApiResponse<SelectDirectoryResponse>))]
+[JsonSerializable(typeof(ApiResponse<ValidateDirectoryResponse>))]
+[JsonSerializable(typeof(GenericActionResponse))]
+[JsonSerializable(typeof(SelectDirectoryResponse))]
+[JsonSerializable(typeof(ValidateDirectoryResponse))]
+[JsonSerializable(typeof(ApiErrorResponse))]
+[JsonSerializable(typeof(ErrorDetails))]
+
+// Common Types
+[JsonSerializable(typeof(Dictionary<string, object>))]
+[JsonSerializable(typeof(Dictionary<string, string>))]
+
+// Health Check
+[JsonSerializable(typeof(HealthResponse))]
+
+// Game Status
+[JsonSerializable(typeof(GameStatusResponse))]
+[JsonSerializable(typeof(PathsResponse))]
+[JsonSerializable(typeof(ConfigPathResponse))]
+[JsonSerializable(typeof(VersionResponse))]
+[JsonSerializable(typeof(UpdateCheckResponse))]
+[JsonSerializable(typeof(DalamudStatusResponse))]
+
+// SSE Event Types
+[JsonSerializable(typeof(SseMessage))]
+[JsonSerializable(typeof(SseError))]
+[JsonSerializable(typeof(ToolLaunchResult))]
+
+// Wine Response Types
+[JsonSerializable(typeof(WineToolLaunchResponse))]
+[JsonSerializable(typeof(WineSettingsAppliedResponse))]
+[JsonSerializable(typeof(ApiResponse<WineToolLaunchResponse>))]
+[JsonSerializable(typeof(ApiResponse<WineSettingsAppliedResponse>))]
+[JsonSerializable(typeof(ApiResponse<DiscordRpcStatusResponse>))]
+[JsonSerializable(typeof(ApiResponse<DiscordRpcInstallResponse>))]
+[JsonSerializable(typeof(ApiResponse<DiscordRpcRemoveResponse>))]
+
+// Game Response Types
+[JsonSerializable(typeof(GameLaunchResponse))]
+[JsonSerializable(typeof(GameExitResponse))]
+[JsonSerializable(typeof(ApiResponse<GameLaunchResponse>))]
+[JsonSerializable(typeof(ApiResponse<GameExitResponse>))]
+[JsonSerializable(typeof(ApiResponse<GameStatusResponse>))]
+
+// Dalamud Response Types
+[JsonSerializable(typeof(ApiResponse<DalamudStatus>))]
+
+[JsonSourceGenerationOptions(
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    WriteIndented = false)]
+public partial class AppJsonContext : JsonSerializerContext { }
+
+// Simple response types for NativeAOT
+public record HealthResponse(string Status, DateTime Timestamp);
+public record GameStatusResponse(bool IsRunning, int? ProcessId);
+public record PathsResponse(string WinePath, string WinePrefixPath, string GamePath);
+public record ConfigPathResponse(string Path);
+public record VersionResponse(string? BootVersion, string? GameVersion);
+public record UpdateCheckResponse(bool HasUpdates, string? BootVersion, string? GameVersion, int PatchCount);
+public record DalamudStatusResponse(DalamudStatus Status, string? Version);
+
+// SSE specific types
+public record SseMessage(string Message);
+public record SseError(string Code, string Message);
+public record ToolLaunchResult(bool Success, int ExitCode, string Stdout, string Stderr);
+
+// Wine response types (NativeAOT compatible)
+public record WineToolLaunchResponse(bool Success, string Message, int? Pid = null);
+public record WineSettingsAppliedResponse(bool Success, string Message);
+public record DiscordRpcStatusResponse(DiscordRpcBridgeStatus Status);
+public record DiscordRpcInstallResponse(bool Success, string Message, DiscordRpcBridgeStatus Status);
+public record DiscordRpcRemoveResponse(bool Success, string Message, DiscordRpcBridgeStatus Status);
+
+// Game response types (NativeAOT compatible)
+public record GameLaunchResponse(int ProcessId, int? ExitCode = null);
+public record GameExitResponse(int ExitCode);
+
+// Electron bridge records
+public record StorageSaveRequest(string Filename, System.Text.Json.JsonElement Data);
+public record StorageLoadRequest(string Filename);
+public record StorageResponse(bool Success, System.Text.Json.JsonElement? Data = null, string? Error = null);
+public record VersionInfoResponse(string Version, string AppName, string Description);
+public record OpenExternalRequest(string Url);
+public record MessageDialogRequest(string Type, string Title, string Message, string[]? Buttons = null);
+public record MessageDialogResponse(int Response);
+public record BroadcastEventRequest(string EventName, System.Text.Json.JsonElement Data);
+public record EventStreamItem(string EventName, System.Text.Json.JsonElement Data);
+public record GenericActionResponse(bool Success, string? Message = null);
+public record SelectDirectoryResponse(bool Success, string? Path = null, bool? Canceled = null);
+public record ValidateDirectoryResponse(bool Valid, string? Reason = null);

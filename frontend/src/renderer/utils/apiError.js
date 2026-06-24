@@ -12,12 +12,12 @@ class ApiError extends Error {
 
 /**
  * Handle API response with standardized error handling
- * @param {Object} response - ElectronAPI response object {ok, status, data} or Fetch API response
+ * @param {Object} response - xivtc response object {ok, status, data} or Fetch API response
  * @returns {Promise<any>} - Response data
  * @throws {ApiError} - Standardized API error
  */
 async function handleApiResponse(response) {
-    // Handle ElectronAPI response format {ok, status, data}
+    // Handle xivtc response format {ok, status, data}
     if (response.hasOwnProperty('data')) {
         if (!response.ok) {
             const errorData = response.data;

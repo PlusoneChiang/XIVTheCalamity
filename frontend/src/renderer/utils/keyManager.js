@@ -24,7 +24,7 @@ function generateEncryptionKey() {
 export async function getEncryptionKey() {
   try {
     // Try to load existing config
-    const result = await window.electronAPI.storage.load(CONFIG_FILE);
+    const result = await window.xivtc.storage.load(CONFIG_FILE);
     
     if (result.success && result.data && result.data.encryptionKey) {
       console.log('[KeyManager] Loaded existing encryption key');
@@ -42,7 +42,7 @@ export async function getEncryptionKey() {
       version: '1.0'
     };
     
-    await window.electronAPI.storage.save(CONFIG_FILE, config);
+    await window.xivtc.storage.save(CONFIG_FILE, config);
     console.log('[KeyManager] Encryption key generated and saved');
     
     return newKey;

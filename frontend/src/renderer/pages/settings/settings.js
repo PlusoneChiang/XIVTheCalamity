@@ -2,6 +2,7 @@
  * Settings Page Logic
  */
 
+import '../../utils/polyfill.js';
 import i18n from '../../i18n/index.js';
 import { applyTheme } from '../../utils/theme.js';
 import { getLastUsedAccount, deleteOTPSecret } from '../../utils/credentialsStore.js';
@@ -80,7 +81,7 @@ async function init() {
  */
 function detectPlatform() {
   try {
-    currentPlatform = window.electronAPI.getPlatform();
+    currentPlatform = window.xivtc.getPlatform();
     document.body.classList.add(`platform-${currentPlatform}`);
     console.log('[Settings] Platform detected:', currentPlatform);
   } catch (error) {
@@ -132,7 +133,7 @@ function switchTab(tabId) {
  */
 async function loadConfig() {
   try {
-    const response = await window.electronAPI.backend.call('/api/config', {
+    const response = await window.xivtc.backend.call('/api/config', {
       method: 'GET'
     });
     if (response.ok && response.data) {
@@ -338,7 +339,7 @@ async function persistConfig(closeWindow) {
     console.log('[Settings] Saving configuration:', formData);
     
     // Step 1: Save configuration
-    const response = await window.electronAPI.backend.call('/api/config', {
+    const response = await window.xivtc.backend.call('/api/config', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: formData
@@ -357,7 +358,7 @@ async function persistConfig(closeWindow) {
     if (currentPlatform === 'darwin') {
       console.log('[Settings] Applying Wine settings to registry...');
       
-      const applyResponse = await window.electronAPI.backend.call('/api/wine/apply-settings', {
+      const applyResponse = await window.xivtc.backend.call('/api/wine/apply-settings', {
         method: 'POST'
       });
       
@@ -381,7 +382,7 @@ async function persistConfig(closeWindow) {
     const dalamudEnabledChanged = oldDalamudEnabled !== newDalamudEnabled;
     
     console.log('[Settings] Notifying login page of config change');
-    window.electronAPI.events.send('config-changed', {
+    window.xivtc.events.send('config-changed', {
       gamePathChanged,
       dalamudEnabledChanged: dalamudEnabledChanged ? newDalamudEnabled : undefined,
       newGamePath
@@ -429,7 +430,7 @@ function initGeneralTab() {
   // Open LOG path
   document.getElementById('openLogPathButton').addEventListener('click', async () => {
     try {
-      const result = await window.electronAPI.openLogFolder();
+      const result = await window.xivtc.openLogFolder();
       if (!result.success) {
         console.error('[Settings] Failed to open log folder:', result.error);
       }
@@ -441,10 +442,10 @@ function initGeneralTab() {
   // Browse game path
   document.getElementById('browseGamePathButton').addEventListener('click', async () => {
     try {
-      const result = await window.electronAPI.selectDirectory();
+      const result = await window.xivtc.selectDirectory();
       if (result && result.success && result.path) {
         // 驗證遊戲目錄是否有效（需包含 boot 和 game 子目錄）
-        const validation = await window.electronAPI.validateGameDirectory(result.path);
+        const validation = await window.xivtc.validateGameDirectory(result.path);
         console.log('[Settings] Game directory validation:', validation);
         
         if (!validation.valid) {
@@ -491,7 +492,7 @@ function initGeneralTab() {
       if (success) {
         alert(i18n.t('settings.general.clear_otp_success', { email }));
         // 通知登入頁刷新帳號狀態
-        window.electronAPI.events.send('config-changed', {});
+        window.xivtc.events.send('config-changed', {});
       } else {
         alert(i18n.t('settings.general.clear_otp_not_found', { email }));
       }
@@ -581,7 +582,7 @@ async function openWineTool(tool) {
     showLoadingOverlay(i18n.t('settings.wine.launching_tool'));
     console.log(`[Settings] Launching Wine tool: ${tool}`);
 
-    await window.electronAPI.backend.call(`/api/wine/launch/${tool}`, {
+    await window.xivtc.backend.call(`/api/wine/launch/${tool}`, {
       method: 'POST'
     });
 
@@ -616,7 +617,7 @@ async function refreshDiscordRpcStatus() {
   if (currentPlatform !== 'darwin') return;
 
   try {
-    const response = await window.electronAPI.backend.call('/api/discord-rpc/status', { method: 'GET' });
+    const response = await window.xivtc.backend.call('/api/discord-rpc/status', { method: 'GET' });
     if (!response.ok) {
       updateDiscordRpcButtonStates(false);
       renderDiscordRpcStatus(i18n.t('settings.discord_rpc.status_error'), true);
@@ -648,7 +649,7 @@ async function refreshDiscordRpcStatus() {
 async function installDiscordRpcBridge() {
   try {
     showLoadingOverlay(i18n.t('settings.discord_rpc.installing'));
-    const response = await window.electronAPI.backend.call('/api/discord-rpc/install', { method: 'POST' });
+    const response = await window.xivtc.backend.call('/api/discord-rpc/install', { method: 'POST' });
     if (!response.ok) {
       throw new Error(response.data?.message || response.statusText || 'Install failed');
     }
@@ -666,7 +667,7 @@ async function installDiscordRpcBridge() {
 async function removeDiscordRpcBridge() {
   try {
     showLoadingOverlay(i18n.t('settings.discord_rpc.removing'));
-    const response = await window.electronAPI.backend.call('/api/discord-rpc/remove', { method: 'POST' });
+    const response = await window.xivtc.backend.call('/api/discord-rpc/remove', { method: 'POST' });
     if (!response.ok) {
       throw new Error(response.data?.message || response.statusText || 'Remove failed');
     }
@@ -765,7 +766,7 @@ async function handleTestLaunch() {
     // Show game running overlay
     overlay.style.display = 'flex';
     
-    const response = await window.electronAPI.backend.call('/api/game/fake-launch', {
+    const response = await window.xivtc.backend.call('/api/game/fake-launch', {
       method: 'POST'
     });
     
@@ -816,7 +817,7 @@ async function handleTestLaunch() {
  */
 async function loadDalamudVersion() {
   try {
-    const response = await window.electronAPI.backend.call('/api/dalamud/status');
+    const response = await window.xivtc.backend.call('/api/dalamud/status');
     if (response.ok && response.data) {
       const result = response.data.success ? response.data.data : response.data;
       document.getElementById('dalamudVersion').textContent = result.localVersion || 'Unknown';
@@ -840,7 +841,7 @@ function initAboutTab() {
   // GitHub link
   document.getElementById('githubLink').addEventListener('click', async () => {
     try {
-      await window.electronAPI.openExternal('https://github.com/PlusoneChiang/XIVTheCalamity');
+      await window.xivtc.openExternal('https://github.com/PlusoneChiang/XIVTheCalamity');
     } catch (error) {
       console.error('[Settings] Failed to open GitHub:', error);
     }
@@ -854,7 +855,7 @@ function initAboutTab() {
  */
 async function loadVersion() {
   try {
-    const versionData = await window.electronAPI.getVersion();
+    const versionData = await window.xivtc.getVersion();
     document.getElementById('appVersion').textContent = versionData.version;
   } catch (error) {
     console.error('[Settings] Failed to load version:', error);
@@ -964,7 +965,7 @@ async function setDalamudTabEnabled(enabled) {
     console.log(`[Settings] Setting Dalamud tab ${action} via Konami code`);
     
     // 1. Call API to update configuration - immediately save the setting
-    const response = await window.electronAPI.backend.call('/api/config', {
+    const response = await window.xivtc.backend.call('/api/config', {
       method: 'PATCH',
       body: JSON.stringify({
         launcher: {

@@ -60,7 +60,7 @@ export async function startUpdate() {
   
   try {
     // Get game path from config
-    const configResponse = await window.electronAPI.backend.call('/api/config', {
+    const configResponse = await window.xivtc.backend.call('/api/config', {
       method: 'GET'
     });
     
@@ -82,7 +82,7 @@ export async function startUpdate() {
     
     // 驗證遊戲路徑是否有效（需包含 boot 和 game 子目錄）
     try {
-      const validation = await window.electronAPI.validateGameDirectory(gamePath);
+      const validation = await window.xivtc.validateGameDirectory(gamePath);
       console.log('[UPDATE] Game directory validation:', validation);
       
       if (!validation.valid) {

@@ -109,7 +109,7 @@ html {
         0 4px 16px rgba(0, 0, 0, 0.3),
         inset 0 1px 1px rgba(255, 255, 255, 0.15);
     z-index: 3;
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
     pointer-events: auto;
@@ -1190,4 +1190,62 @@ html[data-theme="valentine"] .btn-danger span,
 html[data-theme="valentine"] .btn-success,
 html[data-theme="valentine"] .btn-success span {
     color: #ffffff;
+}
+
+/* Settings Modal Styles */
+.settings-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 20000;
+}
+
+.settings-modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: opacity 0.3s ease;
+}
+
+.settings-modal-content {
+    position: relative;
+    width: 800px;
+    height: 632px;
+    background: #1a1a1a;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.7);
+    z-index: 20001;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    animation: settingsModalScaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes settingsModalScaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+#settingsFrame {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: transparent;
 }

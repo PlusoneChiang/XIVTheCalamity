@@ -22,7 +22,7 @@ let initialCheckDone = false;
  * The Promise never resolves if the user chooses "Restart Now".
  */
 export async function initAppUpdater() {
-  if (!window.electronAPI?.updater) {
+  if (!window.xivtc?.updater) {
     console.log('[APP-UPDATE] updater API not available');
     return;
   }
@@ -32,13 +32,13 @@ export async function initAppUpdater() {
   return new Promise((resolve) => {
     resolveUpdatePromise = resolve;
 
-    window.electronAPI.updater.onChecking(() => {
+    window.xivtc.updater.onChecking(() => {
       updateState = 'checking';
       console.log('[APP-UPDATE] Checking for app updates...');
       showTitleBarProgress(0, i18n.t('app_update.checking'));
     });
 
-    window.electronAPI.updater.onAvailable((data) => {
+    window.xivtc.updater.onAvailable((data) => {
       updateState = 'available';
       pendingVersion = data.version;
       pendingReleaseNotes = data.releaseNotes || null;
@@ -53,7 +53,7 @@ export async function initAppUpdater() {
       }
     });
 
-    window.electronAPI.updater.onNotAvailable(() => {
+    window.xivtc.updater.onNotAvailable(() => {
       updateState = 'idle';
       console.log('[APP-UPDATE] App is up to date');
       hideTitleBarProgress();
@@ -63,7 +63,7 @@ export async function initAppUpdater() {
       }
     });
 
-    window.electronAPI.updater.onProgress((data) => {
+    window.xivtc.updater.onProgress((data) => {
       updateState = 'downloading';
       const percent = Math.round(data.percent);
       const speedMB = (data.bytesPerSecond / 1024 / 1024).toFixed(1);
@@ -71,7 +71,7 @@ export async function initAppUpdater() {
       showTitleBarProgress(percent, msg);
     });
 
-    window.electronAPI.updater.onDownloaded((data) => {
+    window.xivtc.updater.onDownloaded((data) => {
       updateState = 'downloaded';
       pendingVersion = data.version;
       console.log('[APP-UPDATE] Update downloaded:', data.version);
@@ -79,7 +79,7 @@ export async function initAppUpdater() {
       showRestartDialog(data.version);
     });
 
-    window.electronAPI.updater.onError((data) => {
+    window.xivtc.updater.onError((data) => {
       updateState = 'error';
       console.error('[APP-UPDATE] Update error:', data.message);
       hideTitleBarProgress();
@@ -91,7 +91,7 @@ export async function initAppUpdater() {
     });
 
     console.log('[APP-UPDATE] Listeners ready, triggering update check');
-    window.electronAPI.updater.check().then((result) => {
+    window.xivtc.updater.check().then((result) => {
       console.log('[APP-UPDATE] Check result:', result);
       if (result?.skipped) {
         console.log('[APP-UPDATE] Update check skipped (dev mode)');
@@ -198,7 +198,7 @@ function showUpdateDialog(version, releaseNotes) {
     dialog.querySelector('.app-update-dialog-title').textContent = i18n.t('app_update.starting');
     dialog.querySelector('.app-update-dialog-buttons').remove();
 
-    await window.electronAPI.updater.download();
+    await window.xivtc.updater.download();
   });
 
   document.getElementById('appUpdateLaterBtn').addEventListener('click', () => {
@@ -236,7 +236,7 @@ function showRestartDialog(version) {
   document.body.appendChild(overlay);
 
   document.getElementById('appUpdateInstallBtn').addEventListener('click', async () => {
-    await window.electronAPI.updater.install();
+    await window.xivtc.updater.install();
   });
 
   document.getElementById('appUpdateLaterBtn').addEventListener('click', () => {

@@ -16,18 +16,6 @@ body {
   overflow: hidden;
 }
 
-/* Draggable Title Bar */
-.title-bar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 32px;
-  -webkit-app-region: drag;
-  z-index: 9999;
-  background: transparent;
-}
-
 /* Main Container */
 .settings-container {
   position: relative;
@@ -35,7 +23,7 @@ body {
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 42px 16px 10px;
+  padding: 16px 16px 10px;
 }
 
 /* Background with mask */
@@ -114,6 +102,7 @@ body {
 /* Tab Content Container */
 .tab-content-container {
   flex: 1;
+  min-height: 0; /* Constraints flex item height to allow overflow scrolling */
   overflow-y: auto;
   overflow-x: hidden;
   background: rgba(80, 80, 80, 0.65);
@@ -128,7 +117,20 @@ body {
 }
 
 .tab-content-container::-webkit-scrollbar {
-  display: none;
+  width: 6px;
+}
+
+.tab-content-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tab-content-container::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+.tab-content-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .tab-content {
