@@ -1,9 +1,6 @@
 name: Build & Pre-release (Manual)
 
 on:
-  push:
-    branches:
-      - 'feature/wine_upgrade'
   workflow_dispatch:
     inputs:
       skip_notarize:
