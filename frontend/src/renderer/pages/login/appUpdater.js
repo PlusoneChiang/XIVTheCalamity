@@ -22,6 +22,10 @@ let initialCheckDone = false;
  * The Promise never resolves if the user chooses "Restart Now".
  */
 export async function initAppUpdater() {
+  // 測試版本暫時關閉更新檢查
+  console.log('[APP-UPDATE] Update checking temporarily disabled for test version');
+  return;
+
   if (!window.xivtc?.updater) {
     console.log('[APP-UPDATE] updater API not available');
     return;
