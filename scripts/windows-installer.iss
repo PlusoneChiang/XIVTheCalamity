@@ -6,15 +6,15 @@ DefaultGroupName=XIVTheCalamity
 UninstallDisplayIcon={app}\XIVTheCalamity.exe
 Compression=lzma2
 SolidCompression=yes
-OutputDir=Release
+OutputDir=..\Release
 OutputBaseFilename=XIVTheCalamity-{#AppVersion}-win-x64-installer
-SetupIconFile=frontend\build\icon.ico
+SetupIconFile=..\frontend\build\icon.ico
 DisableProgramGroupPage=yes
 DisableWelcomePage=no
 
 [Files]
-Source: "Release\win-out\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "shared\resources\*"; DestDir: "{app}\resources"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\Release\win-out\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\shared\resources\*"; DestDir: "{app}\resources"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\XIVTheCalamity"; Filename: "{app}\XIVTheCalamity.exe"
