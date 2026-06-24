@@ -34,12 +34,23 @@ public static class ConfigEndpoints
         group.MapPut("/", async (
             AppConfig config,
             ConfigService configService,
+            XIVTheCalamity.Services.EventBroadcastHub eventHub,
             ILogger<Program> logger) =>
         {
             try
             {
                 logger.LogInformation("Updating application config");
                 await configService.SaveConfigAsync(config);
+                XIVTheCalamity.MainWindowContainer.UpdateDevMode(config.Launcher.DevelopmentMode);
+                try
+                {
+                    var dataElement = System.Text.Json.JsonSerializer.SerializeToElement(config, AppJsonContext.Default.AppConfig);
+                    eventHub.Broadcast("config-updated", dataElement);
+                }
+                catch (Exception broadcastEx)
+                {
+                    logger.LogWarning(broadcastEx, "Failed to broadcast config-updated event on PUT");
+                }
                 return Results.Ok(ApiResponse<AppConfig>.Ok(config));
             }
             catch (ArgumentException ex)
@@ -55,11 +66,11 @@ public static class ConfigEndpoints
             }
         });
 
-        // PATCH /api/config
         group.MapPatch("/", async (
             AppConfig partialConfig,
             ConfigService configService,
             IEnvironmentService environmentService,
+            XIVTheCalamity.Services.EventBroadcastHub eventHub,
             ILogger<Program> logger) =>
         {
             try
@@ -118,6 +129,16 @@ public static class ConfigEndpoints
                 }
                 
                 await configService.SaveConfigAsync(currentConfig);
+                XIVTheCalamity.MainWindowContainer.UpdateDevMode(currentConfig.Launcher.DevelopmentMode);
+                try
+                {
+                    var dataElement = System.Text.Json.JsonSerializer.SerializeToElement(currentConfig, AppJsonContext.Default.AppConfig);
+                    eventHub.Broadcast("config-updated", dataElement);
+                }
+                catch (Exception broadcastEx)
+                {
+                    logger.LogWarning(broadcastEx, "Failed to broadcast config-updated event on PATCH");
+                }
                 
                 try
                 {
@@ -144,15 +165,25 @@ public static class ConfigEndpoints
             }
         });
 
-        // POST /api/config/reset
         group.MapPost("/reset", async (
             ConfigService configService,
+            XIVTheCalamity.Services.EventBroadcastHub eventHub,
             ILogger<Program> logger) =>
         {
             try
             {
                 logger.LogInformation("Resetting application config to default");
                 var config = await configService.ResetToDefaultAsync();
+                XIVTheCalamity.MainWindowContainer.UpdateDevMode(config.Launcher.DevelopmentMode);
+                try
+                {
+                    var dataElement = System.Text.Json.JsonSerializer.SerializeToElement(config, AppJsonContext.Default.AppConfig);
+                    eventHub.Broadcast("config-updated", dataElement);
+                }
+                catch (Exception broadcastEx)
+                {
+                    logger.LogWarning(broadcastEx, "Failed to broadcast config-updated event on reset");
+                }
                 return Results.Ok(ApiResponse<AppConfig>.Ok(config));
             }
             catch (Exception ex)

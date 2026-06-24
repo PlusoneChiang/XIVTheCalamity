@@ -77,13 +77,14 @@ public class Program
             // API 呼叫由 polyfill 直接使用 http://localhost:{port}，不透過此 handler
             var virtualHostClient = new HttpClient { BaseAddress = new Uri($"http://localhost:{port}") };
 
+            var isDevMode = IsDevelopmentMode();
             var window = new PhotinoWindow()
                 .SetTitle("XIV The Calamity")
                 .SetSize(910, 714) // 910 width, 682 content size + 32px macOS titlebar height
                 .SetUseOsDefaultSize(false)
                 .SetResizable(false)
-                .SetDevToolsEnabled(true)
-                .SetContextMenuEnabled(true)
+                .SetDevToolsEnabled(isDevMode)
+                .SetContextMenuEnabled(isDevMode)
                 .SetWebSecurityEnabled(false)
                 .RegisterCustomSchemeHandler("xivtc", (object sender, string scheme, string request, out string contentType) =>
                 {
@@ -162,6 +163,26 @@ public class Program
         {
             Log.CloseAndFlush();
         }
+    }
+
+    public static bool IsDevelopmentMode()
+    {
+        try
+        {
+            var appSupport = GetAppSupportPath();
+            var configPath = Path.Combine(appSupport, "XIVTheCalamity", "config.json");
+            if (File.Exists(configPath))
+            {
+                var configJson = File.ReadAllText(configPath);
+                var config = System.Text.Json.JsonSerializer.Deserialize(configJson, AppJsonContext.Default.AppConfig);
+                return config?.Launcher?.DevelopmentMode ?? false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "[DevModeCheck] Failed to read config to check DevelopmentMode");
+        }
+        return false;
     }
 
     private static void PrepareEnvironment()

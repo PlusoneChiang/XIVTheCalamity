@@ -176,5 +176,53 @@ if (!window.xivtc) {
     }
   };
 
+  // Live DevMode state tracking
+  let isDevMode = false;
+
+  function updateLocalDevMode(config) {
+    if (config && config.launcher) {
+      isDevMode = !!config.launcher.developmentMode;
+      console.log('[Polyfill] Local devMode updated to:', isDevMode);
+    }
+  }
+
+  // Fetch initial configuration from backend
+  fetch(`${backendUrl}/api/config`)
+    .then(res => res.json())
+    .then(json => {
+      if (json && json.success && json.data) {
+        updateLocalDevMode(json.data);
+      }
+    })
+    .catch(err => console.error('[Polyfill] Failed to fetch initial config:', err));
+
+  // Listen to live config updates from backend
+  window.xivtc.events.on('config-updated', (config) => {
+    updateLocalDevMode(config);
+  });
+
+  // Global event interceptor for context menu
+  document.addEventListener('contextmenu', (e) => {
+    if (!isDevMode) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, true);
+
+  // Global event interceptor for developer tools keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    if (isDevMode) return;
+
+    // Block F12, Ctrl+Shift+I, Cmd+Option+I
+    const isF12 = e.key === 'F12' || e.keyCode === 123;
+    const isCtrlShiftI = (e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'i' || e.key === 'I' || e.keyCode === 73);
+    const isCmdOptI = e.metaKey && e.altKey && (e.key === 'i' || e.key === 'I' || e.keyCode === 73);
+
+    if (isF12 || isCtrlShiftI || isCmdOptI) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, true);
+
   console.log('[Polyfill] window.xivtc polyfill successfully initialized');
 }

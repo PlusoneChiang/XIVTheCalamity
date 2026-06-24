@@ -67,13 +67,14 @@ public static class MainWindowContainer
                     else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
                         platformStr = "win32";
 
-                    Log.Information("[MainWindowContainer] Instantiating settings window (Width: 800, Height: 632)");
+                    var isDevMode = Program.IsDevelopmentMode();
+                    Log.Information("[MainWindowContainer] Instantiating settings window (Width: 800, Height: 632, DevTools: {DevTools})", isDevMode);
                     _settingsWindow = new PhotinoWindow()
                         .SetTitle("Settings - XIVTheCalamity")
                         .SetSize(800, 632) // 800 width, 600 content size + 32px macOS titlebar height
                         .SetResizable(false)
-                        .SetDevToolsEnabled(true)
-                        .SetContextMenuEnabled(true)
+                        .SetDevToolsEnabled(isDevMode)
+                        .SetContextMenuEnabled(isDevMode)
                         .SetWebSecurityEnabled(false)
                         .Center()
                         .Load(new Uri($"http://localhost:{Port}/settings.html?platform={platformStr}"));
@@ -100,5 +101,40 @@ public static class MainWindowContainer
         });
 
         return tcs.Task;
+    }
+
+    public static void UpdateDevMode(bool isDevMode)
+    {
+        MainWindow?.Invoke(() =>
+        {
+            try
+            {
+                MainWindow.SetDevToolsEnabled(isDevMode);
+                MainWindow.SetContextMenuEnabled(isDevMode);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "[MainWindowContainer] Failed to update DevMode on MainWindow");
+            }
+        });
+
+        lock (_lock)
+        {
+            if (_settingsWindow != null)
+            {
+                _settingsWindow.Invoke(() =>
+                {
+                    try
+                    {
+                        _settingsWindow.SetDevToolsEnabled(isDevMode);
+                        _settingsWindow.SetContextMenuEnabled(isDevMode);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warning(ex, "[MainWindowContainer] Failed to update DevMode on settings window");
+                    }
+                });
+            }
+        }
     }
 }
