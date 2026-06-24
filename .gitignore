@@ -19,6 +19,10 @@ shared/resources/bin/
 frontend/node_modules/
 frontend/dist/
 
+# Backend wwwroot — build artifact copied from frontend/dist/ by build script
+# Do not commit; regenerate via: cd frontend && npm run build:renderer && cp -R dist/* ../backend/src/XIVTheCalamity/wwwroot/
+backend/src/XIVTheCalamity/wwwroot/
+
 # Documentation (開發文件不上傳)
 docs/
 
