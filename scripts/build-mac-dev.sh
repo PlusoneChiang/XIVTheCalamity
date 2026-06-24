@@ -82,7 +82,7 @@ chmod +x "$APP_DIR/Contents/MacOS/XIVTheCalamity"
 cp "$PROJECT_ROOT/backend/src/XIVTheCalamity/bin/Release/publish/"*.dylib "$APP_DIR/Contents/MacOS/" 2>/dev/null || true
 
 # Copy wwwroot web assets
-cp -R "$PROJECT_ROOT/backend/src/XIVTheCalamity/bin/Release/publish/wwwroot" "$APP_DIR/Contents/MacOS/"
+cp -R "$PROJECT_ROOT/backend/src/XIVTheCalamity/bin/Release/publish/wwwroot" "$APP_DIR/Contents/Resources/"
 
 # Copy Info.plist and Icon
 cp "$PROJECT_ROOT/backend/src/XIVTheCalamity/Info.plist" "$APP_DIR/Contents/Info.plist"
@@ -90,6 +90,15 @@ cp "$PROJECT_ROOT/frontend/build/XIVTC.icns" "$APP_DIR/Contents/Resources/"
 
 # Copy shared resources (including XTCAudioRouter in bin/)
 cp -R "$PROJECT_ROOT/shared/resources/"* "$APP_DIR/Contents/Resources/resources/"
+
+# Ad-hoc codesign — 不需要 Apple 憑證，讓 macOS TCC 以 Bundle ID 穩定識別 app
+# 避免每次 rebuild binary 改變後，macOS 重新要求資料夾存取授權
+echo ""
+echo "🔏 Ad-hoc codesigning app bundle..."
+# 先 sign dylibs 和主 binary（Contents/MacOS/ 只放執行檔，codesign 才能正常完成）
+find "$APP_DIR/Contents/MacOS" -name "*.dylib" -exec codesign --force --sign - {} \; 2>/dev/null || true
+codesign --force --sign - "$APP_DIR/Contents/MacOS/XIVTheCalamity"
+echo "   ✅ Ad-hoc codesign complete"
 
 # Check results
 if [ -d "$APP_DIR" ]; then

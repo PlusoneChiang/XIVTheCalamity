@@ -230,17 +230,26 @@ public class Program
 
         if (!Directory.Exists(Path.Combine(contentRoot, webRoot)))
         {
-            var devContentRoot = Directory.GetCurrentDirectory();
-            if (Directory.Exists(Path.Combine(devContentRoot, webRoot)))
+            // macOS .app bundle: binary 在 Contents/MacOS/，wwwroot 在 Contents/Resources/
+            var resourcesDir = Path.Combine(contentRoot, "..", "Resources");
+            if (Directory.Exists(Path.Combine(resourcesDir, webRoot)))
             {
-                contentRoot = devContentRoot;
+                contentRoot = Path.GetFullPath(resourcesDir);
             }
             else
             {
-                var parentDir = Directory.GetParent(devContentRoot)?.FullName;
-                if (parentDir != null && Directory.Exists(Path.Combine(parentDir, webRoot)))
+                var devContentRoot = Directory.GetCurrentDirectory();
+                if (Directory.Exists(Path.Combine(devContentRoot, webRoot)))
                 {
-                    contentRoot = parentDir;
+                    contentRoot = devContentRoot;
+                }
+                else
+                {
+                    var parentDir = Directory.GetParent(devContentRoot)?.FullName;
+                    if (parentDir != null && Directory.Exists(Path.Combine(parentDir, webRoot)))
+                    {
+                        contentRoot = parentDir;
+                    }
                 }
             }
         }
