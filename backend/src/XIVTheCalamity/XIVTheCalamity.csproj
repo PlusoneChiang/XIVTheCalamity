@@ -4,7 +4,7 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>2.0.0-beta</Version>
+    <Version>2.0.0-beta.1</Version>
     
     <!-- NativeAOT 配置 -->
     <PublishAot>true</PublishAot>
