@@ -91,7 +91,7 @@ if (!window.xivtc) {
     },
     getVersion: async () => {
       const res = await apiCall('/api/app/get-version', 'GET');
-      return res.data || { appName: 'XIVTheCalamity', version: '1.9.3' };
+      return res.data || { appName: 'XIVTheCalamity', version: '2.0.0' };
     },
     openLogFolder: async () => {
       const res = await apiCall('/api/app/open-log-folder', 'POST');

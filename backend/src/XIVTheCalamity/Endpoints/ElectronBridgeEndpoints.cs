@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Threading;
@@ -154,7 +155,19 @@ public static class ElectronBridgeEndpoints
         // 5. App version
         app.MapGet("/api/app/get-version", () =>
         {
-            return Results.Ok(new VersionInfoResponse("1.9.3", "XIVTheCalamity", "Final Fantasy XIV Cross-Platform Launcher"));
+            var informationalVersion = typeof(XIVTheCalamity.Program).Assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+                .InformationalVersion;
+
+            // .NET 8+ 會在資訊版本號尾部加上 git commit hash (例如 2.0.0-alpha+1a2b3c)
+            // 這裡做個分割處理，只保留前面乾淨的版本號部分
+            if (informationalVersion != null && informationalVersion.Contains('+'))
+            {
+                informationalVersion = informationalVersion.Split('+')[0];
+            }
+
+            var appVersion = informationalVersion ?? "2.0.0";
+            return Results.Ok(new VersionInfoResponse(appVersion, "XIVTheCalamity", "Final Fantasy XIV Cross-Platform Launcher"));
         });
 
         // 6. Log folder

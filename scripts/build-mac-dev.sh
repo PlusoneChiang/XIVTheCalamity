@@ -46,6 +46,10 @@ echo "📦 Building Frontend (Vite)..."
 cd "$PROJECT_ROOT/frontend"
 npm run build:renderer
 
+# Read version from XIVTheCalamity.csproj
+VERSION=$(grep -oE '<Version>[^<]+</Version>' "$PROJECT_ROOT/backend/src/XIVTheCalamity/XIVTheCalamity.csproj" | sed -E 's/<\/?Version>//g' | tr -d '[:space:]')
+echo "   📦 Current version from XIVTheCalamity.csproj: $VERSION"
+
 # Copy static assets to C# project
 echo "   Copying frontend assets to C# wwwroot..."
 cp -R dist/* "$PROJECT_ROOT/backend/src/XIVTheCalamity/wwwroot/"
@@ -86,19 +90,35 @@ cp -R "$PROJECT_ROOT/backend/src/XIVTheCalamity/bin/Release/publish/wwwroot" "$A
 
 # Copy Info.plist and Icon
 cp "$PROJECT_ROOT/backend/src/XIVTheCalamity/Info.plist" "$APP_DIR/Contents/Info.plist"
+plutil -replace CFBundleShortVersionString -string "$VERSION" "$APP_DIR/Contents/Info.plist"
+plutil -replace CFBundleVersion -string "$VERSION" "$APP_DIR/Contents/Info.plist"
 cp "$PROJECT_ROOT/frontend/build/XIVTC.icns" "$APP_DIR/Contents/Resources/"
 
 # Copy shared resources (including XTCAudioRouter in bin/)
 cp -R "$PROJECT_ROOT/shared/resources/"* "$APP_DIR/Contents/Resources/resources/"
 
-# Ad-hoc codesign — 不需要 Apple 憑證，讓 macOS TCC 以 Bundle ID 穩定識別 app
-# 避免每次 rebuild binary 改變後，macOS 重新要求資料夾存取授權
+# Codesign app bundle — 優先使用本機開發憑證，若無則回退至 Ad-hoc 簽名
+# 這可以讓 macOS TCC 以穩定的認證主體識別 App，避免每次重新編譯後重新要求 Documents 等目錄授權
 echo ""
-echo "🔏 Ad-hoc codesigning app bundle..."
-# 先 sign dylibs 和主 binary（Contents/MacOS/ 只放執行檔，codesign 才能正常完成）
-find "$APP_DIR/Contents/MacOS" -name "*.dylib" -exec codesign --force --sign - {} \; 2>/dev/null || true
-codesign --force --sign - "$APP_DIR/Contents/MacOS/XIVTheCalamity"
-echo "   ✅ Ad-hoc codesign complete"
+echo "🔏 Code signing app bundle..."
+
+SIGNING_IDENTITY="-"
+if command -v security &> /dev/null; then
+    # 自動尋找金鑰圈中有效的本機開發憑證（如 Apple Development 或 Mac Developer）
+    LOCAL_ID=$(security find-identity -v -p codesigning | grep -E "Apple Development|Mac Developer" | head -n 1 | grep -oE '"[^"]+"' | tr -d '"')
+    if [ ! -z "$LOCAL_ID" ]; then
+        SIGNING_IDENTITY="$LOCAL_ID"
+        echo "   🔍 Detected local developer certificate: $SIGNING_IDENTITY"
+    else
+        echo "   ℹ️ No Apple Development certificate found in Keychain, using Ad-hoc (-)"
+    fi
+fi
+
+# 1. 先強制簽名內嵌的 dynamic libraries 與執行檔
+find "$APP_DIR/Contents/MacOS" -name "*.dylib" -exec codesign --force --sign "$SIGNING_IDENTITY" {} \; 2>/dev/null || true
+# 2. 對整個 .app Bundle 進行深層遞迴簽名
+codesign --force --deep --sign "$SIGNING_IDENTITY" "$APP_DIR"
+echo "   ✅ Code sign complete"
 
 # Check results
 if [ -d "$APP_DIR" ]; then
