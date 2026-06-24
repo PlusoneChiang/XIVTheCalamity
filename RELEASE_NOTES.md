@@ -1,5 +1,33 @@
 # Release Notes
 
+## v1.9.3
+#### 🇹🇼 zh-TW
+### 🔧 調整與優化
+- Mac版 - 升級 Winecx 到 Wine 11 版本
+- Mac版 - 移除輸入法定位點設定功能 (Wine 11 已不支援)
+- Mac版 - 移除 DXVK 並改為原生 DXMT，並升級 DXMT 到 v0.80
+- Mac版 - 簡化音訊路由 (Audio Routing) 實作，提升相容性
+- Linux版 - 調整沙盒環境檢測方式
+- Linux版 - 修正環境變數注入、啟動參數注入方式
+- 改善中國服 (陸服) Dalamud 套件相容性
+- 修正前端，導入現代化架構加快載入速度
+- 使用前端套件取代原先自行開發的模組，強化相容性與安全性
+- 後端重構，強化可維護性
+
+#### 🇺🇸 English
+### 🔧 Changes & Optimizations
+- Mac - Upgraded Winecx to Wine 11.
+- Mac - Removed IME candidate window positioning settings (no longer supported in Wine 11).
+- Mac - Removed DXVK and switched to native DXMT, and upgraded DXMT to v0.80.
+- Mac - Simplified audio routing implementation for better compatibility.
+- Linux - Adjusted sandbox environment detection method.
+- Linux - Fixed environment variables and launch options injection methods.
+- Improved compatibility for Chinese-server Dalamud plugins.
+- Refactored frontend and introduced a modernized architecture to speed up load times.
+- Replaced self-developed frontend features with external packages to enhance compatibility and security.
+- Refactored the backend to improve maintainability.
+
+
 ## v1.8.8
 #### 🇹🇼 zh-TW
 ### ✨ 新功能 (Mac版本)
