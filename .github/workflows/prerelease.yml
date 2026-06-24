@@ -138,7 +138,7 @@ jobs:
           mkdir -p "$APP_DIR/Contents/Resources/resources"
           
           cp Release/mac-out/XIVTheCalamity "$APP_DIR/Contents/MacOS/XIVTheCalamity"
-          cp -R Release/mac-out/wwwroot "$APP_DIR/Contents/MacOS/"
+          cp -R Release/mac-out/wwwroot "$APP_DIR/Contents/Resources/"
           
           # Get version from package.json
           VERSION=$(node -p "require('./frontend/package.json').version")
