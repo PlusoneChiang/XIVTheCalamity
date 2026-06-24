@@ -22,7 +22,7 @@ public class WineDalamudInjector : IDalamudInjector
     protected const int ProcessDetectionMaxRetries = 10;
     protected const int ProcessDetectionRetryDelayMs = 500;
     protected const int InjectorTimeoutMs = 60000;
-    protected const int ClientLanguageChinese = 5;
+    protected const int ClientLanguageChinese = 4;
 
     public WineDalamudInjector(
         ILogger<WineDalamudInjector> logger,

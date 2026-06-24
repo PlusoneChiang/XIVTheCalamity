@@ -25,7 +25,7 @@ public class WindowsDalamudInjector : IDalamudInjector
     private const int ProcessDetectionMaxRetries = 10;
     private const int ProcessDetectionRetryDelayMs = 500;
     private const int InjectorTimeoutMs = 60000;
-    private const int ClientLanguageChinese = 5;
+    private const int ClientLanguageChinese = 4;
 
     public WindowsDalamudInjector(
         ILogger<WindowsDalamudInjector> logger,
