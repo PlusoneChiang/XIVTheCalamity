@@ -40,7 +40,8 @@ public class AppConfig
                 EncryptedArguments = true,
                 ExitWithGame = true,
                 NonZeroExitError = true,
-                DevelopmentMode = false
+                DevelopmentMode = false,
+                EnablePreRelease = false
             }
         };
     }

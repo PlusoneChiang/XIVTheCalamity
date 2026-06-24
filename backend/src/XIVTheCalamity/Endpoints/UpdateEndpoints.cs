@@ -2,6 +2,8 @@ using XIVTheCalamity.DTOs;
 using XIVTheCalamity.Helpers;
 using XIVTheCalamity.Core.Models.Progress;
 using XIVTheCalamity.Game.Services;
+using XIVTheCalamity.Services;
+using XIVTheCalamity.Core.Models;
 
 namespace XIVTheCalamity.Endpoints;
 
@@ -84,6 +86,78 @@ public static class UpdateEndpoints
             }
             
             return Results.Empty;
+        });
+
+        // GET /api/update/check
+        group.MapGet("/check", async (
+            AppUpdaterService appUpdaterService,
+            ILogger<Program> logger) =>
+        {
+            try
+            {
+                var result = await appUpdaterService.CheckForUpdatesAsync();
+                return Results.Ok(ApiResponse<AppUpdateCheckResult>.Ok(result));
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to check for launcher updates");
+                return Results.Json(ApiErrorResponse.Create("INTERNAL_ERROR", "Failed to check updates", ex.Message),
+                    AppJsonContext.Default.ApiErrorResponse, statusCode: 500);
+            }
+        });
+
+        // POST /api/update/download
+        group.MapPost("/download", (
+            string downloadUrl,
+            AppUpdaterService appUpdaterService,
+            ILogger<Program> logger) =>
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(downloadUrl))
+                {
+                    return Results.BadRequest(ApiErrorResponse.Create("VALIDATION_FAILED", "Download URL is required"));
+                }
+
+                // 在背景執行下載
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await appUpdaterService.DownloadUpdateAsync(downloadUrl);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "[AppUpdater-API] Background download failed");
+                    }
+                });
+
+                return Results.Ok(ApiResponse<string>.Ok("Download started"));
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to start update download");
+                return Results.Json(ApiErrorResponse.Create("INTERNAL_ERROR", "Failed to start download", ex.Message),
+                    AppJsonContext.Default.ApiErrorResponse, statusCode: 500);
+            }
+        });
+
+        // POST /api/update/install
+        group.MapPost("/install", (
+            AppUpdaterService appUpdaterService,
+            ILogger<Program> logger) =>
+        {
+            try
+            {
+                appUpdaterService.InstallUpdate();
+                return Results.Ok(ApiResponse<string>.Ok("Install initiated"));
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to execute installer");
+                return Results.Json(ApiErrorResponse.Create("INTERNAL_ERROR", "Failed to execute installer", ex.Message),
+                    AppJsonContext.Default.ApiErrorResponse, statusCode: 500);
+            }
         });
     }
 }

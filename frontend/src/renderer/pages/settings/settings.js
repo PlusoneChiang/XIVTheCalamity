@@ -202,6 +202,7 @@ function populateForm(config) {
     document.getElementById('language').value = config.launcher.language || 'zh-TW';
     i18n.setLocale(config.launcher.language || 'zh-TW');
     document.getElementById('debugLogging').checked = config.launcher.developmentMode || false;
+    document.getElementById('enablePreRelease').checked = config.launcher.enablePreRelease || false;
     updateDebugOnlyVisibility();
     
     const savedTheme = config.launcher.theme || 'dark';
@@ -266,6 +267,7 @@ function collectFormData() {
   const formData = {
     launcher: {
       developmentMode: document.getElementById('debugLogging').checked,
+      enablePreRelease: document.getElementById('enablePreRelease').checked,
       language: document.getElementById('language').value,
       theme: document.querySelector('input[name="theme"]:checked')?.value || 'dark',
       // Preserve showDalamudTab from current config (set via Konami code)

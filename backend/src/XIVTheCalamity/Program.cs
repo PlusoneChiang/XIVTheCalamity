@@ -390,6 +390,7 @@ public class Program
         }
 
         builder.Services.AddSingleton<EventBroadcastHub>();
+        builder.Services.AddSingleton<AppUpdaterService>();
 
         // CORS 設定
         builder.Services.AddCors(options =>

@@ -36,6 +36,11 @@ public class LauncherConfig
     public bool ShowDalamudTab { get; set; } = false;
 
     /// <summary>
+    /// 接收測試通道更新 (Receive pre-release updates)
+    /// </summary>
+    public bool EnablePreRelease { get; set; } = false;
+
+    /// <summary>
     /// UI theme (dark, light, valentine)
     /// </summary>
     public string Theme { get; set; } = "dark";

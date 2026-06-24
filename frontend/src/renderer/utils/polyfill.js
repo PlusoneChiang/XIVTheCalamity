@@ -47,6 +47,14 @@ if (!window.xivtc) {
     }
   }
 
+  let currentUpdateInfo = null;
+  let checkingListeners = [];
+  let availableListeners = [];
+  let notAvailableListeners = [];
+  let progressListeners = [];
+  let downloadedListeners = [];
+  let errorListeners = [];
+
   window.xivtc = {
     backend: {
       call: async (endpoint, options = {}) => {
@@ -164,15 +172,51 @@ if (!window.xivtc) {
       }
     },
     updater: {
-      check: async () => ({ success: true, skipped: true }),
-      download: async () => {},
-      install: async () => {},
-      onChecking: (cb) => () => {},
-      onAvailable: (cb) => () => {},
-      onNotAvailable: (cb) => () => {},
-      onProgress: (cb) => () => {},
-      onDownloaded: (cb) => () => {},
-      onError: (cb) => () => {}
+      check: async () => {
+        checkingListeners.forEach(cb => cb());
+        const res = await apiCall('/api/update/check', 'GET');
+        if (!res.success || !res.data || !res.data.success) {
+          const errMsg = res.error || (res.data && res.data.message) || 'Unknown error';
+          errorListeners.forEach(cb => cb({ message: errMsg }));
+          return { success: false, error: errMsg };
+        }
+        
+        const info = res.data.data;
+        if (info && info.updateAvailable) {
+          currentUpdateInfo = info;
+          availableListeners.forEach(cb => cb({
+            version: info.version,
+            releaseNotes: info.releaseNotes
+          }));
+          return { success: true, updateAvailable: true };
+        } else {
+          notAvailableListeners.forEach(cb => cb());
+          return { success: true, updateAvailable: false };
+        }
+      },
+      download: async () => {
+        if (!currentUpdateInfo || !currentUpdateInfo.downloadUrl) {
+          errorListeners.forEach(cb => cb({ message: 'No update available to download' }));
+          return;
+        }
+        const url = encodeURIComponent(currentUpdateInfo.downloadUrl);
+        const res = await apiCall(`/api/update/download?downloadUrl=${url}`, 'POST');
+        if (!res.success) {
+          errorListeners.forEach(cb => cb({ message: res.error || 'Failed to start download' }));
+        }
+      },
+      install: async () => {
+        const res = await apiCall('/api/update/install', 'POST');
+        if (!res.success) {
+          errorListeners.forEach(cb => cb({ message: res.error || 'Failed to install update' }));
+        }
+      },
+      onChecking: (cb) => { checkingListeners.push(cb); return () => { checkingListeners = checkingListeners.filter(x => x !== cb); }; },
+      onAvailable: (cb) => { availableListeners.push(cb); return () => { availableListeners = availableListeners.filter(x => x !== cb); }; },
+      onNotAvailable: (cb) => { notAvailableListeners.push(cb); return () => { notAvailableListeners = notAvailableListeners.filter(x => x !== cb); }; },
+      onProgress: (cb) => { progressListeners.push(cb); return () => { progressListeners = progressListeners.filter(x => x !== cb); }; },
+      onDownloaded: (cb) => { downloadedListeners.push(cb); return () => { downloadedListeners = downloadedListeners.filter(x => x !== cb); }; },
+      onError: (cb) => { errorListeners.push(cb); return () => { errorListeners = errorListeners.filter(x => x !== cb); }; }
     }
   };
 
@@ -199,6 +243,22 @@ if (!window.xivtc) {
   // Listen to live config updates from backend
   window.xivtc.events.on('config-updated', (config) => {
     updateLocalDevMode(config);
+  });
+
+  // Listen to live app update download progress
+  window.xivtc.events.on('app-update:download-progress', (data) => {
+    if (data) {
+      progressListeners.forEach(cb => cb({
+        percent: data.percent,
+        bytesPerSecond: data.bytesPerSecond
+      }));
+      
+      if (data.percent >= 100) {
+        downloadedListeners.forEach(cb => cb({
+          version: currentUpdateInfo ? currentUpdateInfo.version : ''
+        }));
+      }
+    }
   });
 
   // Global event interceptor for context menu

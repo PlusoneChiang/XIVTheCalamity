@@ -21,6 +21,11 @@ namespace XIVTheCalamity.Api.NativeAOT;
 [JsonSerializable(typeof(ProtonGeConfig))]
 [JsonSerializable(typeof(LoginResult))]
 [JsonSerializable(typeof(WineInitProgress))]
+[JsonSerializable(typeof(XIVTheCalamity.Core.Models.GitHubRelease))]
+[JsonSerializable(typeof(XIVTheCalamity.Core.Models.GitHubRelease[]))]
+[JsonSerializable(typeof(XIVTheCalamity.Core.Models.GitHubAsset))]
+[JsonSerializable(typeof(XIVTheCalamity.Core.Models.AppUpdateCheckResult))]
+[JsonSerializable(typeof(XIVTheCalamity.Core.Models.AppUpdateProgress))]
 
 // Wine Services (needed for DI parameter resolution on Windows)
 [JsonSerializable(typeof(WineConfigService))]
@@ -51,6 +56,7 @@ namespace XIVTheCalamity.Api.NativeAOT;
 [JsonSerializable(typeof(ApiResponse<LoginData>))]
 [JsonSerializable(typeof(ApiResponse<string>))]
 [JsonSerializable(typeof(ApiResponse<object>))]
+[JsonSerializable(typeof(ApiResponse<AppUpdateCheckResult>))]
 [JsonSerializable(typeof(ApiErrorResponse))]
 [JsonSerializable(typeof(ErrorDetails))]
 

@@ -125,6 +125,7 @@ public static class ConfigEndpoints
                     currentConfig.Launcher.NonZeroExitError = partialConfig.Launcher.NonZeroExitError;
                     currentConfig.Launcher.DevelopmentMode = partialConfig.Launcher.DevelopmentMode;
                     currentConfig.Launcher.ShowDalamudTab = partialConfig.Launcher.ShowDalamudTab;
+                    currentConfig.Launcher.EnablePreRelease = partialConfig.Launcher.EnablePreRelease;
                     currentConfig.Launcher.Language = partialConfig.Launcher.Language;
                 }
                 
