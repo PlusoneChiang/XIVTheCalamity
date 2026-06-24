@@ -34,6 +34,22 @@ jobs:
             exit 0
           fi
           
+          # Check version consistency for tag triggers
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            TAG_NAME="${GITHUB_REF#refs/tags/}"
+            VERSION=$(node -p "require('fs').readFileSync('backend/src/XIVTheCalamity/XIVTheCalamity.csproj', 'utf8').match(/<Version>(.*?)<\/Version>/)[1]")
+            EXPECTED_TAG="v${VERSION}"
+            echo "Triggered Tag: $TAG_NAME"
+            echo "Version in csproj: $VERSION (Expected Tag: $EXPECTED_TAG)"
+            
+            if [ "$TAG_NAME" != "$EXPECTED_TAG" ]; then
+              echo "❌ ERROR: Triggered tag ($TAG_NAME) does not match version in csproj ($EXPECTED_TAG)!"
+              echo "should_run=false" >> $GITHUB_OUTPUT
+              exit 1
+            fi
+            echo "✅ Version consistency check passed."
+          fi
+          
           DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
           echo "Default branch is: $DEFAULT_BRANCH"
           git fetch origin "$DEFAULT_BRANCH"

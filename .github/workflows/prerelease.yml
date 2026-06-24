@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check if pre-release version already exists
+      - name: Check if pre-release version already exists for the current commit
         id: check
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -30,7 +30,7 @@ jobs:
           echo "Target Pre-release Tag: $TAG"
           
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "❌ Pre-release $TAG already exists on GitHub. Version has not changed! Skipping build."
+            echo "❌ Pre-release $TAG already exists on GitHub (duplicated). Skipping build."
             echo "should_run=false" >> $GITHUB_OUTPUT
           else
             echo "✅ Pre-release $TAG does not exist. Proceeding with build."
@@ -388,7 +388,8 @@ jobs:
 
   # ==================== Publish Release ====================
   publish-release:
-    needs: [build-macos, build-linux, build-windows]
+    needs: [check-version, build-macos, build-linux, build-windows]
+    if: needs.check-version.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -538,5 +539,5 @@ jobs:
             gh release edit "$TAG" --notes "$FULL_BODY" --prerelease --repo "$GITHUB_REPOSITORY"
             gh release upload "$TAG" Release/binaries/* --repo "$GITHUB_REPOSITORY" --clobber
           else
-            gh release create "$TAG" Release/binaries/* --title "${VERSION} (Pre-release)" --prerelease --notes "$FULL_BODY" --repo "$GITHUB_REPOSITORY"
+            gh release create "$TAG" Release/binaries/* --title "${VERSION} (Pre-release)" --prerelease --notes "$FULL_BODY" --target "$GITHUB_SHA" --repo "$GITHUB_REPOSITORY"
           fi
