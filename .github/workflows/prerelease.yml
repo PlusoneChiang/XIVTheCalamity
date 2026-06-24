@@ -476,6 +476,12 @@ jobs:
           TAG="v${VERSION}"
           echo "Publishing pre-release for tag: $TAG"
           
+          # Create and push the Git tag first
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git tag --force "$TAG" "$GITHUB_SHA"
+          git push https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git "$TAG"
+          
           RELEASE_NOTES=""
           if [ -f "RELEASE_NOTES.md" ]; then
             RELEASE_NOTES=$(awk -v tag="## ${TAG}" 'BEGIN{f=0} $0==tag{f=1;next} f && /^## v/{exit} f{print}' RELEASE_NOTES.md)
@@ -539,5 +545,5 @@ jobs:
             gh release edit "$TAG" --notes "$FULL_BODY" --prerelease --repo "$GITHUB_REPOSITORY"
             gh release upload "$TAG" Release/binaries/* --repo "$GITHUB_REPOSITORY" --clobber
           else
-            gh release create "$TAG" Release/binaries/* --title "${VERSION} (Pre-release)" --prerelease --notes "$FULL_BODY" --target "$GITHUB_SHA" --repo "$GITHUB_REPOSITORY"
+            gh release create "$TAG" Release/binaries/* --title "${VERSION} (Pre-release)" --prerelease --notes "$FULL_BODY" --repo "$GITHUB_REPOSITORY"
           fi
