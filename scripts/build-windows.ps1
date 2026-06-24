@@ -1,5 +1,5 @@
-# XIVTheCalamity Windows Build Script
-# All-in-one script: Check environment, build backend, package frontend, create installer
+# XIVTheCalamity Windows Build Script (Photino Version)
+# All-in-one script: Check environment, build frontend, compile backend (NativeAOT)
 
 $ErrorActionPreference = "Stop"
 
@@ -8,11 +8,11 @@ $PROJECT_ROOT = Split-Path -Parent $SCRIPT_DIR
 $BACKEND_DIR = Join-Path $PROJECT_ROOT "backend"
 $FRONTEND_DIR = Join-Path $PROJECT_ROOT "frontend"
 $RELEASE_DIR = Join-Path $PROJECT_ROOT "Release"
-$BUILD_DIR = Join-Path $FRONTEND_DIR "build"
+$OUTPUT_DIR = Join-Path $RELEASE_DIR "win-x64"
 
 Write-Host ""
 Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
-Write-Host "  XIVTheCalamity - Windows Build" -ForegroundColor Cyan
+Write-Host "  XIVTheCalamity - Windows Build (Photino)" -ForegroundColor Cyan
 Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
 Write-Host ""
 
@@ -64,7 +64,7 @@ if (Test-Command "dotnet") {
 }
 
 # Check backend project
-$backendProject = Join-Path $BACKEND_DIR "src\XIVTheCalamity.Api.NativeAOT\XIVTheCalamity.Api.NativeAOT.csproj"
+$backendProject = Join-Path $BACKEND_DIR "src\XIVTheCalamity\XIVTheCalamity.csproj"
 if (Test-Path $backendProject) {
     Write-Host "   ✅ Backend project found" -ForegroundColor Green
 } else {
@@ -73,26 +73,11 @@ if (Test-Path $backendProject) {
     $allChecksPass = $false
 }
 
-# Check shared resources (optional)
-$sharedResourcesDir = Join-Path $PROJECT_ROOT "shared\resources"
-if (Test-Path $sharedResourcesDir) {
-    $resourceCount = (Get-ChildItem -Path $sharedResourcesDir -Recurse -File).Count
-    Write-Host "   ✅ Shared resources ($resourceCount files)" -ForegroundColor Green
-} else {
-    Write-Host "   ⚠️  Shared resources not found (optional)" -ForegroundColor Yellow
-}
-
-Write-Host ""
-Write-Host "   💡 Note: icon.ico should be in frontend/build/" -ForegroundColor Gray
-Write-Host "      (electron-builder will check it during build)" -ForegroundColor Gray
-
 if (-not $allChecksPass) {
     Write-Host ""
     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Red
     Write-Host "❌ Pre-flight checks failed!" -ForegroundColor Red
     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Red
-    Write-Host ""
-    Write-Host "Please fix the issues above and try again." -ForegroundColor Yellow
     exit 1
 }
 
@@ -103,30 +88,41 @@ Write-Host "━━━━━━━━━━━━━━━━━━━━━━�
 Write-Host ""
 
 # ================== Clean Release Directory ==================
-Write-Host ""
 Write-Host "🧹 Cleaning Release directory..." -ForegroundColor Yellow
 
-if (Test-Path $RELEASE_DIR) {
-    # Remove old Windows build
-    $winUnpackedPath = Join-Path $RELEASE_DIR "win-unpacked"
-    if (Test-Path $winUnpackedPath) {
-        Remove-Item -Path $winUnpackedPath -Recurse -Force -ErrorAction SilentlyContinue
-    }
-    
-    # Remove old installers
-    Get-ChildItem -Path $RELEASE_DIR -Filter "*.exe" | Remove-Item -Force -ErrorAction SilentlyContinue
-    
-    # Remove old temp backend
-    $tempBackendPath = Join-Path $RELEASE_DIR "temp-backend-windows"
-    if (Test-Path $tempBackendPath) {
-        Remove-Item -Path $tempBackendPath -Recurse -Force -ErrorAction SilentlyContinue
-    }
-    
-    Write-Host "   ✅ Cleaned release directory" -ForegroundColor Green
+if (Test-Path $OUTPUT_DIR) {
+    Remove-Item -Path $OUTPUT_DIR -Recurse -Force -ErrorAction SilentlyContinue | Out-Null
+    Write-Host "   ✅ Cleaned output directory" -ForegroundColor Green
 } else {
     New-Item -ItemType Directory -Path $RELEASE_DIR -Force | Out-Null
-    Write-Host "   ✅ Created Release directory" -ForegroundColor Green
 }
+
+# ================== Check Frontend Dependencies ==================
+Write-Host ""
+Write-Host "📦 Checking frontend dependencies..." -ForegroundColor Yellow
+Set-Location $FRONTEND_DIR
+
+if (Test-Path "node_modules") {
+    Write-Host "   ✅ Dependencies already installed" -ForegroundColor Green
+} else {
+    Write-Host "   Installing dependencies..." -ForegroundColor Gray
+    npm install --silent
+    Write-Host "   ✅ Dependencies installed" -ForegroundColor Green
+}
+
+# ================== Build Frontend ==================
+Write-Host ""
+Write-Host "📦 Building Frontend (Vite)..." -ForegroundColor Yellow
+npm run build:renderer
+
+# ================== Copy Frontend to Backend ==================
+Write-Host ""
+Write-Host "   Copying frontend assets to C# wwwroot..." -ForegroundColor Gray
+$wwwrootPath = Join-Path $BACKEND_DIR "src\XIVTheCalamity\wwwroot"
+if (-not (Test-Path $wwwrootPath)) {
+    New-Item -ItemType Directory -Path $wwwrootPath -Force | Out-Null
+}
+Copy-Item -Path (Join-Path $FRONTEND_DIR "dist\*") -Destination $wwwrootPath -Recurse -Force
 
 # ================== Compile Backend ==================
 Write-Host ""
@@ -135,36 +131,17 @@ Write-Host "   This may take 2-5 minutes..." -ForegroundColor Gray
 
 Set-Location $BACKEND_DIR
 
-$publishOutput = Join-Path $RELEASE_DIR "temp-backend-windows"
-
 try {
-    dotnet publish src/XIVTheCalamity.Api.NativeAOT/XIVTheCalamity.Api.NativeAOT.csproj `
+    dotnet publish src\XIVTheCalamity\XIVTheCalamity.csproj `
         -c Release `
         -r win-x64 `
         --self-contained true `
-        -o $publishOutput `
-        /p:PublishTrimmed=true `
-        /p:PublishSingleFile=true `
+        /p:PublishAot=true `
+        -o $OUTPUT_DIR `
         --nologo
     
     if ($LASTEXITCODE -eq 0) {
         Write-Host "   ✅ Backend compiled successfully" -ForegroundColor Green
-        
-        # Remove PDB files (NativeAOT always generates them despite settings)
-        $pdbFiles = Get-ChildItem -Path $publishOutput -Filter "*.pdb" -Recurse -ErrorAction SilentlyContinue
-        if ($pdbFiles) {
-            foreach ($pdb in $pdbFiles) {
-                Remove-Item $pdb.FullName -Force -ErrorAction SilentlyContinue
-                Write-Host "   🗑️  Removed: $($pdb.Name)" -ForegroundColor Gray
-            }
-        }
-        
-        # Check backend executable
-        $backendExe = Join-Path $publishOutput "XIVTheCalamity.Api.NativeAOT.exe"
-        if (Test-Path $backendExe) {
-            $backendSize = [math]::Round((Get-Item $backendExe).Length / 1MB, 2)
-            Write-Host "   📦 Backend size: $backendSize MB" -ForegroundColor Cyan
-        }
     } else {
         Write-Host "   ❌ Backend compilation failed" -ForegroundColor Red
         exit 1
@@ -174,216 +151,51 @@ try {
     exit 1
 }
 
-# ================== Configure Build ==================
+# ================== Copy Shared Resources ==================
 Write-Host ""
-Write-Host "📝 Configuring build..." -ForegroundColor Yellow
+Write-Host "📦 Copying shared resources..." -ForegroundColor Yellow
+$destResources = Join-Path $OUTPUT_DIR "resources"
+Copy-Item -Path (Join-Path $PROJECT_ROOT "shared\resources\*") -Destination $destResources -Recurse -Force
+Write-Host "   ✅ Resources copied" -ForegroundColor Green
 
-Set-Location $FRONTEND_DIR
-
-# Read version from package.json
-$packageJson = Get-Content "package.json" -Raw | ConvertFrom-Json
-$VERSION = $packageJson.version
-Write-Host "   📦 Version: $VERSION" -ForegroundColor Cyan
-
-# Create inline electron-builder config for Windows
-# Use single quotes to avoid PowerShell variable expansion
-$builderConfig = @'
-module.exports = {
-    appId: 'com.xivthecalamity.launcher',
-    productName: 'XIVTheCalamity',
-    artifactName: '${productName}-${version}-${os}-${arch}.${ext}',
-    electronVersion: '40.0.0',
-    directories: {
-        output: '../Release',
-        buildResources: 'build'
-    },
-    files: [
-        'src/**/*',
-        'resources/**/*',
-        'package.json',
-        'node_modules/**/*'
-    ],
-    win: {
-        target: [{ target: 'nsis', arch: ['x64'] }],
-        icon: 'build/icon.ico'
-    },
-    nsis: {
-        oneClick: false,
-        allowToChangeInstallationDirectory: true,
-        allowElevation: true,
-        createDesktopShortcut: true,
-        createStartMenuShortcut: true,
-        perMachine: false,
-        deleteAppDataOnUninstall: false,
-        runAfterFinish: true,
-        menuCategory: false,
-        shortcutName: 'XIV The Calamity'
-    },
-    extraResources: [
-        {
-            from: '../Release/temp-backend-windows',
-            to: 'backend',
-            filter: ['**/*']
-        },
-        {
-            from: '../shared/resources',
-            to: 'resources',
-            filter: ['**/*']
-        }
-    ]
-};
-'@
-
-# Write config file
-$builderConfig | Out-File -FilePath "electron-builder.config.js" -Encoding utf8 -Force
-Write-Host "   ✅ Build configuration created" -ForegroundColor Green
-
-# ================== Check Frontend Dependencies ==================
+# ================== Run Test ==================
 Write-Host ""
-Write-Host "📦 Checking frontend dependencies..." -ForegroundColor Yellow
-
-if (Test-Path "node_modules") {
-    Write-Host "   ✅ Dependencies already installed" -ForegroundColor Green
-} else {
-    Write-Host "   Installing dependencies..." -ForegroundColor Gray
-    npm install --silent 2>&1 | Out-Null
-    Write-Host "   ✅ Dependencies installed" -ForegroundColor Green
-}
-
-# ================== Build Installer ==================
+Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
+Write-Host "✅ Build completed successfully!" -ForegroundColor Green
+Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
 Write-Host ""
-Write-Host "📦 Building Windows installer..." -ForegroundColor Yellow
-Write-Host "   Version: $VERSION" -ForegroundColor Cyan
-Write-Host "   This may take 5-10 minutes..." -ForegroundColor Gray
+Write-Host "📦 Location: $OUTPUT_DIR" -ForegroundColor Cyan
 Write-Host ""
 
-try {
-    # Build without code signing
-    $env:CSC_IDENTITY_AUTO_DISCOVERY = "false"
-    
-    Write-Host "   Building renderer (Vite)..." -ForegroundColor Gray
-    npm run build:renderer
-    
-    npx electron-builder --win --x64 --config electron-builder.config.js
-    
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host ""
-        Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
-        Write-Host "✅ Build completed successfully!" -ForegroundColor Green
-        Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
-        Write-Host ""
-        
-        # Find the installer
-        $installerPattern = "XIVTheCalamity-*-win-*.exe"
-        $installer = Get-ChildItem -Path $RELEASE_DIR -Filter $installerPattern | Select-Object -First 1
-        
-        if ($installer) {
-            $installerSize = [math]::Round($installer.Length / 1MB, 2)
-            Write-Host "📦 Installer: $($installer.Name)" -ForegroundColor Cyan
-            Write-Host "📏 Size: $installerSize MB" -ForegroundColor Cyan
-            Write-Host "📂 Location: $($installer.FullName)" -ForegroundColor Cyan
-            Write-Host ""
-            
-            # Check unpacked directory
-            $unpackedDir = Join-Path $RELEASE_DIR "win-unpacked"
-            if (Test-Path $unpackedDir) {
-                $unpackedSize = [math]::Round((Get-ChildItem -Path $unpackedDir -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB, 2)
-                Write-Host "📊 Unpacked size: $unpackedSize MB" -ForegroundColor Cyan
-                
-                # Verify backend
-                $backendExe = Join-Path $unpackedDir "resources\backend\XIVTheCalamity.Api.NativeAOT.exe"
-                if (Test-Path $backendExe) {
-                    Write-Host "✅ Backend verified" -ForegroundColor Green
-                } else {
-                    Write-Host "⚠️  Backend not found in package" -ForegroundColor Yellow
-                }
-            }
-            
-            Write-Host ""
-            Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
-            Write-Host ""
-            
-            # Ask to run unpacked version
-            $runChoice = Read-Host "🧪 Run unpacked version for testing? [y/N]"
-            
-            if ($runChoice -match '^[Yy]$') {
-                Write-Host ""
-                Write-Host "🚀 Starting unpacked application..." -ForegroundColor Yellow
-                Write-Host ""
-                
-                $unpackedExe = Join-Path $unpackedDir "XIVTheCalamity.exe"
-                if (Test-Path $unpackedExe) {
-                    Start-Process -FilePath $unpackedExe
-                    Write-Host "✅ Application started!" -ForegroundColor Green
-                    Write-Host ""
-                    Write-Host "   Logs: $env:APPDATA\XIVTheCalamity\logs\" -ForegroundColor Cyan
-                } else {
-                    Write-Host "❌ Unpacked executable not found" -ForegroundColor Red
-                }
-            } else {
-                Write-Host ""
-                Write-Host "💡 Manual testing options:" -ForegroundColor Cyan
-                Write-Host ""
-                Write-Host "   Run installer:" -ForegroundColor Gray
-                Write-Host "   $($installer.FullName)" -ForegroundColor White
-                Write-Host ""
-                Write-Host "   Test without installing:" -ForegroundColor Gray
-                $unpackedExe = Join-Path $unpackedDir "XIVTheCalamity.exe"
-                if (Test-Path $unpackedExe) {
-                    Write-Host "   $unpackedExe" -ForegroundColor White
-                }
-            }
-        } else {
-            Write-Host "⚠️  Installer not found in expected location" -ForegroundColor Yellow
-            Write-Host "   Check $RELEASE_DIR for output files" -ForegroundColor Gray
-        }
-    } else {
-        Write-Host ""
-        Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Red
-        Write-Host "❌ Build failed!" -ForegroundColor Red
-        Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Red
-        Write-Host ""
-        Write-Host "Please check the error messages above." -ForegroundColor Yellow
-        
-        # Clean up temp config on failure
-        Remove-Item -Path "electron-builder.config.js" -Force -ErrorAction SilentlyContinue
-        Set-Location $PROJECT_ROOT
-        
-        exit 1
+$runChoice = Read-Host "🧪 Run application now for testing? [y/N]"
+
+if ($runChoice -match '^[Yy]$') {
+    $configFile = Join-Path $env:APPDATA "XIVTheCalamity\config.json"
+    if (Test-Path $configFile) {
+        Write-Host "🔧 Enabling development mode in config..." -ForegroundColor Gray
+        $configJson = Get-Content $configFile -Raw | ConvertFrom-Json
+        $configJson.launcher.developmentMode = $true
+        $configJson | ConvertTo-Json -Depth 10 | Out-File $configFile -Encoding utf8 -Force
+        Write-Host "   ✅ Development mode enabled" -ForegroundColor Green
     }
-} catch {
+
     Write-Host ""
-    Write-Host "❌ Build failed: $_" -ForegroundColor Red
+    Write-Host "🚀 Starting application..." -ForegroundColor Yellow
     
-    # Clean up temp config on failure
-    Set-Location $FRONTEND_DIR
-    Remove-Item -Path "electron-builder.config.js" -Force -ErrorAction SilentlyContinue
-    Set-Location $PROJECT_ROOT
-    
-    exit 1
+    $appExe = Join-Path $OUTPUT_DIR "XIVTheCalamity.exe"
+    if (Test-Path $appExe) {
+        Start-Process -FilePath $appExe
+        Write-Host "   ✅ Application started!" -ForegroundColor Green
+    } else {
+        Write-Host "   ❌ Executable not found" -ForegroundColor Red
+    }
+} else {
+    Write-Host ""
+    Write-Host "💡 You can run it manually with:" -ForegroundColor Cyan
+    Write-Host "   $(Join-Path $OUTPUT_DIR "XIVTheCalamity.exe")" -ForegroundColor White
 }
-
-# ================== Clean Temporary Files ==================
-Write-Host ""
-Write-Host "🧹 Cleaning temporary files..." -ForegroundColor Yellow
-
-# Remove temp backend
-$tempBackendPath = Join-Path $RELEASE_DIR "temp-backend-windows"
-if (Test-Path $tempBackendPath) {
-    Remove-Item -Path $tempBackendPath -Recurse -Force -ErrorAction SilentlyContinue
-}
-
-# Remove temp config
-Set-Location $FRONTEND_DIR
-$tempConfigPath = "electron-builder.config.js"
-if (Test-Path $tempConfigPath) {
-    Remove-Item -Path $tempConfigPath -Force -ErrorAction SilentlyContinue
-}
-
-Write-Host "   ✅ Cleanup complete" -ForegroundColor Green
 
 Set-Location $PROJECT_ROOT
-
 Write-Host ""
 Write-Host "✅ All done!" -ForegroundColor Green
 Write-Host ""

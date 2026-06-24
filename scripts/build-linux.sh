@@ -1,11 +1,12 @@
 #!/bin/bash
 
-# XIVTheCalamity Linux Build Script
+# XIVTheCalamity Linux Build Script (Photino Version)
 # This script will:
 # 1. Clean Release directory
-# 2. Compile backend (.NET)
-# 3. Package frontend (Electron)
-# 4. Create AppImage
+# 2. Compile frontend (Vite)
+# 3. Copy frontend assets to backend wwwroot
+# 4. Compile backend (.NET NativeAOT) to Release/linux-unpacked
+# 5. Copy shared resources to Release/linux-unpacked
 
 set -e
 
@@ -14,8 +15,9 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 BACKEND_DIR="$PROJECT_ROOT/backend"
 FRONTEND_DIR="$PROJECT_ROOT/frontend"
 RELEASE_DIR="$PROJECT_ROOT/Release"
+OUTPUT_DIR="$RELEASE_DIR/linux-unpacked"
 
-echo "🚀 XIVTheCalamity Linux Build Script"
+echo "🚀 XIVTheCalamity Linux Build Script (Photino Version)"
 echo ""
 
 # ================== Check Dependencies ==================
@@ -46,30 +48,47 @@ check_command dotnet
 echo ""
 echo "🧹 Cleaning Release directory..."
 
-if [ -d "$RELEASE_DIR" ]; then
-  # Remove old AppImage files
-  rm -f "$RELEASE_DIR"/*.AppImage
-  # Remove old unpacked directory
-  rm -rf "$RELEASE_DIR/linux-unpacked"
-  # Remove old temp backend
-  rm -rf "$RELEASE_DIR/temp-backend-linux"
+if [ -d "$OUTPUT_DIR" ]; then
+  rm -rf "$OUTPUT_DIR"
   echo "   ✅ Cleaned release directory"
 else
   mkdir -p "$RELEASE_DIR"
-  echo "   ✅ Created Release directory"
 fi
+
+# ================== Install Frontend Dependencies ==================
+echo ""
+echo "📦 Checking frontend dependencies..."
+cd "$FRONTEND_DIR"
+
+if [ -d "node_modules" ]; then
+  echo "   ✅ Dependencies already installed"
+else
+  npm install
+  echo "   ✅ Dependencies installed"
+fi
+
+# ================== Build Frontend ==================
+echo ""
+echo "📦 Building Frontend (Vite)..."
+npm run build:renderer
+
+# ================== Copy Frontend to Backend ==================
+echo ""
+echo "   Copying frontend assets to C# wwwroot..."
+mkdir -p "$BACKEND_DIR/src/XIVTheCalamity/wwwroot"
+cp -R dist/* "$BACKEND_DIR/src/XIVTheCalamity/wwwroot/"
 
 # ================== Compile Backend ==================
 echo ""
-echo "🔨 Compiling backend (NativeAOT linux-x64)..."
-
+echo "🔨 Compiling C# Photino Application (NativeAOT linux-x64)..."
 cd "$BACKEND_DIR"
 
-dotnet publish src/XIVTheCalamity.Api.NativeAOT/XIVTheCalamity.Api.NativeAOT.csproj \
+dotnet publish src/XIVTheCalamity/XIVTheCalamity.csproj \
   -c Release \
   -r linux-x64 \
   --self-contained true \
-  -o "$RELEASE_DIR/temp-backend-linux"
+  /p:PublishAot=true \
+  -o "$OUTPUT_DIR"
 
 if [ $? -eq 0 ]; then
   echo "   ✅ Backend compiled successfully"
@@ -78,84 +97,50 @@ else
   exit 1
 fi
 
-# ================== Read Version ==================
+# ================== Copy Shared Resources ==================
 echo ""
+echo "📦 Copying shared resources..."
+cp -R "$PROJECT_ROOT/shared/resources" "$OUTPUT_DIR/"
+echo "   ✅ Resources copied"
 
-cd "$FRONTEND_DIR"
-
-# Read version from package.json
-VERSION=$(node -e "console.log(require('./package.json').version)")
-echo "   📦 Current version: $VERSION"
-
-# ================== Install Frontend Dependencies ==================
-echo ""
-echo "📦 Installing frontend dependencies..."
-
-if [ -d "node_modules" ]; then
-  echo "   ✅ Dependencies already installed"
-else
-  npm install > /dev/null 2>&1
-  echo "   ✅ Dependencies installed"
-fi
-
-# ================== Build AppImage ==================
-echo ""
-echo "📦 Building AppImage (version $VERSION)..."
-echo "   (This may take 5-10 minutes...)"
-echo ""
-
-# Build renderer (Vite)
-echo "   Build renderer..."
-npm run build:renderer
-
-# Use npx electron-builder (linux extraResources is already configured in package.json)
-npx electron-builder --linux --x64
-
-# Expected filename pattern
-EXPECTED_APPIMAGE="XIVTheCalamity-${VERSION}-linux-x86_64.AppImage"
-APPIMAGE="$RELEASE_DIR/$EXPECTED_APPIMAGE"
-
-# Fallback: find any AppImage with version
-if [ ! -f "$APPIMAGE" ]; then
-  APPIMAGE=$(ls -t "$RELEASE_DIR"/XIVTheCalamity-*-linux-*.AppImage 2>/dev/null | head -1)
-fi
-
-# Last resort: find any AppImage
-if [ ! -f "$APPIMAGE" ]; then
-  APPIMAGE=$(ls -t "$RELEASE_DIR"/*.AppImage 2>/dev/null | head -1)
-fi
-
-if [ -f "$APPIMAGE" ]; then
-  chmod +x "$APPIMAGE"
+# ================== Run Test ==================
+APP_BIN="$OUTPUT_DIR/XIVTheCalamity"
+if [ -f "$APP_BIN" ]; then
+  chmod +x "$APP_BIN"
   echo ""
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo "✅ Build completed successfully!"
   echo ""
-  echo "📦 AppImage: $(basename "$APPIMAGE")"
-  echo "📏 Size: $(du -h "$APPIMAGE" | cut -f1)"
-  echo "📂 Location: $APPIMAGE"
-  echo ""
+  echo "📦 Location: $OUTPUT_DIR"
+  echo "📏 Size: $(du -sh "$OUTPUT_DIR" | cut -f1)"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo ""
-  read -p "🧪 Do you want to run the AppImage now? [y/N]: " run_choice
+  
+  read -p "🧪 Do you want to run the application now? [y/N]: " run_choice
   
   if [[ "$run_choice" =~ ^[Yy]$ ]]; then
+    # Enable development mode in config
+    CONFIG_FILE="$HOME/.config/XIVTheCalamity/config.json"
+    if [ -f "$CONFIG_FILE" ]; then
+      echo "🔧 Enabling development mode in config..."
+      if command -v jq &> /dev/null; then
+        TMP_FILE=$(mktemp)
+        jq '.launcher.developmentMode = true' "$CONFIG_FILE" > "$TMP_FILE" && mv "$TMP_FILE" "$CONFIG_FILE"
+      else
+        sed -i 's/"developmentMode": false/"developmentMode": true/g' "$CONFIG_FILE"
+      fi
+      echo "✅ Development mode enabled"
+    fi
+
     echo ""
-    echo "🚀 Starting AppImage..."
-    "$APPIMAGE"
+    echo "🚀 Starting XIVTheCalamity..."
+    "$APP_BIN"
   else
     echo ""
     echo "💡 You can run it manually with:"
-    echo "   $APPIMAGE"
+    echo "   $APP_BIN"
   fi
 else
-  echo ""
-  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  echo "❌ Build failed - AppImage not found"
-  echo ""
-  echo "Please check the error messages above."
-  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "❌ Executable not found at $APP_BIN"
   exit 1
 fi
-
-echo ""
