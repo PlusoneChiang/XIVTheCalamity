@@ -139,9 +139,42 @@ jobs:
           
           cp Release/mac-out/XIVTheCalamity "$APP_DIR/Contents/MacOS/XIVTheCalamity"
           cp -R Release/mac-out/wwwroot "$APP_DIR/Contents/MacOS/"
-          cp frontend/build/Info.plist "$APP_DIR/Contents/Info.plist"
-          cp frontend/build/XIVTC.icns "$APP_DIR/Contents/Resources/"
           
+          # Get version from package.json
+          VERSION=$(node -p "require('./frontend/package.json').version")
+          if [[ "${{ github.workflow }}" == *"Pre-release"* ]] && [[ ! "$VERSION" == *-pre ]]; then
+            VERSION="${VERSION}-pre"
+          fi
+          
+          # Dynamically create Info.plist
+          cat <<EOF > "$APP_DIR/Contents/Info.plist"
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleName</key>
+              <string>XIVTheCalamity</string>
+              <key>CFBundleExecutable</key>
+              <string>XIVTheCalamity</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.plusone.xivthecalamity</string>
+              <key>CFBundleVersion</key>
+              <string>${VERSION}</string>
+              <key>CFBundleShortVersionString</key>
+              <string>${VERSION}</string>
+              <key>CFBundleIconFile</key>
+              <string>XIVTC.icns</string>
+              <key>LSMinimumSystemVersion</key>
+              <string>10.15</string>
+              <key>NSHighResolutionCapable</key>
+              <true/>
+          </dict>
+          </plist>
+          EOF
+          
+          cp frontend/build/XIVTC.icns "$APP_DIR/Contents/Resources/"
           cp shared/resources/bin/XTCAudioRouter "$APP_DIR/Contents/Resources/bin/"
           cp -R shared/resources/ "$APP_DIR/Contents/Resources/resources/"
 
@@ -259,8 +292,19 @@ jobs:
           cp -R Release/linux-out/wwwroot "$APPDIR/usr/bin/"
           cp -R shared/resources/ "$APPDIR/usr/share/resources/"
           
-          cp frontend/build/XIVTheCalamity.desktop "$APPDIR/"
-          cp frontend/build/icons/icon.png "$APPDIR/XIVTheCalamity.png"
+          # Copy icon
+          cp frontend/build/icons/256x256.png "$APPDIR/XIVTheCalamity.png"
+          
+          # Dynamically create desktop entry
+          cat << 'EOF' > "$APPDIR/XIVTheCalamity.desktop"
+          [Desktop Entry]
+          Type=Application
+          Name=XIVTheCalamity
+          Comment=Cross-platform FFXIV Launcher
+          Exec=XIVTheCalamity %U
+          Icon=XIVTheCalamity
+          Categories=Game;
+          EOF
           
           cat << 'EOF' > "$APPDIR/AppRun"
           #!/bin/sh
