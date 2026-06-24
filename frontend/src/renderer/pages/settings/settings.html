@@ -33,6 +33,12 @@
                 <option value="en-US">English</option>
               </select>
               <p class="help-text" data-i18n="settings.general.language_help">選擇介面語言</p>
+              <div class="checkbox-group" style="margin-top: 10px; justify-content: flex-start;">
+                <label>
+                  <input type="checkbox" id="enablePreRelease">
+                  <span data-i18n="settings.general.enable_pre_release">接收測試通道更新</span>
+                </label>
+              </div>
             </div>
             <div class="checkbox-group">
               <label>
@@ -40,12 +46,6 @@
                 <span data-i18n="settings.general.debug">Debug 記錄</span>
               </label>
               <button id="openLogPathButton" class="btn btn-secondary btn-sm" data-i18n="settings.general.open_log">開啟</button>
-            </div>
-            <div class="checkbox-group">
-              <label>
-                <input type="checkbox" id="enablePreRelease">
-                <span data-i18n="settings.general.enable_pre_release">接收測試通道更新</span>
-              </label>
             </div>
           </div>
         </div>
