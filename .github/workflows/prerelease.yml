@@ -203,14 +203,11 @@ jobs:
           DMG_PATH="Release/XIVTheCalamity-${VERSION}-mac-arm64.dmg"
           hdiutil create -fs HFS+ -srcfolder "Release/mac-arm64/XIVTheCalamity.app" -volname "XIVTheCalamity" "$DMG_PATH"
           
-          # Codesign and Staple DMG
+          # Codesign DMG
           IDENTITY="${{ env.CSC_NAME }}"
           if [ -n "$IDENTITY" ]; then
             echo "Signing DMG..."
             codesign --force --sign "Developer ID Application: $IDENTITY" "$DMG_PATH"
-            if [ "${{ inputs.skip_notarize }}" != "true" ]; then
-              xcrun stapler staple "$DMG_PATH"
-            fi
           fi
 
       # Upload macOS artifact
