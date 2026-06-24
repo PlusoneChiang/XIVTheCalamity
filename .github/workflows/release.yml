@@ -135,11 +135,8 @@ jobs:
           cp Release/mac-out/XIVTheCalamity "$APP_DIR/Contents/MacOS/XIVTheCalamity"
           cp -R Release/mac-out/wwwroot "$APP_DIR/Contents/Resources/"
           
-          # Get version from package.json
-          VERSION=$(node -p "require('./frontend/package.json').version")
-          if [[ "${{ github.workflow }}" == *"Pre-release"* ]] && [[ ! "$VERSION" == *-pre ]]; then
-            VERSION="${VERSION}-pre"
-          fi
+          # Get version from csproj
+          VERSION=$(node -p "require('fs').readFileSync('backend/src/XIVTheCalamity/XIVTheCalamity.csproj', 'utf8').match(/<Version>(.*?)<\/Version>/)[1]")
           
           # Dynamically create Info.plist
           cat <<EOF > "$APP_DIR/Contents/Info.plist"
@@ -186,41 +183,49 @@ jobs:
             echo "Signing identity not found, skipping codesign."
           fi
 
-      # Prepare Zip
-      - name: Prepare Zip
-        run: |
-          APP_PATH="Release/mac-arm64/XIVTheCalamity.app"
-          ZIP_PATH="Release/XIVTheCalamity-mac-arm64.zip"
-          xattr -cr "$APP_PATH"
-          COPYFILE_DISABLE=1 ditto -c -k --keepParent "$APP_PATH" "$ZIP_PATH"
-
-      # Notarize app
-      - name: Notarize app
-        if: ${{ !inputs.skip_notarize }}
+      # Package DMG and Notarize
+      - name: Package DMG and Notarize
         env:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         run: |
-          APP_PATH="Release/mac-arm64/XIVTheCalamity.app"
-          ZIP_PATH="Release/XIVTheCalamity-mac-arm64.zip"
+          VERSION=$(node -p "require('fs').readFileSync('backend/src/XIVTheCalamity/XIVTheCalamity.csproj', 'utf8').match(/<Version>(.*?)<\/Version>/)[1]")
           
-          xcrun notarytool submit "$ZIP_PATH" \
-            --key "$APPLE_API_KEY_PATH" \
-            --key-id "$APPLE_API_KEY_ID" \
-            --issuer "$APPLE_API_ISSUER" \
-            --wait
+          # Notarize App Bundle first if requested
+          if [ "${{ inputs.skip_notarize }}" != "true" ]; then
+            echo "Starting Notarization for App Bundle..."
+            COPYFILE_DISABLE=1 ditto -c -k --keepParent "Release/mac-arm64/XIVTheCalamity.app" "Release/temp-notarize.zip"
+            
+            xcrun notarytool submit "Release/temp-notarize.zip" \
+              --key "$APPLE_API_KEY_PATH" \
+              --key-id "$APPLE_API_KEY_ID" \
+              --issuer "$APPLE_API_ISSUER" \
+              --wait
+              
+            xcrun stapler staple "Release/mac-arm64/XIVTheCalamity.app"
+            rm "Release/temp-notarize.zip"
+          fi
           
-          xcrun stapler staple "$APP_PATH"
+          # Build DMG
+          DMG_PATH="Release/XIVTheCalamity-${VERSION}-mac-arm64.dmg"
+          hdiutil create -fs HFS+ -srcfolder "Release/mac-arm64/XIVTheCalamity.app" -volname "XIVTheCalamity" "$DMG_PATH"
           
-          rm "$ZIP_PATH"
-          COPYFILE_DISABLE=1 ditto -c -k --keepParent "$APP_PATH" "$ZIP_PATH"
+          # Codesign and Staple DMG
+          IDENTITY="${{ env.CSC_NAME }}"
+          if [ -n "$IDENTITY" ]; then
+            echo "Signing DMG..."
+            codesign --force --sign "Developer ID Application: $IDENTITY" "$DMG_PATH"
+            if [ "${{ inputs.skip_notarize }}" != "true" ]; then
+              xcrun stapler staple "$DMG_PATH"
+            fi
+          fi
 
       # Upload macOS artifact
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: macos-artifact
-          path: Release/XIVTheCalamity-mac-arm64.zip
+          path: Release/XIVTheCalamity-*-mac-arm64.dmg
 
   # ==================== Linux ====================
   build-linux:
@@ -300,10 +305,7 @@ jobs:
       # Build AppImage
       - name: Build AppImage
         run: |
-          VERSION=$(node -p "require('./frontend/package.json').version")
-          if [[ "${{ github.workflow }}" == *"Pre-release"* ]] && [[ ! "$VERSION" == *-pre ]]; then
-            VERSION="${VERSION}-pre"
-          fi
+          VERSION=$(node -p "require('fs').readFileSync('backend/src/XIVTheCalamity/XIVTheCalamity.csproj', 'utf8').match(/<Version>(.*?)<\/Version>/)[1]")
           export ARCH=x86_64
           appimagetool Release/linux-x64/AppDir Release/XIVTheCalamity-${VERSION}-linux-x64.AppImage
 
@@ -354,10 +356,7 @@ jobs:
       - name: Package zip
         shell: pwsh
         run: |
-          $version = node -e "console.log(require('./frontend/package.json').version)"
-          if ("${{ github.workflow }}" -like "*Pre-release*" -and !$version.EndsWith("-pre")) {
-            $version = "${version}-pre"
-          }
+          $version = node -e "console.log(require('fs').readFileSync('backend/src/XIVTheCalamity/XIVTheCalamity.csproj', 'utf8').match(/<Version>(.*?)<\/Version>/)[1])"
           $packageDir = "Release/XIVTheCalamity"
           New-Item -ItemType Directory -Force -Path $packageDir
           Copy-Item -Path "Release/win-out/*" -Destination $packageDir -Recurse -Force
@@ -416,7 +415,7 @@ jobs:
           fi
           
           # macOS metadata
-          MAC_ZIP=$(ls -1 Release/binaries/XIVTheCalamity-mac-arm64.zip 2>/dev/null | tail -1)
+          MAC_ZIP=$(ls -1 Release/binaries/XIVTheCalamity-*-mac-arm64.dmg 2>/dev/null | tail -1)
           if [ -n "$MAC_ZIP" ] && [ -f "$MAC_ZIP" ]; then
             MAC_ZIP_NAME=$(basename "$MAC_ZIP")
             MAC_SHA=$(sha512sum "$MAC_ZIP" | cut -d' ' -f1)
@@ -488,7 +487,7 @@ jobs:
           
           | 平台 Platform | 檔案 File | 說明 Description |
           |---|---|---|
-          | **macOS** (Apple Silicon) | `XIVTheCalamity-mac-arm64.zip` | 綠色免安裝壓縮包，解壓後將 `XIVTheCalamity.app` 拖曳至 Applications 即可使用 |
+          | **macOS** (Apple Silicon) | `XIVTheCalamity-VERSION-mac-arm64.dmg` | 安裝檔，雙擊後將 `XIVTheCalamity.app` 拖曳至 Applications 即可使用 |
           | **Linux** (x64) | `XIVTheCalamity-VERSION-linux-x64.AppImage` | 執行前需加上執行權限：`chmod +x *.AppImage`</br> 如果在Steam App中使用或是透過Game Mode執行，需額外加上 `--no-sandbox` 執行參數 |
           | **Windows** (x64) | `XIVTheCalamity-VERSION-win-x64.zip` | 免安裝壓縮檔，解壓後執行 `XIVTheCalamity.exe` 即可 |
           
