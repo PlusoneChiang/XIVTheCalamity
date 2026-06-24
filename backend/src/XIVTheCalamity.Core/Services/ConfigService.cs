@@ -103,9 +103,7 @@ public class ConfigService
                     LeftOptionIsAlt = config.Wine.LeftOptionIsAlt,
                     RightOptionIsAlt = config.Wine.RightOptionIsAlt,
                     LeftCommandIsCtrl = config.Wine.LeftCommandIsCtrl,
-                    RightCommandIsCtrl = config.Wine.RightCommandIsCtrl,
-                    ImeCandidatePositionX = config.Wine.ImeCandidatePositionX,
-                    ImeCandidatePositionY = config.Wine.ImeCandidatePositionY
+                    RightCommandIsCtrl = config.Wine.RightCommandIsCtrl
                 };
             }
 
@@ -166,9 +164,7 @@ public class ConfigService
                 LeftOptionIsAlt = config.WineCompat?.LeftOptionIsAlt ?? true,
                 RightOptionIsAlt = config.WineCompat?.RightOptionIsAlt ?? true,
                 LeftCommandIsCtrl = config.WineCompat?.LeftCommandIsCtrl ?? true,
-                RightCommandIsCtrl = config.WineCompat?.RightCommandIsCtrl ?? true,
-                ImeCandidatePositionX = config.WineCompat?.ImeCandidatePositionX ?? 25,
-                ImeCandidatePositionY = config.WineCompat?.ImeCandidatePositionY ?? 85
+                RightCommandIsCtrl = config.WineCompat?.RightCommandIsCtrl ?? true
             };
         }
 

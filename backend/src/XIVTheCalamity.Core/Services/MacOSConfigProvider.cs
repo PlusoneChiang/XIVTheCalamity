@@ -27,9 +27,7 @@ public class MacOSConfigProvider : IPlatformConfigProvider
             LeftOptionIsAlt = true,
             RightOptionIsAlt = true,
             LeftCommandIsCtrl = true,
-            RightCommandIsCtrl = true,
-            ImeCandidatePositionX = 25,
-            ImeCandidatePositionY = 85
+            RightCommandIsCtrl = true
         };
 
         config.WineGraphics ??= new WineGraphicsConfig
@@ -55,9 +53,7 @@ public class MacOSConfigProvider : IPlatformConfigProvider
             LeftOptionIsAlt = config.Wine.LeftOptionIsAlt,
             RightOptionIsAlt = config.Wine.RightOptionIsAlt,
             LeftCommandIsCtrl = config.Wine.LeftCommandIsCtrl,
-            RightCommandIsCtrl = config.Wine.RightCommandIsCtrl,
-            ImeCandidatePositionX = config.Wine.ImeCandidatePositionX,
-            ImeCandidatePositionY = config.Wine.ImeCandidatePositionY
+            RightCommandIsCtrl = config.Wine.RightCommandIsCtrl
         };
     }
 
@@ -75,15 +71,6 @@ public class MacOSConfigProvider : IPlatformConfigProvider
                 throw new ArgumentException("MaxFramerate must be between 30 and 240");
             }
 
-            if (config.Wine.ImeCandidatePositionX < 0 || config.Wine.ImeCandidatePositionX > 100)
-            {
-                throw new ArgumentException("ImeCandidatePositionX must be between 0 and 100");
-            }
-
-            if (config.Wine.ImeCandidatePositionY < 0 || config.Wine.ImeCandidatePositionY > 100)
-            {
-                throw new ArgumentException("ImeCandidatePositionY must be between 0 and 100");
-            }
         }
     }
 }

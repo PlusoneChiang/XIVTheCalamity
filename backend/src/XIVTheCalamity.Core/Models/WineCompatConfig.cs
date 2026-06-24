@@ -34,16 +34,4 @@ public class WineCompatConfig
     /// Map right Command key to Ctrl (macOS)
     /// </summary>
     public bool RightCommandIsCtrl { get; set; } = true;
-    
-    /// <summary>
-    /// IME candidate window X position (% from left edge of game window, 0-100)
-    /// Default 25 = 25% from left
-    /// </summary>
-    public int ImeCandidatePositionX { get; set; } = 25;
-    
-    /// <summary>
-    /// IME candidate window Y position (% from top edge of game window, 0-100)
-    /// Default 85 = 85% from top (near bottom, where chat typically is)
-    /// </summary>
-    public int ImeCandidatePositionY { get; set; } = 85;
 }

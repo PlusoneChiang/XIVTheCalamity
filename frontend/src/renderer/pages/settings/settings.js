@@ -239,9 +239,7 @@ function populateForm(config) {
     document.getElementById('leftCommandMapping').value = config.wine.leftCommandIsCtrl !== undefined ? String(config.wine.leftCommandIsCtrl) : 'true';
     document.getElementById('rightCommandMapping').value = config.wine.rightCommandIsCtrl !== undefined ? String(config.wine.rightCommandIsCtrl) : 'true';
     
-    // IME candidate window position
-    document.getElementById('imePosX').value = config.wine.imeCandidatePositionX !== undefined ? config.wine.imeCandidatePositionX : 25;
-    document.getElementById('imePosY').value = config.wine.imeCandidatePositionY !== undefined ? config.wine.imeCandidatePositionY : 85;
+
   }
 
   // Discord RPC bridge settings (macOS only) — no config fields to populate
@@ -290,9 +288,7 @@ function collectFormData() {
       leftOptionIsAlt: document.getElementById('leftOptionMapping').value === 'true',
       rightOptionIsAlt: document.getElementById('rightOptionMapping').value === 'true',
       leftCommandIsCtrl: document.getElementById('leftCommandMapping').value === 'true',
-      rightCommandIsCtrl: document.getElementById('rightCommandMapping').value === 'true',
-      imeCandidatePositionX: parseInt(document.getElementById('imePosX').value) || 25,
-      imeCandidatePositionY: parseInt(document.getElementById('imePosY').value) || 85
+      rightCommandIsCtrl: document.getElementById('rightCommandMapping').value === 'true'
     },
     protonGe: {
       dxvkHudEnabled: document.getElementById('protongeDxvkHudEnabled')?.checked || false,

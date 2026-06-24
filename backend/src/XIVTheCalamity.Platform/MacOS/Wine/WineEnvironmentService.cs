@@ -212,11 +212,7 @@ public class WineEnvironmentService(
             logger?.LogDebug("[WINE-ENV] Retina mode enabled");
         }
         
-        // IME candidate window position (fallback when app doesn't provide position)
-        env["WINE_IME_POS_X"] = config.ImeCandidatePositionX.ToString();
-        env["WINE_IME_POS_Y"] = config.ImeCandidatePositionY.ToString();
-        logger?.LogDebug("[WINE-ENV] IME candidate position: {X}%, {Y}%", 
-            config.ImeCandidatePositionX, config.ImeCandidatePositionY);
+
         
         // env["WINEDLLOVERRIDES"] = "msquic=,mscoree=n,b;d3d9,d3d10core=n;d3d11=n;dxgi=n";
         // logger?.LogDebug("[WINE-ENV] DLL overrides: d3d9,d3d10core,d3d11,dxgi=n");
