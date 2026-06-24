@@ -25,14 +25,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Read canonical version from package.json
           VERSION=$(node -p "require('./frontend/package.json').version")
-          
-          # Formulate the target pre-release tag
           TAG="v${VERSION}-pre"
           echo "Target Pre-release Tag: $TAG"
           
-          # Check if a GitHub Release with this tag already exists
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "❌ Pre-release $TAG already exists on GitHub. Version has not changed! Skipping build."
             echo "should_run=false" >> $GITHUB_OUTPUT
@@ -59,7 +55,6 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
-      # Suffix version in package.json with -pre to align electron-builder release tagging
       - name: Suffix version for pre-release
         working-directory: frontend
         run: |
@@ -79,13 +74,22 @@ jobs:
           mkdir -p shared/resources/bin
           swiftc XTCAudioRouter/AudioRouter.swift -framework CoreAudio -framework AudioToolbox -o shared/resources/bin/XTCAudioRouter
 
+      # Build frontend
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm ci
+          npm run build:renderer
+          mkdir -p ../backend/src/XIVTheCalamity/wwwroot
+          cp -R dist/* ../backend/src/XIVTheCalamity/wwwroot/
+
       # Build backend (NativeAOT)
       - name: Build backend
         run: |
           cd backend
-          dotnet publish src/XIVTheCalamity.Api.NativeAOT/XIVTheCalamity.Api.NativeAOT.csproj \
-            -c Release -r osx-arm64 --self-contained true \
-            -o ../Release/temp-backend
+          dotnet publish src/XIVTheCalamity/XIVTheCalamity.csproj \
+            -c Release -r osx-arm64 --self-contained true /p:PublishAot=true \
+            -o ../Release/mac-out
 
       # Import signing certificate
       - name: Import certificate
@@ -97,6 +101,7 @@ jobs:
           KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
           
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           
@@ -125,31 +130,44 @@ jobs:
           echo "$APPLE_API_KEY" | base64 --decode > "$API_KEY_PATH"
           echo "APPLE_API_KEY_PATH=$API_KEY_PATH" >> $GITHUB_ENV
 
-      # Use .icns on CI (actool for .icon requires Xcode 26+)
-      - name: Use icns icon for CI
-        working-directory: frontend
+      # Package App Bundle
+      - name: Package App Bundle
         run: |
-          node -e "
-          const fs = require('fs');
-          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          pkg.build.mac.icon = 'build/XIVTC.icns';
-          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-          "
+          APP_DIR="Release/mac-arm64/XIVTheCalamity.app"
+          mkdir -p "$APP_DIR/Contents/MacOS"
+          mkdir -p "$APP_DIR/Contents/Resources/bin"
+          mkdir -p "$APP_DIR/Contents/Resources/resources"
+          
+          cp Release/mac-out/XIVTheCalamity "$APP_DIR/Contents/MacOS/XIVTheCalamity"
+          cp -R Release/mac-out/wwwroot "$APP_DIR/Contents/MacOS/"
+          cp frontend/build/Info.plist "$APP_DIR/Contents/Info.plist"
+          cp frontend/build/XIVTC.icns "$APP_DIR/Contents/Resources/"
+          
+          cp shared/resources/bin/XTCAudioRouter "$APP_DIR/Contents/Resources/bin/"
+          cp -R shared/resources/ "$APP_DIR/Contents/Resources/resources/"
 
-      # Package and publish to GitHub Release
-      - name: Package and publish
-        working-directory: frontend
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          NOTARIZE: ${{ inputs.skip_notarize && '0' || '1' }}
+      # Codesign App Bundle
+      - name: Codesign App Bundle
         run: |
-          npm ci
-          npm run build:renderer
-          npx electron-builder --mac --arm64 --publish always
+          IDENTITY="${{ env.CSC_NAME }}"
+          if [ -n "$IDENTITY" ]; then
+            echo "Signing with identity: $IDENTITY"
+            codesign --force --options runtime --sign "Developer ID Application: $IDENTITY" "Release/mac-arm64/XIVTheCalamity.app/Contents/Resources/bin/XTCAudioRouter"
+            codesign --force --options runtime --sign "Developer ID Application: $IDENTITY" "Release/mac-arm64/XIVTheCalamity.app/Contents/MacOS/XIVTheCalamity"
+            codesign --force --options runtime --sign "Developer ID Application: $IDENTITY" "Release/mac-arm64/XIVTheCalamity.app"
+          else
+            echo "Signing identity not found, skipping codesign."
+          fi
 
-      # Notarize
+      # Prepare Zip
+      - name: Prepare Zip
+        run: |
+          APP_PATH="Release/mac-arm64/XIVTheCalamity.app"
+          ZIP_PATH="Release/XIVTheCalamity-mac-arm64.zip"
+          xattr -cr "$APP_PATH"
+          COPYFILE_DISABLE=1 ditto -c -k --keepParent "$APP_PATH" "$ZIP_PATH"
+
+      # Notarize app
       - name: Notarize app
         if: ${{ !inputs.skip_notarize }}
         env:
@@ -159,9 +177,6 @@ jobs:
           APP_PATH="Release/mac-arm64/XIVTheCalamity.app"
           ZIP_PATH="Release/XIVTheCalamity-mac-arm64.zip"
           
-          xattr -cr "$APP_PATH"
-          COPYFILE_DISABLE=1 ditto -c -k --keepParent "$APP_PATH" "$ZIP_PATH"
-          
           xcrun notarytool submit "$ZIP_PATH" \
             --key "$APPLE_API_KEY_PATH" \
             --key-id "$APPLE_API_KEY_ID" \
@@ -170,10 +185,15 @@ jobs:
           
           xcrun stapler staple "$APP_PATH"
           
-          DMG_PATH=$(ls -1 Release/XIVTheCalamity-*-darwin-arm64.dmg 2>/dev/null | tail -1) || true
-          if [ -n "$DMG_PATH" ] && [ -f "$DMG_PATH" ]; then
-            xcrun stapler staple "$DMG_PATH"
-          fi
+          rm "$ZIP_PATH"
+          COPYFILE_DISABLE=1 ditto -c -k --keepParent "$APP_PATH" "$ZIP_PATH"
+
+      # Upload macOS artifact
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-artifact
+          path: Release/XIVTheCalamity-mac-arm64.zip
 
   # ==================== Linux ====================
   build-linux:
@@ -193,7 +213,6 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
-      # Suffix version in package.json with -pre to align electron-builder release tagging
       - name: Suffix version for pre-release
         working-directory: frontend
         run: |
@@ -207,23 +226,65 @@ jobs:
           }
           "
 
+      # Build frontend
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm ci
+          npm run build:renderer
+          mkdir -p ../backend/src/XIVTheCalamity/wwwroot
+          cp -R dist/* ../backend/src/XIVTheCalamity/wwwroot/
+
       # Build backend (NativeAOT)
       - name: Build backend
         run: |
           cd backend
-          dotnet publish src/XIVTheCalamity.Api.NativeAOT/XIVTheCalamity.Api.NativeAOT.csproj \
-            -c Release -r linux-x64 --self-contained true \
-            -o ../Release/temp-backend-linux
+          dotnet publish src/XIVTheCalamity/XIVTheCalamity.csproj \
+            -c Release -r linux-x64 --self-contained true /p:PublishAot=true \
+            -o ../Release/linux-out
 
-      # Package and publish
-      - name: Package and publish
-        working-directory: frontend
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Install appimagetool
+      - name: Install appimagetool
         run: |
-          npm ci
-          npm run build:renderer
-          npx electron-builder --linux --x64 --publish always
+          sudo wget -O /usr/local/bin/appimagetool https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage
+          sudo chmod +x /usr/local/bin/appimagetool
+
+      # Package AppDir
+      - name: Package AppDir
+        run: |
+          APPDIR="Release/linux-x64/AppDir"
+          mkdir -p "$APPDIR/usr/bin"
+          mkdir -p "$APPDIR/usr/share/resources"
+          
+          cp Release/linux-out/XIVTheCalamity "$APPDIR/usr/bin/XIVTheCalamity"
+          cp -R Release/linux-out/wwwroot "$APPDIR/usr/bin/"
+          cp -R shared/resources/ "$APPDIR/usr/share/resources/"
+          
+          cp frontend/build/XIVTheCalamity.desktop "$APPDIR/"
+          cp frontend/build/icons/icon.png "$APPDIR/XIVTheCalamity.png"
+          
+          cat << 'EOF' > "$APPDIR/AppRun"
+          #!/bin/sh
+          SELF=$(readlink -f "$0")
+          HERE=$(dirname "$SELF")
+          export PATH="${HERE}/usr/bin:${PATH}"
+          exec XIVTheCalamity "$@"
+          EOF
+          chmod +x "$APPDIR/AppRun"
+
+      # Build AppImage
+      - name: Build AppImage
+        run: |
+          VERSION=$(node -p "require('./frontend/package.json').version")
+          export ARCH=x86_64
+          appimagetool Release/linux-x64/AppDir Release/XIVTheCalamity-${VERSION}-linux-x64.AppImage
+
+      # Upload Linux artifact
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-artifact
+          path: Release/XIVTheCalamity-*-linux-x64.AppImage
 
   # ==================== Windows ====================
   build-windows:
@@ -243,11 +304,6 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
-      # Pre-install NSIS
-      - name: Install NSIS
-        run: choco install nsis --no-progress -y
-
-      # Suffix version in package.json with -pre to align electron-builder release tagging
       - name: Suffix version for pre-release
         working-directory: frontend
         run: |
@@ -261,37 +317,42 @@ jobs:
           }
           "
 
+      # Build frontend
+      - name: Build frontend
+        shell: pwsh
+        run: |
+          cd frontend
+          npm ci
+          npm run build:renderer
+          New-Item -ItemType Directory -Force -Path "../backend/src/XIVTheCalamity/wwwroot"
+          Copy-Item -Path "dist/*" -Destination "../backend/src/XIVTheCalamity/wwwroot" -Recurse -Force
+
       # Build backend (NativeAOT)
       - name: Build backend
         run: |
           cd backend
-          dotnet publish src/XIVTheCalamity.Api.NativeAOT/XIVTheCalamity.Api.NativeAOT.csproj `
-            -c Release -r win-x64 --self-contained true `
-            -o ../Release/temp-backend-windows `
-            /p:PublishTrimmed=true /p:PublishSingleFile=true
+          dotnet publish src/XIVTheCalamity/XIVTheCalamity.csproj `
+            -c Release -r win-x64 --self-contained true /p:PublishAot=true `
+            -o ../Release/win-out
 
-      # Package and publish
-      - name: Package and publish
-        working-directory: frontend
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      # Package zip
+      - name: Package zip
+        shell: pwsh
         run: |
-          npm ci
-          npm run build:renderer
-          
-          # Create Windows-specific electron-builder config
-          node -e "
-          const fs = require('fs');
-          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          pkg.build.extraResources = [
-            { from: '../Release/temp-backend-windows', to: 'backend', filter: ['**/*'] },
-            { from: '../shared/resources', to: 'resources', filter: ['**/*'] }
-          ];
-          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-          "
-          
-          npx electron-builder --win --x64 --publish always
+          $version = node -e "console.log(require('./frontend/package.json').version)"
+          $packageDir = "Release/XIVTheCalamity"
+          New-Item -ItemType Directory -Force -Path $packageDir
+          Copy-Item -Path "Release/win-out/*" -Destination $packageDir -Recurse -Force
+          Copy-Item -Path "shared/resources" -Destination "$packageDir/resources" -Recurse -Force
+          $zipPath = "Release/XIVTheCalamity-$version-win-x64.zip"
+          Compress-Archive -Path $packageDir -DestinationPath $zipPath -Force
+
+      # Upload Windows artifact
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-artifact
+          path: Release/XIVTheCalamity-*-win-x64.zip
 
   # ==================== Publish Release ====================
   publish-release:
@@ -300,11 +361,87 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: Release/artifacts
+
+      - name: Prepare binaries for upload
+        run: |
+          mkdir -p Release/binaries
+          find Release/artifacts/ -type f -exec cp {} Release/binaries/ \;
+          ls -R Release/binaries/
+
+      - name: Generate legacy update metadata (yml)
+        run: |
+          VERSION=$(node -p "require('./frontend/package.json').version")
+          if [[ ! "$VERSION" == *-pre ]]; then
+            VERSION="${VERSION}-pre"
+          fi
+          
+          # Windows metadata
+          WIN_ZIP=$(ls -1 Release/binaries/XIVTheCalamity-*-win-x64.zip 2>/dev/null | tail -1)
+          if [ -n "$WIN_ZIP" ] && [ -f "$WIN_ZIP" ]; then
+            WIN_ZIP_NAME=$(basename "$WIN_ZIP")
+            WIN_SHA=$(sha512sum "$WIN_ZIP" | cut -d' ' -f1)
+            WIN_SIZE=$(wc -c < "$WIN_ZIP" | tr -d ' ')
+            
+            cat <<EOF > Release/binaries/latest.yml
+          version: ${VERSION}
+          files:
+            - url: ${WIN_ZIP_NAME}
+              sha512: ${WIN_SHA}
+              size: ${WIN_SIZE}
+          path: ${WIN_ZIP_NAME}
+          sha512: ${WIN_SHA}
+          releaseDate: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          EOF
+          fi
+          
+          # macOS metadata
+          MAC_ZIP=$(ls -1 Release/binaries/XIVTheCalamity-mac-arm64.zip 2>/dev/null | tail -1)
+          if [ -n "$MAC_ZIP" ] && [ -f "$MAC_ZIP" ]; then
+            MAC_ZIP_NAME=$(basename "$MAC_ZIP")
+            MAC_SHA=$(sha512sum "$MAC_ZIP" | cut -d' ' -f1)
+            MAC_SIZE=$(wc -c < "$MAC_ZIP" | tr -d ' ')
+            
+            cat <<EOF > Release/binaries/latest-mac.yml
+          version: ${VERSION}
+          files:
+            - url: ${MAC_ZIP_NAME}
+              sha512: ${MAC_SHA}
+              size: ${MAC_SIZE}
+          path: ${MAC_ZIP_NAME}
+          sha512: ${MAC_SHA}
+          releaseDate: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          EOF
+          fi
+          
+          # Linux metadata
+          LINUX_APPIMAGE=$(ls -1 Release/binaries/XIVTheCalamity-*-linux-x64.AppImage 2>/dev/null | tail -1)
+          if [ -n "$LINUX_APPIMAGE" ] && [ -f "$LINUX_APPIMAGE" ]; then
+            LINUX_NAME=$(basename "$LINUX_APPIMAGE")
+            LINUX_SHA=$(sha512sum "$LINUX_APPIMAGE" | cut -d' ' -f1)
+            LINUX_SIZE=$(wc -c < "$LINUX_APPIMAGE" | tr -d ' ')
+            
+            cat <<EOF > Release/binaries/latest-linux.yml
+          version: ${VERSION}
+          files:
+            - url: ${LINUX_NAME}
+              sha512: ${LINUX_SHA}
+              size: ${LINUX_SIZE}
+          path: ${LINUX_NAME}
+          sha512: ${LINUX_SHA}
+          releaseDate: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          EOF
+          fi
+          
+          ls -R Release/binaries/
+
       - name: Publish pre-release with download guide
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Read canonical version and append -pre to match electron-builder output
           VERSION=$(node -p "require('./frontend/package.json').version")
           if [[ ! "$VERSION" == *-pre ]]; then
             VERSION="${VERSION}-pre"
@@ -312,22 +449,14 @@ jobs:
           TAG="v${VERSION}"
           echo "Publishing pre-release for tag: $TAG"
           
-          # Extract release notes for current version from RELEASE_NOTES.md
           RELEASE_NOTES=""
           if [ -f "RELEASE_NOTES.md" ]; then
             RELEASE_NOTES=$(awk -v tag="## ${TAG}" 'BEGIN{f=0} $0==tag{f=1;next} f && /^## v/{exit} f{print}' RELEASE_NOTES.md)
             RELEASE_NOTES=$(echo "$RELEASE_NOTES" | sed '/./,$!d' | sed -e :a -e '/^\n*$/{$d;N;ba;}')
           fi
           
-          if [ -n "$RELEASE_NOTES" ]; then
-            echo "Found release notes for $TAG"
-          else
-            echo "No release notes found for $TAG in RELEASE_NOTES.md"
-          fi
-          
-          # Generate changelog notes
-          PREVIOUS_TAG=$(gh api repos/$GITHUB_REPOSITORY/releases/latest --jq '.tag_name' 2>/dev/null || echo "")
           GENERATE_BODY=""
+          PREVIOUS_TAG=$(gh api repos/$GITHUB_REPOSITORY/releases/latest --jq '.tag_name' 2>/dev/null || echo "")
           if [ -n "$PREVIOUS_TAG" ] && [ "$PREVIOUS_TAG" != "$TAG" ]; then
             GENERATE_BODY=$(gh api repos/$GITHUB_REPOSITORY/releases/generate-notes \
               -f tag_name="$TAG" -f previous_tag_name="$PREVIOUS_TAG" \
@@ -339,21 +468,18 @@ jobs:
               --jq '.body' 2>/dev/null || echo "")
           fi
           
-          # Download guide
           GUIDE=$(cat << 'GUIDE_EOF'
           
           ## 📥 下載指南 / Download Guide (Pre-release)
           
           | 平台 Platform | 檔案 File | 說明 Description |
           |---|---|---|
-          | **macOS** (Apple Silicon) | `XIVTheCalamity-VERSION-darwin-arm64.dmg` | 安裝檔，拖曳至 Applications 即可使用 |
+          | **macOS** (Apple Silicon) | `XIVTheCalamity-mac-arm64.zip` | 綠色免安裝壓縮包，解壓後將 `XIVTheCalamity.app` 拖曳至 Applications 即可使用 |
           | **Linux** (x64) | `XIVTheCalamity-VERSION-linux-x64.AppImage` | 執行前需加上執行權限：`chmod +x *.AppImage`</br> 如果在Steam App中使用或是透過Game Mode執行，需額外加上 `--no-sandbox` 執行參數 |
-          | **Windows** (x64) | `XIVTheCalamity-VERSION-win-x64.exe` | 安裝程式，依提示完成安裝 |
+          | **Windows** (x64) | `XIVTheCalamity-VERSION-win-x64.zip` | 免安裝壓縮檔，解壓後執行 `XIVTheCalamity.exe` 即可 |
           
-          > ⚠️ 以下檔案為自動更新系統使用，**一般使用者請勿下載**：
+          > ⚠️ 以下檔案為自動更新系統使用，一般使用者請勿下載：
           > - `*.yml` — 自動更新元資料（`latest-mac.yml`、`latest-linux.yml`、`latest.yml`）
-          > - `*.zip` — macOS 自動更新差異包
-          > - `*.blockmap` — 差異更新索引檔
           
           ---
           
@@ -371,7 +497,6 @@ jobs:
           )
           GUIDE="${GUIDE//VERSION/$VERSION}"
           
-          # Compose full body
           FULL_BODY=""
           SEP=$'\n---\n'
           if [ -n "$RELEASE_NOTES" ]; then
@@ -382,9 +507,9 @@ jobs:
           fi
           FULL_BODY="${FULL_BODY}${GUIDE}"
           
-          # Create release if it doesn't exist, or edit existing one. Always mark as Pre-release.
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-            gh release edit "$TAG" --draft=false --prerelease --notes "$FULL_BODY" --repo "$GITHUB_REPOSITORY"
+            gh release edit "$TAG" --notes "$FULL_BODY" --prerelease --repo "$GITHUB_REPOSITORY"
+            gh release upload "$TAG" Release/binaries/* --repo "$GITHUB_REPOSITORY" --clobber
           else
-            gh release create "$TAG" --title "${VERSION} (Pre-release)" --prerelease --notes "$FULL_BODY" --repo "$GITHUB_REPOSITORY"
+            gh release create "$TAG" Release/binaries/* --title "${VERSION} (Pre-release)" --prerelease --notes "$FULL_BODY" --repo "$GITHUB_REPOSITORY"
           fi
