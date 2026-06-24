@@ -382,7 +382,7 @@ async function persistConfig(closeWindow) {
     const dalamudEnabledChanged = oldDalamudEnabled !== newDalamudEnabled;
     
     console.log('[Settings] Notifying login page of config change');
-    window.xivtc.events.send('config-changed', {
+    await window.xivtc.events.send('config-changed', {
       gamePathChanged,
       dalamudEnabledChanged: dalamudEnabledChanged ? newDalamudEnabled : undefined,
       newGamePath
@@ -895,13 +895,68 @@ function setupEventListeners() {
   });
 }
 
+let toastTimeout = null;
+
+/**
+ * Show a beautiful, lightweight in-page toast notification with a small icon next to the text,
+ * avoiding obtrusive native dialogs with titlebars/program names.
+ */
+function showToast(message, type = 'info') {
+  // Find or create toast container
+  let toast = document.getElementById('customToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'customToast';
+    toast.className = 'toast-container';
+    
+    const icon = document.createElement('div');
+    icon.id = 'customToastIcon';
+    icon.className = 'toast-icon';
+    
+    const msg = document.createElement('span');
+    msg.id = 'customToastMsg';
+    msg.className = 'toast-message';
+    
+    toast.appendChild(icon);
+    toast.appendChild(msg);
+    document.body.appendChild(toast);
+  }
+  
+  const iconEl = document.getElementById('customToastIcon');
+  const msgEl = document.getElementById('customToastMsg');
+  
+  // Set message
+  msgEl.textContent = message;
+  
+  // Set icon and style based on type
+  if (type === 'error') {
+    iconEl.className = 'toast-icon toast-icon-error';
+    iconEl.textContent = '✕'; // Small cross
+  } else {
+    iconEl.className = 'toast-icon toast-icon-info';
+    iconEl.textContent = '✓'; // Small checkmark
+  }
+  
+  // Show toast with smooth CSS transition
+  toast.classList.add('show');
+  
+  // Clear any existing active timeout
+  if (toastTimeout) {
+    clearTimeout(toastTimeout);
+  }
+  
+  // Auto hide after 2.5 seconds
+  toastTimeout = setTimeout(() => {
+    toast.classList.remove('show');
+  }, 2500);
+}
+
 /**
  * Show notification
  */
 function showNotification(message) {
   console.log('[Settings] Notification:', message);
-  // TODO: Implement notification UI
-  alert(message);
+  showToast(message, 'info');
 }
 
 /**
@@ -909,8 +964,7 @@ function showNotification(message) {
  */
 function showError(message) {
   console.error('[Settings] Error:', message);
-  // TODO: Implement error UI
-  alert(message);
+  showToast(message, 'error');
 }
 
 /**
@@ -918,8 +972,7 @@ function showError(message) {
  */
 function showSuccess(message) {
   console.log('[Settings] Success:', message);
-  // TODO: Implement success UI
-  alert(message);
+  showToast(message, 'info');
 }
 
 /**

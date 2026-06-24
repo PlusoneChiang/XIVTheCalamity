@@ -100,6 +100,18 @@ public static class ElectronBridgeEndpoints
             return Results.Ok(new GenericActionResponse(true));
         });
 
+        app.MapPost("/api/window/start-drag", () =>
+        {
+            if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.OSX))
+            {
+                MainWindowContainer.MainWindow?.Invoke(() =>
+                {
+                    Program.StartMacWindowDrag();
+                });
+            }
+            return Results.Ok(new GenericActionResponse(true));
+        });
+
         // 3. Dialog operations
         app.MapPost("/api/app/select-directory", async (HttpContext context) =>
         {

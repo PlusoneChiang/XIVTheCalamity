@@ -114,6 +114,18 @@ async function init() {
   const platformClass = platform === 'darwin' ? 'platform-darwin' : (platform === 'win32' ? 'platform-windows' : 'platform-linux');
   document.body.classList.add(platformClass);
 
+  // macOS 專用：監聽標題列 mousedown 動作並通知 C# 進行原生視窗拖曳
+  if (platform === 'darwin') {
+    const titleBar = document.querySelector('.title-bar');
+    if (titleBar) {
+      titleBar.addEventListener('mousedown', (e) => {
+        if (e.button === 0) { // 只允許滑鼠左鍵
+          window.xivtc.backend.call('/api/window/start-drag', { method: 'POST' });
+        }
+      });
+    }
+  }
+
   console.log('[Login] xivtc is available');
   
   // Load config for language and dev mode

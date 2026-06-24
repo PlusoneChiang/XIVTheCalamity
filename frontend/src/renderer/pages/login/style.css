@@ -21,13 +21,13 @@ html {
 .title-bar {
     position: fixed;
     top: 0;
-    left: 0;
-    right: 0;
+    left: 80px;      /* 避開左上角紅綠燈控制元件 (Traffic lights) */
+    right: 110px;    /* 避開右上角設定按鈕 (Settings button) */
     height: 32px;
     -webkit-app-region: drag;
     z-index: 9999;
     background: transparent;
-    pointer-events: none;
+    pointer-events: auto; /* 必須啟用 pointer-events 才能觸發滑鼠拖曳 */
     display: block;
 }
 

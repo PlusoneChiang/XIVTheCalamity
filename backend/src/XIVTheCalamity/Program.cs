@@ -112,6 +112,35 @@ public class Program
 
             MainWindowContainer.MainWindow = window;
 
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                Task.Run(async () =>
+                {
+                    Log.Information("Starting background macOS window customization loop...");
+                    for (int i = 0; i < 50; i++) // 嘗試 50 次 (共 5 秒)
+                    {
+                        await Task.Delay(100);
+                        
+                        bool customized = false;
+                        window.Invoke(() =>
+                        {
+                            var nsWindow = FindMacWindow();
+                            if (nsWindow != IntPtr.Zero)
+                            {
+                                CustomizeMacWindow(nsWindow);
+                                customized = true;
+                            }
+                        });
+
+                        if (customized)
+                        {
+                            Log.Information("macOS window successfully customized!");
+                            break;
+                        }
+                    }
+                });
+            }
+
             // 監聽視窗關閉以優雅停止 Kestrel 伺服器
             window.WindowClosing += (sender, e) =>
             {
@@ -426,5 +455,143 @@ public class Program
         Directory.CreateDirectory(logDir);
         
         return Path.Combine(logDir, "backend-.log");
+    }
+
+    [DllImport("/usr/lib/libobjc.dylib", EntryPoint = "objc_getClass")]
+    private static extern IntPtr ObjcGetClass(string name);
+
+    [DllImport("/usr/lib/libobjc.dylib", EntryPoint = "sel_registerName")]
+    private static extern IntPtr SelRegisterName(string name);
+
+    [DllImport("/usr/lib/libobjc.dylib", EntryPoint = "objc_msgSend")]
+    private static extern IntPtr ObjcMsgSend(IntPtr receiver, IntPtr selector);
+
+    [DllImport("/usr/lib/libobjc.dylib", EntryPoint = "objc_msgSend")]
+    private static extern void ObjcMsgSend(IntPtr receiver, IntPtr selector, IntPtr arg);
+
+    [DllImport("/usr/lib/libobjc.dylib", EntryPoint = "objc_msgSend")]
+    private static extern void ObjcMsgSend_bool(IntPtr receiver, IntPtr selector, bool arg);
+
+    [DllImport("/usr/lib/libobjc.dylib", EntryPoint = "objc_msgSend")]
+    private static extern void ObjcMsgSend_int(IntPtr receiver, IntPtr selector, int arg);
+
+    [DllImport("/usr/lib/libobjc.dylib", EntryPoint = "objc_msgSend")]
+    private static extern void ObjcMsgSend_intptr(IntPtr receiver, IntPtr selector, IntPtr arg);
+
+    [DllImport("/usr/lib/libobjc.dylib", EntryPoint = "objc_msgSend")]
+    private static extern IntPtr ObjcMsgSend_int_ptr(IntPtr receiver, IntPtr selector, int arg);
+
+    private static IntPtr FindMacWindow()
+    {
+        try
+        {
+            IntPtr nsAppClass = ObjcGetClass("NSApplication");
+            if (nsAppClass == IntPtr.Zero) return IntPtr.Zero;
+
+            IntPtr sharedApp = ObjcMsgSend(nsAppClass, SelRegisterName("sharedApplication"));
+            if (sharedApp == IntPtr.Zero) return IntPtr.Zero;
+
+            IntPtr windowsArray = ObjcMsgSend(sharedApp, SelRegisterName("windows"));
+            if (windowsArray == IntPtr.Zero) return IntPtr.Zero;
+
+            var countSel = SelRegisterName("count");
+            var objectAtIndexSel = SelRegisterName("objectAtIndex:");
+            var titleSel = SelRegisterName("title");
+            var utf8Sel = SelRegisterName("UTF8String");
+
+            int count = (int)ObjcMsgSend(windowsArray, countSel);
+            for (int i = 0; i < count; i++)
+            {
+                IntPtr nsWindow = ObjcMsgSend_int_ptr(windowsArray, objectAtIndexSel, i);
+                if (nsWindow == IntPtr.Zero) continue;
+
+                IntPtr nsTitle = ObjcMsgSend(nsWindow, titleSel);
+                if (nsTitle != IntPtr.Zero)
+                {
+                    IntPtr utf8Ptr = ObjcMsgSend(nsTitle, utf8Sel);
+                    if (utf8Ptr != IntPtr.Zero)
+                    {
+                        string? title = Marshal.PtrToStringAnsi(utf8Ptr);
+                        if (title == "XIV The Calamity")
+                        {
+                            return nsWindow;
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to find native macOS window");
+        }
+
+        return IntPtr.Zero;
+    }
+
+    private static void CustomizeMacWindow(IntPtr nsWindow)
+    {
+        if (nsWindow == IntPtr.Zero) return;
+
+        try
+        {
+            Log.Information("Customizing macOS titlebar for seamless UI...");
+
+            // 1. 取得當前的 styleMask
+            var styleMaskSel = SelRegisterName("styleMask");
+            var styleMask = ObjcMsgSend(nsWindow, styleMaskSel);
+
+            // 2. 將 styleMask 加上 NSWindowStyleMaskFullSizeContentView (1 << 15 = 32768)
+            var setStyleMaskSel = SelRegisterName("setStyleMask:");
+            var fullSizeContentViewMask = (IntPtr)((ulong)styleMask | (1UL << 15));
+            ObjcMsgSend(nsWindow, setStyleMaskSel, fullSizeContentViewMask);
+
+            // 3. 設定標題列透明 (titlebarAppearsTransparent = YES)
+            var setTitlebarTransparentSel = SelRegisterName("setTitlebarAppearsTransparent:");
+            ObjcMsgSend_bool(nsWindow, setTitlebarTransparentSel, true);
+
+            // 4. 隱藏原本的標題文字 (titleVisibility = NSWindowTitleHidden)
+            // 註：NSWindowTitleVisibility 在 64-bit 系統上是 NSInteger (64-bit)，必須使用 ObjcMsgSend_intptr
+            var setTitleVisibilitySel = SelRegisterName("setTitleVisibility:");
+            ObjcMsgSend_intptr(nsWindow, setTitleVisibilitySel, (IntPtr)1); // 1 = NSWindowTitleHidden
+
+            // 5. 強制重繪與重新整理版面 (Force layout and redraw)
+            var displaySel = SelRegisterName("display");
+            ObjcMsgSend(nsWindow, displaySel);
+            
+            var contentViewSel = SelRegisterName("contentView");
+            IntPtr contentView = ObjcMsgSend(nsWindow, contentViewSel);
+            if (contentView != IntPtr.Zero)
+            {
+                var setNeedsDisplaySel = SelRegisterName("setNeedsDisplay:");
+                ObjcMsgSend_bool(contentView, setNeedsDisplaySel, true);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to customize macOS window titlebar");
+        }
+    }
+
+    public static void StartMacWindowDrag()
+    {
+        try
+        {
+            var nsWindow = FindMacWindow();
+            if (nsWindow == IntPtr.Zero) return;
+
+            IntPtr nsAppClass = ObjcGetClass("NSApplication");
+            IntPtr sharedApp = ObjcMsgSend(nsAppClass, SelRegisterName("sharedApplication"));
+            IntPtr currentEvent = ObjcMsgSend(sharedApp, SelRegisterName("currentEvent"));
+
+            if (currentEvent != IntPtr.Zero)
+            {
+                var performDragSel = SelRegisterName("performWindowDragWithEvent:");
+                ObjcMsgSend(nsWindow, performDragSel, currentEvent);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to perform native macOS window drag");
+        }
     }
 }

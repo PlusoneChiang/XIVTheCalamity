@@ -133,8 +133,8 @@ if (!window.xivtc) {
       return res.data || { response: 0 };
     },
     events: {
-      send: (eventName, data) => {
-        apiCall('/api/events/broadcast', 'POST', { eventName, data });
+      send: async (eventName, data) => {
+        return await apiCall('/api/events/broadcast', 'POST', { eventName, data });
       },
       on: (eventName, callback) => {
         if (!window.__photinoEventSource) {
