@@ -287,13 +287,16 @@ public class AppUpdaterService
 sleep 1
 rm -rf ""{currentAppPath}""
 mv ""{newAppFolder}"" ""{currentAppPath}""
-open ""{currentAppPath}""
+# 使用 env -i 呼叫 open，通知 macOS LaunchServices 以全新的系統預設會話啟動 App
+env -i open ""{currentAppPath}""
 rm -rf ""{tempExtractPath}""
 rm -- ""$0""
 ";
                             File.WriteAllText(scriptPath, scriptContent);
                             Process.Start("chmod", $"+x \"{scriptPath}\"")?.WaitForExit();
-                            Process.Start("/bin/bash", $"\"{scriptPath}\"");
+                            
+                            // 用 env -i 執行 bash 腳本，使其以完全乾淨且不繼承的環境變數執行
+                            Process.Start("env", $"-i /bin/bash \"{scriptPath}\"");
                             Environment.Exit(0);
                             return;
                         }
@@ -304,11 +307,12 @@ rm -- ""$0""
                     }
                 }
                 
-                Process.Start("open", path);
+                // 用 env -i 呼叫 open 啟動更新安裝檔
+                Process.Start("env", $"-i open \"{path}\"");
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
-                // 給予執行權限並啟動
+                // Linux 系統沒有 HomeAlias 功能，其環境變數從未被修改，故可以直接啟動新版並繼承當前正常的系統環境
                 Process.Start("chmod", $"+x \"{path}\"")?.WaitForExit();
                 Process.Start(path);
             }
