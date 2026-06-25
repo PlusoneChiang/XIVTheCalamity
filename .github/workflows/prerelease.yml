@@ -131,33 +131,11 @@ jobs:
           # Get version from csproj
           VERSION=$(node -p "require('fs').readFileSync('backend/src/XIVTheCalamity/XIVTheCalamity.csproj', 'utf8').match(/<Version>(.*?)<\/Version>/)[1]")
           
-          # Dynamically create Info.plist
-          cat <<EOF > "$APP_DIR/Contents/Info.plist"
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>CFBundlePackageType</key>
-              <string>APPL</string>
-              <key>CFBundleName</key>
-              <string>XIVTheCalamity</string>
-              <key>CFBundleExecutable</key>
-              <string>XIVTheCalamity</string>
-              <key>CFBundleIdentifier</key>
-              <string>com.plusone.xivthecalamity</string>
-              <key>CFBundleVersion</key>
-              <string>${VERSION}</string>
-              <key>CFBundleShortVersionString</key>
-              <string>${VERSION}</string>
-              <key>CFBundleIconFile</key>
-              <string>XIVTC.icns</string>
-              <key>LSMinimumSystemVersion</key>
-              <string>10.15</string>
-              <key>NSHighResolutionCapable</key>
-              <true/>
-          </dict>
-          </plist>
-          EOF
+          # Copy Info.plist from repository and dynamically patch versions using plutil
+          cp backend/src/XIVTheCalamity/Info.plist "$APP_DIR/Contents/Info.plist"
+          plutil -replace CFShortVersionString -string "$VERSION" "$APP_DIR/Contents/Info.plist"
+          plutil -replace CFBundleShortVersionString -string "$VERSION" "$APP_DIR/Contents/Info.plist"
+          plutil -replace CFBundleVersion -string "$VERSION" "$APP_DIR/Contents/Info.plist"
           
           cp frontend/build/XIVTC.icns "$APP_DIR/Contents/Resources/"
           cp -R shared/resources/ "$APP_DIR/Contents/Resources/resources/"
