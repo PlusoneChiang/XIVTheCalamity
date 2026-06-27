@@ -1,5 +1,14 @@
 # Release Notes
 
+## v1.9.4
+#### 🇹🇼 zh-TW
+### 🐛 修復
+- 設定頁面版面錯誤
+
+#### 🇺🇸 English
+### 🐛 Bug Fixes
+- Setting page display error
+
 ## v1.9.3
 #### 🇹🇼 zh-TW
 ### 🔧 調整與優化
