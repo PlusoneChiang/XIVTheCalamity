@@ -269,29 +269,9 @@ public class GameLaunchService
     /// </summary>
     private static string GetFfxivConfigPath()
     {
-        var homeDir = HomePathService.GetEffectiveHomePath();
-        string appSupport;
-        
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-        {
-            appSupport = Path.Combine(homeDir, "Library", "Application Support", "XIVTheCalamity");
-        }
-        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-        {
-            appSupport = Path.Combine(homeDir, ".config", "XIVTheCalamity");
-        }
-        else
-        {
-            // Windows
-            appSupport = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "XIVTheCalamity");
-        }
-        
-        var ffxivConfigPath = Path.Combine(appSupport, "ffxivConfig");
-        
-        // Ensure directory exists
-        Directory.CreateDirectory(ffxivConfigPath);
-        
-        return ffxivConfigPath;
+        var path = PlatformPathService.Instance.GetFfxivConfigDirectory();
+        Directory.CreateDirectory(path);
+        return path;
     }
     
     /// <summary>

@@ -31,7 +31,7 @@ public class WinePathService
     public string PrefixSystem32 { get; }
     
     // Application paths
-    public string FfxivConfigPath { get; }
+    public string FfxivConfigPath => PlatformPathService.Instance.GetFfxivConfigDirectory();
     public string LogsPath { get; }
     public string DalamudLogsPath { get; }
     
@@ -118,7 +118,6 @@ public class WinePathService
         PrefixSystem32 = Path.Combine(PrefixWindows, "system32");
         
         // Application paths
-        FfxivConfigPath = Path.Combine(AppSupport, "ffxivConfig");
         LogsPath = Path.Combine(AppSupport, "logs");
         DalamudLogsPath = Path.Combine(LogsPath, "Dalamud");
         

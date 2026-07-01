@@ -106,6 +106,14 @@ const translations = {
     
     // General settings
     'settings.general.basic': '基本設定',
+    'settings.general.profile_management': '設定檔管理',
+    'settings.general.current_profile': '當前設定檔',
+    'settings.general.add_profile': '新增',
+    'settings.general.delete_profile': '刪除',
+    'settings.general.profile_help': '切換設定檔會變更程式設定、遊戲個人設定與 Dalamud 插件。Wine 主程式與容器不受影響。',
+    'settings.profile.add_title': '新增設定檔',
+    'settings.profile.name_label': '設定檔名稱 (僅限英數字)',
+    'settings.profile.copy_default': '複製預設設定檔的設定',
     'settings.general.language': '語言',
     'settings.general.language_help': '選擇介面語言',
     'settings.general.debug': 'Debug 記錄',
@@ -546,6 +554,14 @@ const translations = {
     
     // General settings
     'settings.general.basic': 'Basic Settings',
+    'settings.general.profile_management': 'Profile Management',
+    'settings.general.current_profile': 'Current Profile',
+    'settings.general.add_profile': 'Add',
+    'settings.general.delete_profile': 'Delete',
+    'settings.general.profile_help': 'Switching profiles will change application settings, game configuration, and Dalamud plugins. Wine core and Wineprefix are not affected.',
+    'settings.profile.add_title': 'Add Profile',
+    'settings.profile.name_label': 'Profile Name (letters/numbers only)',
+    'settings.profile.copy_default': 'Copy settings from default profile',
     'settings.general.language': 'Language',
     'settings.general.language_help': 'Select interface language',
     'settings.general.debug': 'Debug Logging',

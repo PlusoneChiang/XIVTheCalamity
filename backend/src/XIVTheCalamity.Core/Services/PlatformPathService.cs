@@ -59,6 +59,13 @@ public class PlatformPathService
     /// </summary>
     public OSPlatform CurrentPlatform { get; }
 
+    private string _activeProfile = "default";
+
+    /// <summary>
+    /// Currently active profile name
+    /// </summary>
+    public string ActiveProfile => _activeProfile;
+
     private PlatformPathService()
     {
         CurrentPlatform = GetCurrentPlatform();
@@ -100,7 +107,36 @@ public class PlatformPathService
                 $"Unsupported platform: {RuntimeInformation.OSDescription}");
         }
 
+        // Load active profile from file
+        LoadActiveProfile();
+
         // Ensure directories exist
+        EnsureDirectoriesExist();
+    }
+
+    private void LoadActiveProfile()
+    {
+        var activeFile = Path.Combine(AppDataDirectory, "active_profile.txt");
+        if (File.Exists(activeFile))
+        {
+            var name = File.ReadAllText(activeFile).Trim();
+            if (!string.IsNullOrEmpty(name))
+            {
+                _activeProfile = name;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Switch active profile and write it to persistent storage
+    /// </summary>
+    public void SwitchProfile(string profileName)
+    {
+        _activeProfile = string.IsNullOrWhiteSpace(profileName) ? "default" : profileName.Trim();
+        var activeFile = Path.Combine(AppDataDirectory, "active_profile.txt");
+        File.WriteAllText(activeFile, _activeProfile);
+
+        // Ensure directories exist for the new profile
         EnsureDirectoriesExist();
     }
 
@@ -109,7 +145,19 @@ public class PlatformPathService
     /// </summary>
     public string GetConfigPath(string filename = "config.json")
     {
-        return Path.Combine(AppDataDirectory, filename);
+        return _activeProfile == "default"
+            ? Path.Combine(AppDataDirectory, filename)
+            : Path.Combine(AppDataDirectory, "profiles", _activeProfile, filename);
+    }
+
+    /// <summary>
+    /// Get config file path for a specific profile
+    /// </summary>
+    public string GetConfigPathForProfile(string profileName, string filename = "config.json")
+    {
+        return profileName == "default"
+            ? Path.Combine(AppDataDirectory, filename)
+            : Path.Combine(AppDataDirectory, "profiles", profileName, filename);
     }
 
     /// <summary>
@@ -127,7 +175,19 @@ public class PlatformPathService
     /// </summary>
     public string GetDalamudDirectory()
     {
-        return Path.Combine(UserDataDirectory, "Dalamud");  // 大写 D，保持向后兼容
+        return _activeProfile == "default"
+            ? Path.Combine(UserDataDirectory, "Dalamud")
+            : Path.Combine(UserDataDirectory, "profiles", _activeProfile, "Dalamud");
+    }
+
+    /// <summary>
+    /// Get FFXIV config directory
+    /// </summary>
+    public string GetFfxivConfigDirectory()
+    {
+        return _activeProfile == "default"
+            ? Path.Combine(AppDataDirectory, "ffxivConfig")
+            : Path.Combine(AppDataDirectory, "profiles", _activeProfile, "ffxivConfig");
     }
 
     /// <summary>
@@ -187,6 +247,13 @@ public class PlatformPathService
         Directory.CreateDirectory(UserDataDirectory);
         Directory.CreateDirectory(CacheDirectory);
         Directory.CreateDirectory(LogsDirectory);
+
+        if (_activeProfile != "default")
+        {
+            Directory.CreateDirectory(Path.Combine(AppDataDirectory, "profiles", _activeProfile));
+            Directory.CreateDirectory(GetFfxivConfigDirectory());
+            Directory.CreateDirectory(GetDalamudDirectory());
+        }
     }
 
     /// <summary>

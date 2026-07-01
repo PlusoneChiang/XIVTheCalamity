@@ -99,6 +99,11 @@ namespace XIVTheCalamity.Api.NativeAOT;
 // Dalamud Response Types
 [JsonSerializable(typeof(ApiResponse<DalamudStatus>))]
 
+// Profile Response Types
+[JsonSerializable(typeof(ProfilesResponse))]
+[JsonSerializable(typeof(ProfileSwitchRequest))]
+[JsonSerializable(typeof(ApiResponse<ProfilesResponse>))]
+
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -129,3 +134,7 @@ public record DiscordRpcRemoveResponse(bool Success, string Message, DiscordRpcB
 // Game response types (NativeAOT compatible)
 public record GameLaunchResponse(int ProcessId, int? ExitCode = null);
 public record GameExitResponse(int ExitCode);
+
+// Profile response types (NativeAOT compatible)
+public record ProfilesResponse(string Active, string[] Profiles);
+public record ProfileSwitchRequest(string Name, bool CopyDefault = false);

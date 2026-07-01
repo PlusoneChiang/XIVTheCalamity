@@ -51,6 +51,23 @@
         </div>
 
         <div class="settings-section">
+          <h2 data-i18n="settings.general.profile_management">設定檔管理</h2>
+          <div class="form-group">
+            <div class="full-width" style="display: flex; flex-direction: row; gap: 10px; align-items: flex-end; width: 100%;">
+              <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+                <label for="profileSelect" data-i18n="settings.general.current_profile">當前設定檔</label>
+                <select id="profileSelect" style="width: 100%;">
+                  <option value="default">預設 (default)</option>
+                </select>
+              </div>
+              <button id="addProfileButton" class="btn btn-secondary" style="height: 30px; padding: 0 16px;" data-i18n="settings.general.add_profile">新增</button>
+              <button id="deleteProfileButton" class="btn btn-danger" style="height: 30px; padding: 0 16px;" data-i18n="settings.general.delete_profile">刪除</button>
+            </div>
+            <p class="help-text" data-i18n="settings.general.profile_help" style="grid-column: span 2;">切換設定檔會變更程式設定、遊戲個人設定與 Dalamud 插件。Wine 主程式與容器不受影響。</p>
+          </div>
+        </div>
+
+        <div class="settings-section">
           <h2 data-i18n="settings.general.theme">主題設定</h2>
           <div class="form-group">
             <div class="full-width">
@@ -426,6 +443,29 @@ data-styled.g160[id="sc-1ykasxb-0"]{content:"eDynhg,"}/*!sc*/
       <button id="cancelButton" class="btn btn-secondary" data-i18n="button.cancel">取消</button>
       <button id="applyButton" class="btn btn-secondary" data-i18n="button.apply">套用</button>
       <button id="saveButton" class="btn btn-primary" data-i18n="button.save">儲存</button>
+    </div>
+  </div>
+
+  <!-- Add Profile Modal -->
+  <div id="addProfileModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 360px; padding: 24px;">
+      <h2 data-i18n="settings.profile.add_title" style="font-size: 16px; margin-bottom: 12px; text-align: left;">新增設定檔</h2>
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <label for="newProfileNameInput" data-i18n="settings.profile.name_label" style="font-size: 11px; color: rgba(255,255,255,0.7); text-align: left;">設定檔名稱 (僅限英數字)</label>
+          <input type="text" id="newProfileNameInput" placeholder="MyProfile" style="width: 100%; padding: 8px 12px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; font-size: 13px;">
+        </div>
+        <div class="checkbox-group" style="justify-content: flex-start; gap: 8px;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; font-size: 12px;">
+            <input type="checkbox" id="copyDefaultSettingsCheckbox" checked style="margin: 0;">
+            <span data-i18n="settings.profile.copy_default">複製預設設定檔的設定</span>
+          </label>
+        </div>
+        <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px;">
+          <button id="addProfileCancelBtn" class="btn btn-secondary" style="flex: 1; padding: 8px;" data-i18n="button.cancel">取消</button>
+          <button id="addProfileConfirmBtn" class="btn btn-primary" style="flex: 1; padding: 8px;" data-i18n="button.confirm">確定</button>
+        </div>
+      </div>
     </div>
   </div>
 

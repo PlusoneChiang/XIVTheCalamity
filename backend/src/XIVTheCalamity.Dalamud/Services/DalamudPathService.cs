@@ -9,32 +9,33 @@ namespace XIVTheCalamity.Dalamud.Services;
 /// </summary>
 public class DalamudPathService
 {
-    private readonly string _basePath;
-    
     public DalamudPathService()
     {
-        // Use PlatformPathService to get correct cross-platform path
-        var platformPaths = PlatformPathService.Instance;
-        _basePath = platformPaths.GetDalamudDirectory();
     }
     
-    /// <summary>Dalamud root directory</summary>
-    public string BasePath => _basePath;
+    /// <summary>Dalamud root directory (shared among all profiles)</summary>
+    public string BasePath => 
+        Path.Combine(PlatformPathService.Instance.UserDataDirectory, "Dalamud");
     
     /// <summary>Hooks directory (Dalamud main program)</summary>
-    public string HooksPath => Path.Combine(_basePath, "Hooks");
+    public string HooksPath => Path.Combine(BasePath, "Hooks");
     
     /// <summary>Runtime directory (.NET Runtime)</summary>
-    public string RuntimePath => Path.Combine(_basePath, "Runtime");
+    public string RuntimePath => Path.Combine(BasePath, "Runtime");
     
     /// <summary>Assets directory (UI resources)</summary>
-    public string AssetsPath => Path.Combine(_basePath, "Assets");
+    public string AssetsPath => Path.Combine(BasePath, "Assets");
+
+    /// <summary>Profile-specific Dalamud directory</summary>
+    private string ProfileDalamudPath => PlatformPathService.Instance.ActiveProfile == "default"
+        ? BasePath
+        : Path.Combine(PlatformPathService.Instance.UserDataDirectory, "profiles", PlatformPathService.Instance.ActiveProfile, "Dalamud");
     
-    /// <summary>Configuration directory</summary>
-    public string ConfigPath => Path.Combine(_basePath, "Config");
+    /// <summary>Configuration directory (Profile-specific)</summary>
+    public string ConfigPath => Path.Combine(ProfileDalamudPath, "Config");
     
-    /// <summary>Plugins directory</summary>
-    public string PluginsPath => Path.Combine(_basePath, "Plugins");
+    /// <summary>Plugins directory (Profile-specific)</summary>
+    public string PluginsPath => Path.Combine(ProfileDalamudPath, "Plugins");
     
     /// <summary>Get Hooks directory for specific version</summary>
     public string GetHooksVersionPath(string version) => 

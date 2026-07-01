@@ -12,7 +12,7 @@ namespace XIVTheCalamity.Core.Services;
 public class ConfigService
 {
     private static readonly object _lock = new();
-    private readonly string _configPath;
+    private string ConfigPath => GetConfigFilePath();
     private readonly IEnumerable<IPlatformConfigProvider> _platformProviders;
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
@@ -32,11 +32,10 @@ public class ConfigService
 
     public ConfigService(IEnumerable<IPlatformConfigProvider> platformProviders)
     {
-        _configPath = GetConfigFilePath();
         _platformProviders = platformProviders;
         
         // Ensure config directory exists
-        var configDir = Path.GetDirectoryName(_configPath);
+        var configDir = Path.GetDirectoryName(ConfigPath);
         if (!string.IsNullOrEmpty(configDir) && !Directory.Exists(configDir))
         {
             Directory.CreateDirectory(configDir);
@@ -46,27 +45,27 @@ public class ConfigService
     /// <summary>
     /// Get config file path
     /// </summary>
-    public string GetConfigPath() => _configPath;
+    public string GetConfigPath() => ConfigPath;
 
     /// <summary>
     /// Load configuration
     /// </summary>
-    public async Task<AppConfig> LoadConfigAsync()
+    public async Task<AppConfig> LoadConfigAsync(string? profileName = null)
     {
+        var configPath = GetConfigFilePath(profileName);
         lock (_lock)
         {
-            if (!File.Exists(_configPath))
+            if (!File.Exists(configPath))
             {
-                Console.WriteLine($"[Config] Config file not found, creating default config at {_configPath}");
+                Console.WriteLine($"[Config] Config file not found, creating default config at {configPath}");
                 var defaultConfig = CreateDefaultConfig();
-                SaveConfigSync(defaultConfig);
                 return defaultConfig;
             }
         }
 
         try
         {
-            var json = await File.ReadAllTextAsync(_configPath);
+            var json = await File.ReadAllTextAsync(configPath);
             var config = JsonSerializer.Deserialize<AppConfig>(json, _jsonOptions);
             
             if (config is null)
@@ -120,10 +119,10 @@ public class ConfigService
             Console.WriteLine($"[Config] Invalid JSON format: {ex.Message}");
             
             // Backup corrupted config
-            var backupPath = $"{_configPath}.backup";
-            if (File.Exists(_configPath))
+            var backupPath = $"{configPath}.backup";
+            if (File.Exists(configPath))
             {
-                File.Copy(_configPath, backupPath, true);
+                File.Copy(configPath, backupPath, true);
                 Console.WriteLine($"[Config] Backed up corrupted config to {backupPath}");
             }
             
@@ -139,7 +138,7 @@ public class ConfigService
     /// <summary>
     /// Save configuration
     /// </summary>
-    public Task SaveConfigAsync(AppConfig config)
+    public Task SaveConfigAsync(AppConfig config, string? profileName = null)
     {
         // Sync split config properties back to the main Wine wrapper object before save and validation
         if (config.WineGraphics != null || config.WinePerformance != null || config.WineCompat != null)
@@ -175,7 +174,7 @@ public class ConfigService
         
         lock (_lock)
         {
-            SaveConfigSync(config);
+            SaveConfigSync(config, profileName);
         }
         
         return Task.CompletedTask;
@@ -184,12 +183,13 @@ public class ConfigService
     /// <summary>
     /// Save config synchronously (internal)
     /// </summary>
-    private void SaveConfigSync(AppConfig config)
+    private void SaveConfigSync(AppConfig config, string? profileName = null)
     {
+        var configPath = GetConfigFilePath(profileName);
         try
         {
             var json = JsonSerializer.Serialize(config, _jsonOptions);
-            File.WriteAllText(_configPath, json);
+            File.WriteAllText(configPath, json);
             Console.WriteLine("[Config] Config saved successfully");
         }
         catch (Exception ex)
@@ -262,9 +262,13 @@ public class ConfigService
     /// <summary>
     /// Get config file path
     /// </summary>
-    private static string GetConfigFilePath()
+    private static string GetConfigFilePath(string? profileName = null)
     {
         var platformPaths = PlatformPathService.Instance;
-        return platformPaths.GetConfigPath("config.json");
+        if (string.IsNullOrEmpty(profileName))
+        {
+            return platformPaths.GetConfigPath("config.json");
+        }
+        return platformPaths.GetConfigPathForProfile(profileName, "config.json");
     }
 }

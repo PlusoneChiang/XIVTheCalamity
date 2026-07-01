@@ -9,6 +9,10 @@ import { getLastUsedAccount, deleteOTPSecret } from '../../utils/credentialsStor
 
 let currentConfig = null;
 let currentPlatform = 'win32';
+let localProfiles = ['default'];
+let profileQueue = []; // Action queue: { action: 'add'|'delete', name, copyDefault }
+let profileConfigsCache = {}; // Cache of unsaved profile form data
+let currentSelectedProfile = 'default';
 
 /**
  * Konami Code 偵測引擎 - 使用 KeyCode 避免大小寫問題
@@ -51,8 +55,8 @@ async function init() {
   // Initialize tab navigation
   initTabNavigation();
   
-  // Load configuration
-  await loadConfig();
+  // Load configuration and apply theme/locale visuals on startup active profile load
+  await loadConfig(null, true);
   
   // Update Dalamud tab visibility based on configuration
   updateDalamudTabVisibility();
@@ -131,17 +135,21 @@ function switchTab(tabId) {
 /**
  * Load configuration from backend
  */
-async function loadConfig() {
+async function loadConfig(profile = null, applyVisuals = false) {
   try {
-    const response = await window.xivtc.backend.call('/api/config', {
+    const url = profile ? `/api/config?profile=${profile}` : '/api/config';
+    const response = await window.xivtc.backend.call(url, {
       method: 'GET'
     });
     if (response.ok && response.data) {
       // Handle new API response format: { success: true, data: {...} }
       const configData = response.data.success ? response.data.data : response.data;
       currentConfig = configData;
-      populateForm(currentConfig);
-      console.log('[Settings] Configuration loaded:', currentConfig);
+      populateForm(currentConfig, applyVisuals);
+      if (profile) {
+        currentSelectedProfile = profile;
+      }
+      console.log('[Settings] Configuration loaded for profile:', profile || 'active', currentConfig);
     }
   } catch (error) {
     console.error('[Settings] Failed to load configuration:', error);
@@ -194,13 +202,15 @@ function updateDalamudTabVisibility() {
 /**
  * Populate form with current configuration
  */
-function populateForm(config) {
+function populateForm(config, applyVisuals = false) {
   if (!config) return;
   
   // General settings
   if (config.launcher) {
     document.getElementById('language').value = config.launcher.language || 'zh-TW';
-    i18n.setLocale(config.launcher.language || 'zh-TW');
+    if (applyVisuals) {
+      i18n.setLocale(config.launcher.language || 'zh-TW');
+    }
     document.getElementById('debugLogging').checked = config.launcher.developmentMode || false;
     document.getElementById('enablePreRelease').checked = config.launcher.enablePreRelease || false;
     updateDebugOnlyVisibility();
@@ -208,7 +218,9 @@ function populateForm(config) {
     const savedTheme = config.launcher.theme || 'dark';
     const themeRadio = document.querySelector(`input[name="theme"][value="${savedTheme}"]`);
     if (themeRadio) themeRadio.checked = true;
-    applyTheme(savedTheme);
+    if (applyVisuals) {
+      applyTheme(savedTheme);
+    }
   }
   
   if (config.game) {
@@ -326,6 +338,7 @@ async function persistConfig(closeWindow) {
   try {
     showLoadingOverlay(i18n.t('settings.applying'));
     
+    const selectedProfile = document.getElementById('profileSelect')?.value || 'default';
     const formData = collectFormData();
     
     const oldGamePath = currentConfig?.game?.gamePath || '';
@@ -338,10 +351,34 @@ async function persistConfig(closeWindow) {
     
     applyTheme(formData.launcher.theme || 'dark');
     
-    console.log('[Settings] Saving configuration:', formData);
+    console.log('[Settings] Saving configuration for profile:', selectedProfile, formData);
     
-    // Step 1: Save configuration
-    const response = await window.xivtc.backend.call('/api/config', {
+    // Step 1: Execute the queued profile commands
+    if (profileQueue.length > 0) {
+      console.log('[Settings] Executing profile action queue:', profileQueue);
+      for (const op of profileQueue) {
+        if (op.action === 'add') {
+          try {
+            await window.xivtc.backend.call('/api/config/profiles', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: op.name, copyDefault: op.copyDefault })
+            });
+          } catch (err) {
+            console.error('[Settings] Queue ADD failed:', op.name, err);
+          }
+        } else if (op.action === 'delete') {
+          try {
+            await window.xivtc.backend.call(`/api/config/profiles/${op.name}`, { method: 'DELETE' });
+          } catch (err) {
+            console.error('[Settings] Queue DELETE failed:', op.name, err);
+          }
+        }
+      }
+    }
+
+    // Step 2: Save final selected profile configuration
+    const response = await window.xivtc.backend.call(`/api/config?profile=${selectedProfile}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: formData
@@ -352,9 +389,23 @@ async function persistConfig(closeWindow) {
     if (!response.ok) {
       throw new Error(response.data?.message || response.statusText || 'Save failed');
     }
+
+    // Step 3: Switch persistent active profile to the final selected profile
+    console.log('[Settings] Persistently switching active profile to:', selectedProfile);
+    const switchResponse = await window.xivtc.backend.call('/api/config/profiles/switch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: selectedProfile })
+    });
+
+    if (!switchResponse.ok) {
+      throw new Error('Failed to switch active profile');
+    }
     
-    console.log('[Settings] Configuration saved successfully');
+    console.log('[Settings] Action queue processed, config saved and active profile switched successfully');
     currentConfig = formData;
+    profileQueue = []; // Clear transaction queue
+    profileConfigsCache = {}; // Clear cache
     
     // Step 2: Apply Wine settings to registry (macOS only)
     if (currentPlatform === 'darwin') {
@@ -503,6 +554,9 @@ function initGeneralTab() {
       alert(i18n.t('settings.general.clear_otp_error'));
     }
   });
+
+  // Initialize profile section
+  initProfileSection();
 }
 
 /**
@@ -878,7 +932,10 @@ function showLicense() {
 function setupEventListeners() {
   document.getElementById('saveButton').addEventListener('click', saveConfig);
   document.getElementById('applyButton').addEventListener('click', applyConfig);
-  document.getElementById('cancelButton').addEventListener('click', () => window.close());
+  document.getElementById('cancelButton').addEventListener('click', async () => {
+    await cleanupUnsavedProfiles();
+    window.close();
+  });
   
   // Exit code dialog OK button
   document.getElementById('exitCodeOkButton').addEventListener('click', () => {
@@ -1051,6 +1108,170 @@ async function setDalamudTabEnabled(enabled) {
     hideKonamiCodeDialog();
     showError(i18n.t('settings.konami.error') || '✗ 操作失敗，請重試');
   }
+}
+
+/**
+ * Initialize Profile Section
+ */
+async function initProfileSection() {
+  const select = document.getElementById('profileSelect');
+  const addButton = document.getElementById('addProfileButton');
+  const deleteButton = document.getElementById('deleteProfileButton');
+  
+  if (!select || !addButton || !deleteButton) return;
+
+  // 1. Fetch current profiles or fallback to default
+  let active = 'default';
+  let profiles = ['default'];
+  try {
+    const response = await window.xivtc.backend.call('/api/config/profiles', { method: 'GET' });
+    if (response.ok && response.data) {
+      const result = response.data.success ? response.data.data : response.data;
+      active = result.active || 'default';
+      profiles = result.profiles || ['default'];
+      localProfiles = [...profiles];
+      currentSelectedProfile = active; // Synchronize active profile name on startup
+    }
+  } catch (err) {
+    console.warn('[Settings] Failed to fetch profiles, using default fallback:', err);
+  }
+
+  // Helper to populate dropdown
+  function updateDropdown(profilesList, selectedValue) {
+    select.innerHTML = '';
+    profilesList.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p;
+      opt.textContent = p === 'default' ? '預設 (default)' : p;
+      select.appendChild(opt);
+    });
+    select.value = selectedValue;
+  }
+
+  // 2. Populate dropdown initially
+  updateDropdown(profiles, active);
+
+  // 3. Select change listener (Preview config with in-memory transaction support)
+  select.addEventListener('change', async (e) => {
+    const targetProfile = e.target.value;
+    console.log('[Settings] Previewing configuration for profile:', targetProfile);
+    
+    // Save current form state to cache
+    profileConfigsCache[currentSelectedProfile] = collectFormData();
+    
+    if (profileConfigsCache[targetProfile]) {
+      populateForm(profileConfigsCache[targetProfile], false); // Preview only, do not apply live theme
+      currentSelectedProfile = targetProfile;
+    } else {
+      await loadConfig(targetProfile, false); // Preview only, do not apply live theme
+    }
+  });
+
+  // 4. Add profile listener -> show custom modal
+  const modal = document.getElementById('addProfileModal');
+  const cancelBtn = document.getElementById('addProfileCancelBtn');
+  const confirmBtn = document.getElementById('addProfileConfirmBtn');
+  const nameInput = document.getElementById('newProfileNameInput');
+  const copyCheckbox = document.getElementById('copyDefaultSettingsCheckbox');
+
+  addButton.addEventListener('click', () => {
+    if (modal && nameInput && copyCheckbox) {
+      nameInput.value = '';
+      copyCheckbox.checked = true;
+      modal.style.display = 'flex';
+      nameInput.focus();
+    }
+  });
+
+  if (cancelBtn && modal) {
+    cancelBtn.addEventListener('click', () => {
+      modal.style.display = 'none';
+    });
+  }
+
+  if (confirmBtn && modal && nameInput && copyCheckbox) {
+    confirmBtn.addEventListener('click', async () => {
+      const name = nameInput.value.trim();
+      if (!name) {
+        alert(i18n.getLocale() === 'en-US' ? "Please enter a profile name" : "請輸入設定檔名稱");
+        return;
+      }
+      const sanitized = name.replace(/[^a-zA-Z0-9_-]/g, '');
+      if (!sanitized || sanitized !== name) {
+        alert(i18n.getLocale() === 'en-US' ? "Profile name must only contain alphanumeric characters, hyphens, or underscores" : "設定檔名稱僅限使用英數字、底線或減號");
+        return;
+      }
+      modal.style.display = 'none';
+      
+      // Save current selected profile form state to cache before switching
+      profileConfigsCache[currentSelectedProfile] = collectFormData();
+      
+      // Cancel any queued deletion for this profile name
+      profileQueue = profileQueue.filter(op => !(op.action === 'delete' && op.name === sanitized));
+      
+      if (!localProfiles.includes(sanitized)) {
+        localProfiles.push(sanitized);
+      }
+      
+      // Queue the ADD command/action
+      if (!profileQueue.some(op => op.action === 'add' && op.name === sanitized)) {
+        profileQueue.push({ action: 'add', name: sanitized, copyDefault: copyCheckbox.checked });
+      }
+      
+      // Create in-memory profile config
+      let newConfig = collectFormData(); // Defaults to currently active settings (copyDefault = true)
+      if (!copyCheckbox.checked) {
+        newConfig.game = { gamePath: "" };
+        newConfig.dalamud = { enabled: false, injectDelay: 5000, safeMode: false, pluginRepoUrl: "" };
+      }
+      profileConfigsCache[sanitized] = newConfig;
+
+      // Update select and set selected value to new profile
+      updateDropdown(localProfiles, sanitized);
+      currentSelectedProfile = sanitized;
+      populateForm(profileConfigsCache[sanitized], false); // Preview only, do not apply live theme
+    });
+  }
+
+  // 5. Delete profile listener
+  deleteButton.addEventListener('click', async () => {
+    const current = select.value;
+    if (current === 'default') {
+      alert(i18n.getLocale() === 'en-US' ? "Default profile cannot be deleted" : "預設設定檔不可刪除");
+      return;
+    }
+    const confirmMsg = i18n.getLocale() === 'en-US' 
+      ? `Are you sure you want to delete profile "${current}"?` 
+      : `確定要刪除設定檔「${current}」嗎？這將會清除其專屬設定與插件。`;
+    if (confirm(confirmMsg)) {
+      // Cancel any queued addition for this profile name
+      profileQueue = profileQueue.filter(op => !(op.action === 'add' && op.name === current));
+      
+      // Queue the DELETE command/action
+      if (!profileQueue.some(op => op.action === 'delete' && op.name === current)) {
+        profileQueue.push({ action: 'delete', name: current });
+      }
+      
+      localProfiles = localProfiles.filter(p => p !== current);
+      delete profileConfigsCache[current];
+      
+      // Save current state of default to cache if not already there
+      if (!profileConfigsCache['default']) {
+        profileConfigsCache['default'] = collectFormData();
+      }
+      
+      // Update select and set selected value back to default
+      updateDropdown(localProfiles, 'default');
+      currentSelectedProfile = 'default';
+      populateForm(profileConfigsCache['default'], false); // Preview only, do not apply live theme
+    }
+  });
+}
+
+/**
+ * Cleanup unsaved newly-added profile directories on Cancel
+ */
+async function cleanupUnsavedProfiles() {
 }
 
 // Initialize on load
