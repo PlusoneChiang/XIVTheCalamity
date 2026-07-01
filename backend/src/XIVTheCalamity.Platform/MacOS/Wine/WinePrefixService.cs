@@ -441,7 +441,8 @@ public class WinePrefixService
                 }
             }
 
-            // Add MediaFoundation section if not exists
+            // Ensure the MediaFoundation section exists and enables the old byte-stream handler.
+            content = Regex.Replace(content, @"(?m)^""DisableGstByteStreamHandler""=.*$", "\"DisableGstByteStreamHandler\"=\"0\"", RegexOptions.Multiline);
             if (!content.Contains("[Software\\\\Wine\\\\MediaFoundation]"))
             {
                 var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
@@ -450,11 +451,21 @@ public class WinePrefixService
                     $"\"DisableGstByteStreamHandler\"=\"0\"\n";
                 content += mediaFoundation;
             }
+            else if (!Regex.IsMatch(content, @"(?m)^""DisableGstByteStreamHandler""=", RegexOptions.Multiline))
+            {
+                var mediaFoundationIndex = content.IndexOf("[Software\\\\Wine\\\\MediaFoundation]");
+                var sectionStart = mediaFoundationIndex + "[Software\\\\Wine\\\\MediaFoundation]".Length;
+                var firstLineBreak = content.IndexOf('\n', sectionStart);
+                if (firstLineBreak > 0)
+                {
+                    content = content.Insert(firstLineBreak + 1, "\"DisableGstByteStreamHandler\"=\"0\"\n");
+                }
+            }
 
             // Write back to file
             await File.WriteAllTextAsync(userRegPath, content, cancellationToken);
             
-            _logger?.LogInformation("MediaFoundation configured successfully (fast mode)");
+            _logger?.LogInformation("MediaFoundation configured successfully with GStreamer (fast mode)");
         }
         catch (Exception ex)
         {

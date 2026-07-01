@@ -124,7 +124,7 @@ public class WinePathService
         
         GstLib = Path.Combine(WineRoot, "lib");
         GstPlugin = Path.Combine(GstLib, "gstreamer-1.0");
-        GstRegistry = Path.Combine(WinePrefix, "gstreamer-registry.bin");
+        GstRegistry = Path.Combine(AppSupport, "gstreamer-registry.bin");
         
         Fonts = new[]
         {
