@@ -169,9 +169,6 @@ async function init() {
   // Settings button
   const settingsBtn = document.getElementById('settingsBtn');
   settingsBtn.addEventListener('click', handleOpenSettings);
-
-  // Settings modal close actions
-  document.getElementById('settingsModalOverlay').addEventListener('click', closeSettingsModal);
   
   // Close button (Linux only)
   const closeBtn = document.getElementById('closeBtn');
