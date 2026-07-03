@@ -30,6 +30,8 @@ public class Program
     [DllImport("libc", EntryPoint = "getuid")]
     private static extern uint GetUid();
 
+
+
     [STAThread]
     public static void Main(string[] args)
     {
@@ -78,40 +80,55 @@ public class Program
             var virtualHostClient = new HttpClient { BaseAddress = new Uri($"http://localhost:{port}") };
 
             var isDevMode = IsDevelopmentMode();
+            string vhScheme = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "https" : "xivtc";
             var window = new PhotinoWindow()
                 .SetTitle("XIV The Calamity")
-                .SetSize(910, 714) // 910 width, 682 content size + 32px macOS titlebar height
+                .SetSize(910, 682) // initial size; final size locked by /api/window/ready
                 .SetUseOsDefaultSize(false)
-                .SetResizable(false)
+                .SetResizable(true) // 初始可縮放，避免被系統/Parallels視為對話框而限制大小
                 .SetDevToolsEnabled(isDevMode)
                 .SetContextMenuEnabled(isDevMode)
                 .SetWebSecurityEnabled(false)
-                .RegisterCustomSchemeHandler("xivtc", (object sender, string scheme, string request, out string contentType) =>
+                .RegisterCustomSchemeHandler(vhScheme, (object sender, string scheme, string request, out string contentType) =>
                 {
-                    // 將 xivtc://user.ffxiv.com.tw/{path} 代理到 Kestrel 的靜態檔案
-                    // 只處理靜態頁面資源（HTML/CSS/JS），API 請求由 polyfill 直接走 http://localhost
                     try
                     {
                         var uri = new Uri(request);
-                        var pathAndQuery = uri.PathAndQuery; // e.g. "/login.html?platform=darwin"
+                        if (uri.Host.Equals("user.ffxiv.com.tw", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var pathAndQuery = uri.PathAndQuery;
+                            Log.Debug("[VirtualHost] Intercepted local {Scheme} request: {PathAndQuery} -> Kestrel", scheme, pathAndQuery);
 
-                        Log.Debug("[VirtualHost] xivtc:// proxy: {PathAndQuery} -> Kestrel", pathAndQuery);
-
-                        var response = virtualHostClient.GetAsync(pathAndQuery).GetAwaiter().GetResult();
-                        contentType = response.Content.Headers.ContentType?.MediaType ?? "text/html";
-                        return response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
+                            var response = virtualHostClient.GetAsync(pathAndQuery).GetAwaiter().GetResult();
+                            contentType = response.Content.Headers.ContentType?.MediaType ?? "text/html";
+                            return response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
+                        }
                     }
                     catch (Exception ex)
                     {
-                        Log.Warning(ex, "[VirtualHost] Failed to proxy xivtc request: {Request}", request);
-                        contentType = "text/html";
-                        return System.IO.Stream.Null;
+                        Log.Warning(ex, "[VirtualHost] Failed to handle local intercept for scheme {Scheme}: {Request}", scheme, request);
                     }
+
+                    contentType = null;
+                    return scheme == "https" ? null : System.IO.Stream.Null;
                 })
                 .Center()
-                .Load(new Uri($"xivtc://user.ffxiv.com.tw/login.html?platform={platformStr}"));
+                .Load(new Uri($"{vhScheme}://user.ffxiv.com.tw/login.html?platform={platformStr}"));
+
+            if (File.Exists("icon.ico"))
+            {
+                try
+                {
+                    window.SetIconFile("icon.ico");
+                }
+                catch (Exception ex)
+                {
+                    Log.Debug("[Window] Failed to set window icon: {Message}", ex.Message);
+                }
+            }
 
             MainWindowContainer.MainWindow = window;
+
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
@@ -420,7 +437,7 @@ public class Program
         _webApp.MapDiscordRpcEndpoints();
         _webApp.MapUpdateEndpoints();
         _webApp.MapWineEndpoints();
-        _webApp.MapElectronBridgeEndpoints();
+        _webApp.MapNativeBridgeEndpoints();
 
         _webApp.MapGet("/health", () => Results.Ok(new HealthResponse("healthy", DateTime.UtcNow)))
            .WithName("HealthCheck");

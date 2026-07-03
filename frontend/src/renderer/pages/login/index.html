@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="unsafe-url">
     <meta name="color-scheme" content="dark">
     <title data-i18n="app.title">XIVTheCalamity</title>
     
@@ -197,6 +198,11 @@
         </div>
     </div>
     
+    <script>
+        if (window.external && window.external.sendMessage) {
+            window.external.sendMessage("resize-to:910,714");
+        }
+    </script>
     <script type="module" src="login.js"></script>
 </body>
 </html>

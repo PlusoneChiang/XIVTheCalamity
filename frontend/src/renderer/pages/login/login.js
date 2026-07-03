@@ -225,6 +225,13 @@ async function init() {
   // === Sequential initialization pipeline ===
   // Each step must complete before the next starts
   
+  // DOM 已就緒，鎖定視窗（不等更新檢查）
+  try {
+    window.xivtc.backend.call('/api/window/ready', { method: 'POST' });
+  } catch (err) {
+    console.error('[Login] Failed to send window ready signal:', err);
+  }
+
   // Step 1: Check for launcher updates (blocking)
   try {
     await initAppUpdater();

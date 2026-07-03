@@ -14,9 +14,9 @@ using XIVTheCalamity.Services;
 
 namespace XIVTheCalamity.Endpoints;
 
-public static class ElectronBridgeEndpoints
+public static class NativeBridgeEndpoints
 {
-    public static void MapElectronBridgeEndpoints(this WebApplication app)
+    public static void MapNativeBridgeEndpoints(this WebApplication app)
     {
         // 1. Storage endpoints
         app.MapPost("/api/storage/save", async (StorageSaveRequest req) =>
@@ -89,6 +89,44 @@ public static class ElectronBridgeEndpoints
                 Serilog.Log.Error(ex, "[IPC] Failed to open settings window");
                 return Results.Ok(new GenericActionResponse(false, ex.Message));
             }
+        });
+
+        app.MapPost("/api/window/ready", () =>
+        {
+            
+            var window = MainWindowContainer.MainWindow;
+            if (window != null)
+            {
+                try
+                {
+                    IntPtr hwnd = window.WindowHandle;
+                    double scale = 1.0;
+                    int targetWidth = 910;
+                    int targetHeight = 682;
+
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        scale = GetWindowDpiScale(hwnd);
+                        // 實測 Windows 系統 chrome 消耗量（SetSize 設定外框，需補償才能讓內容區恰好為 910×714）
+                        // 量測方式：SetSize(910,714) 時 DevTools 顯示 viewport 897×679 → chrome = 13px 寬、35px 高
+                        const int windowChromeWidth = 13;
+                        const int windowChromeHeight = 35;
+                        targetWidth  += windowChromeWidth;
+                        targetHeight += windowChromeHeight;
+                    }
+
+                    Serilog.Log.Information($"[IPC] Sizing and locking window: {targetWidth}x{targetHeight} (scale: {scale})");
+                    
+                    window.SetSize((int)Math.Round(targetWidth * scale), (int)Math.Round(targetHeight * scale));
+                    window.Center();
+                    window.SetResizable(false);
+                }
+                catch (Exception ex)
+                {
+                    Serilog.Log.Error(ex, "[IPC] Failed to resize and lock window");
+                }
+            }
+            return Results.Ok(new GenericActionResponse(true));
         });
 
         app.MapPost("/api/window/close", () =>
@@ -286,4 +324,10 @@ public static class ElectronBridgeEndpoints
             }
         });
     }
+
+    [DllImport("user32.dll", CallingConvention = CallingConvention.StdCall)]
+    private static extern uint GetDpiForWindow(IntPtr hwnd);
+
+    private static double GetWindowDpiScale(IntPtr hwnd) =>
+        hwnd != IntPtr.Zero ? Math.Max(1.0, GetDpiForWindow(hwnd) / 96.0) : 1.0;
 }

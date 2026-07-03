@@ -1,4 +1,4 @@
-# XIVTheCalamity Windows Build Script (Photino Version)
+﻿# XIVTheCalamity Windows Build Script (Photino Version)
 # All-in-one script: Check environment, build frontend, compile backend (NativeAOT)
 
 $ErrorActionPreference = "Stop"
@@ -155,7 +155,7 @@ try {
 Write-Host ""
 Write-Host "📦 Copying shared resources..." -ForegroundColor Yellow
 $destResources = Join-Path $OUTPUT_DIR "resources"
-Copy-Item -Path (Join-Path $PROJECT_ROOT "shared\resources\*") -Destination $destResources -Recurse -Force
+Copy-Item -Path (Join-Path $PROJECT_ROOT "shared\resources") -Destination $OUTPUT_DIR -Recurse -Force
 Write-Host "   ✅ Resources copied" -ForegroundColor Green
 
 # ================== Run Test ==================
