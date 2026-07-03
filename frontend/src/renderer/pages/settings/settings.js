@@ -1321,8 +1321,8 @@ async function initProfileSection() {
             ? `Apply Profile`
             : `應用設定檔`;
           const confirmMsg = i18n.getLocale() === 'en-US'
-            ? `Are you sure you want to apply profile "${targetProfile}"? Unsaved changes will be discarded.`
-            : `確定要應用設定檔「${targetProfile}」嗎？未儲存的變更將會捨棄。`;
+            ? `Are you sure you want to apply profile "${targetProfile}"?\nUnsaved changes will be discarded.`
+            : `確定要應用設定檔「${targetProfile}」嗎？\n未儲存的變更將會捨棄。`;
           
           const confirmed = await showConfirmModal(confirmTitle, confirmMsg);
           if (!confirmed) {
@@ -1387,8 +1387,8 @@ async function initProfileSection() {
             ? `Delete Profile`
             : `刪除設定檔`;
           const confirmMsg = i18n.getLocale() === 'en-US'
-            ? `Are you sure you want to delete profile "${p}"? This will erase its settings and plugins.`
-            : `確定要刪除設定檔「${p}」嗎？這將會清除其專屬設定與插件。`;
+            ? `Are you sure you want to delete profile "${p}"?\nThis will erase its settings and plugins.`
+            : `確定要刪除設定檔「${p}」嗎？\n這將會清除其專屬設定與插件。`;
           const confirmed = await showConfirmModal(delTitle, confirmMsg);
           if (confirmed) {
             try {

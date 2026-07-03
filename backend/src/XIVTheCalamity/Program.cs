@@ -88,7 +88,6 @@ public class Program
                 .RegisterWindowCreatedHandler((sender, args) =>
                 {
                     if (sender is not PhotinoWindow win) return;
-                    IntPtr hwnd = win.WindowHandle;
                     
                     int w = 910;
                     int h = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 714 : 682;
@@ -96,6 +95,7 @@ public class Program
                     
                     if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     {
+                        IntPtr hwnd = win.WindowHandle;
                         scale = Math.Max(1.0, GetDpiForWindow(hwnd) / 96.0);
                         const int windowChromeWidth = 13;
                         const int windowChromeHeight = 35;
