@@ -22,7 +22,7 @@ Source: "..\shared\resources\*"; DestDir: "{app}\resources"; Flags: ignoreversio
 
 [Icons]
 Name: "{group}\XIVTheCalamity"; Filename: "{app}\XIVTheCalamity.exe"
-Name: "{commondesktop}\XIVTheCalamity"; Filename: "{app}\XIVTheCalamity.exe"
+Name: "{userdesktop}\XIVTheCalamity"; Filename: "{app}\XIVTheCalamity.exe"
 
 [Run]
 Filename: "{app}\XIVTheCalamity.exe"; Description: "Launch XIVTheCalamity"; Flags: nowait postinstall skipifsilent
