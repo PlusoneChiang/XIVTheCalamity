@@ -81,9 +81,10 @@ public class Program
 
             var isDevMode = IsDevelopmentMode();
             string vhScheme = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "https" : "xivtc";
+            int windowHeight = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 714 : 682; // macOS WKWebView 標題列高度較高，需額外調整
             var window = new PhotinoWindow()
                 .SetTitle("XIV The Calamity")
-                .SetSize(910, 682) // initial size; final size locked by /api/window/ready
+                .SetSize(910, windowHeight) // initial size; final size locked by /api/window/ready
                 .SetUseOsDefaultSize(false)
                 .SetResizable(true) // 初始可縮放，避免被系統/Parallels視為對話框而限制大小
                 .SetDevToolsEnabled(isDevMode)

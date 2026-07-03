@@ -1,0 +1,15 @@
+# Normalize line endings for all files
+* text=auto
+
+# Enforce LF for text/code files (highly recommended for cross-platform .NET/JS)
+*.cs text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+
+# Enforce LF for shell scripts to prevent execution failures on macOS/Linux
+*.sh text eol=lf
+
+# Keep CRLF for Windows PowerShell scripts
+*.ps1 text eol=crlf
