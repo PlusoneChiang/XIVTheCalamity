@@ -1,7 +1,8 @@
 [Setup]
 AppName=XIVTheCalamity
 AppVersion={#AppVersion}
-DefaultDirName={pf}\XIVTheCalamity
+PrivilegesRequired=lowest
+DefaultDirName={localappdata}\Programs\XIVTheCalamity
 DefaultGroupName=XIVTheCalamity
 UninstallDisplayIcon={app}\XIVTheCalamity.exe
 Compression=lzma2
@@ -12,8 +13,11 @@ SetupIconFile=..\frontend\build\icon.ico
 DisableProgramGroupPage=yes
 DisableWelcomePage=no
 
+[InstallDelete]
+Type: filesandordirs; Name: "{app}\*"
+
 [Files]
-Source: "..\Release\win-out\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\Release\win-out\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.pdb"
 Source: "..\shared\resources\*"; DestDir: "{app}\resources"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]

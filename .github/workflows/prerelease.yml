@@ -321,11 +321,13 @@ jobs:
 
       # Build backend (NativeAOT)
       - name: Build backend
+        shell: pwsh
         run: |
           cd backend
           dotnet publish src/XIVTheCalamity/XIVTheCalamity.csproj `
             -c Release -r win-x64 --self-contained true /p:PublishAot=true `
             -o ../Release/win-out
+          Remove-Item -Path "../Release/win-out/*.pdb" -ErrorAction SilentlyContinue
 
       # Package zip
       - name: Package zip
