@@ -16,6 +16,9 @@
     <!-- 優化選項 -->
     <IlcOptimizationPreference>Speed</IlcOptimizationPreference>
     <IlcGenerateStackTraceData>false</IlcGenerateStackTraceData>
+    
+    <!-- 啟用嵌入檔案資訊清單生成，保留前端資料夾結構 -->
+    <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
   </PropertyGroup>
 
   <ItemGroup>
@@ -30,6 +33,14 @@
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <!-- Photino.NET 核心套件 -->
     <PackageReference Include="Photino.NET" Version="3.*" />
+    <!-- 嵌入檔案供應器套件 -->
+    <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 將前端打包產物設為內部資源，並自實體發佈目錄中移除（避免生成外部鬆散檔案） -->
+    <EmbeddedResource Include="wwwroot\**" />
+    <Content Remove="wwwroot\**" />
   </ItemGroup>
 
   <ItemGroup>

@@ -427,7 +427,13 @@ public class Program
         _ = AdjustLogLevelAsync(_webApp, logPath);
 
         _webApp.UseCors();
-        _webApp.UseStaticFiles();
+        _webApp.UseStaticFiles(new StaticFileOptions
+        {
+            FileProvider = new Microsoft.Extensions.FileProviders.ManifestEmbeddedFileProvider(
+                typeof(Program).Assembly,
+                "wwwroot"
+            )
+        });
 
         // 映射 API Endpoints
         _webApp.MapConfigEndpoints();
