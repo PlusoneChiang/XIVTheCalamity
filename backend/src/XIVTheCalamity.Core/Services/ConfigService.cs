@@ -111,6 +111,31 @@ public class ConfigService
             // Force-overwrite managed fields that users must not change
             config.Dalamud.PluginRepoUrl = DalamudConfig.ManagedPluginRepoUrl;
 
+            // Inherit GamePath from default profile if loading a non-default profile
+            var targetProfile = string.IsNullOrEmpty(profileName) 
+                ? PlatformPathService.Instance.ActiveProfile 
+                : profileName;
+
+            if (targetProfile != "default")
+            {
+                try
+                {
+                    var defaultConfig = await LoadConfigAsync("default");
+                    if (config.Game != null && defaultConfig.Game != null)
+                    {
+                        config.Game.GamePath = defaultConfig.Game.GamePath;
+                    }
+                    if (config.Launcher != null && defaultConfig.Launcher != null)
+                    {
+                        config.Launcher.ShowDalamudTab = defaultConfig.Launcher.ShowDalamudTab;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[Config] Failed to inherit game path or showDalamudTab from default profile: {ex.Message}");
+                }
+            }
+
             Console.WriteLine("[Config] Config loaded successfully");
             return config;
         }
@@ -138,7 +163,7 @@ public class ConfigService
     /// <summary>
     /// Save configuration
     /// </summary>
-    public Task SaveConfigAsync(AppConfig config, string? profileName = null)
+    public async Task SaveConfigAsync(AppConfig config, string? profileName = null)
     {
         // Sync split config properties back to the main Wine wrapper object before save and validation
         if (config.WineGraphics != null || config.WinePerformance != null || config.WineCompat != null)
@@ -170,14 +195,37 @@ public class ConfigService
         // Force-overwrite managed fields before validation and save
         config.Dalamud.PluginRepoUrl = DalamudConfig.ManagedPluginRepoUrl;
 
+        // Force-overwrite GamePath from default profile config if saving a non-default profile
+        var targetProfile = string.IsNullOrEmpty(profileName) 
+            ? PlatformPathService.Instance.ActiveProfile 
+            : profileName;
+
+        if (targetProfile != "default")
+        {
+            try
+            {
+                var defaultConfig = await LoadConfigAsync("default");
+                if (config.Game != null && defaultConfig.Game != null)
+                {
+                    config.Game.GamePath = defaultConfig.Game.GamePath;
+                }
+                if (config.Launcher != null && defaultConfig.Launcher != null)
+                {
+                    config.Launcher.ShowDalamudTab = defaultConfig.Launcher.ShowDalamudTab;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Config] Failed to force default game path or showDalamudTab on save: {ex.Message}");
+            }
+        }
+
         ValidateConfig(config);
         
         lock (_lock)
         {
             SaveConfigSync(config, profileName);
         }
-        
-        return Task.CompletedTask;
     }
 
     /// <summary>

@@ -877,3 +877,192 @@ html[data-theme="light"] .toast-container {
 html[data-theme="light"] .toast-message {
   color: #111111;
 }
+
+/* ================================================
+ * PROFILES TAB STYLES
+ * ================================================ */
+#tab-profiles.active {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  animation: fadeIn 0.3s;
+}
+
+#tab-profiles .settings-section {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  margin-bottom: 0;
+}
+
+.profiles-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
+  margin-top: 10px;
+  min-height: 120px;
+}
+
+.profile-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.profile-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.profile-card.active {
+  background: rgba(52, 152, 219, 0.12);
+  border-color: #3498db;
+  box-shadow: 0 0 10px rgba(52, 152, 219, 0.15);
+}
+
+.profile-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.profile-desc {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  margin-top: 2px;
+}
+
+.profile-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.profile-badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  color: #fff;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.profile-badge.badge-active {
+  background: #2ecc71;
+}
+
+.profile-badge.badge-selected {
+  background: #3498db;
+}
+
+/* Light Theme overrides for active/selected badges */
+html[data-theme="light"] .profile-badge.badge-active {
+  background: #27ae60;
+}
+
+html[data-theme="light"] .profile-badge.badge-selected {
+  background: #2980b9;
+}
+
+.profile-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.profile-btn {
+  padding: 5px 12px;
+  font-size: 11px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+  font-weight: 500;
+}
+
+.profile-btn.btn-use {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.profile-btn.btn-use:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.profile-btn.btn-delete {
+  background: rgba(231, 76, 60, 0.12);
+  border-color: rgba(231, 76, 60, 0.25);
+  color: #e74c3c;
+}
+
+.profile-btn.btn-delete:hover {
+  background: #e74c3c;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.profile-btn.btn-edit {
+  background: rgba(52, 152, 219, 0.12);
+  border-color: rgba(52, 152, 219, 0.25);
+  color: #3498db;
+}
+
+.profile-btn.btn-edit:hover {
+  background: #3498db;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+/* Light Theme overrides for Profiles */
+html[data-theme="light"] .profile-name {
+  color: #1a1a2e;
+}
+
+html[data-theme="light"] .profile-desc {
+  color: rgba(26, 26, 46, 0.55);
+}
+
+html[data-theme="light"] .profile-card {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+html[data-theme="light"] .profile-card:hover {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.15);
+}
+
+html[data-theme="light"] .profile-card.active {
+  background: rgba(52, 152, 219, 0.08);
+  border-color: #3498db;
+}
+
+html[data-theme="light"] .profile-btn.btn-use {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.15);
+  color: #333333;
+}
+
+html[data-theme="light"] .profile-btn.btn-use:hover {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+html[data-theme="light"] .profile-btn.btn-edit {
+  background: rgba(52, 152, 219, 0.08);
+  border-color: rgba(52, 152, 219, 0.2);
+  color: #2980b9;
+}
+
+html[data-theme="light"] .profile-btn.btn-edit:hover {
+  background: #2980b9;
+  color: #ffffff;
+}

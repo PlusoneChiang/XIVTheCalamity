@@ -80,27 +80,4 @@ export function initializeEnvironment(onProgress, onComplete, onError) {
   return eventSource;
 }
 
-/**
- * 啟動 Wine 配置
- * @returns {Promise<{success: boolean, message: string}>}
- */
-export async function launchWineConfig() {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/wine/config`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    const data = await response.json();
-    console.log('[Wine] Config response:', data);
-    return data;
-  } catch (err) {
-    console.error('[Wine] Failed to launch config:', err);
-    return {
-      success: false,
-      message: err.message || '啟動失敗'
-    };
-  }
-}
+

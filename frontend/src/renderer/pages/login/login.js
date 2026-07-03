@@ -225,12 +225,7 @@ async function init() {
   // === Sequential initialization pipeline ===
   // Each step must complete before the next starts
   
-  // DOM 已就緒，鎖定視窗（不等更新檢查）
-  try {
-    window.xivtc.backend.call('/api/window/ready', { method: 'POST' });
-  } catch (err) {
-    console.error('[Login] Failed to send window ready signal:', err);
-  }
+
 
   // Step 1: Check for launcher updates (blocking)
   try {
@@ -266,6 +261,7 @@ async function init() {
   
   // Cleanup on page unload
   window.addEventListener('beforeunload', () => {
+    console.warn('[Login] window beforeunload event fired! Page is unloading/reloading!');
     cleanupAccountManagement();
     // 移除事件監聽
     if (window.xivtc.events) {
@@ -538,13 +534,14 @@ function openSettingsModal() {
   if (!modal || !iframe) return;
 
   const platform = window.xivtc.getPlatform();
-  // Load settings.html directly into iframe
-  iframe.src = `settings.html?platform=${platform}`;
-  
-  modal.style.display = 'flex';
-  
-  // Attach window.close override when settings page loads
-  iframe.onload = () => {
+
+  // Use named handler so we can cleanly remove any previous listener
+  // before attaching a new one (prevents duplicate handlers on re-open)
+  if (iframe._settingsLoadHandler) {
+    iframe.removeEventListener('load', iframe._settingsLoadHandler);
+  }
+
+  iframe._settingsLoadHandler = () => {
     try {
       const iframeWindow = iframe.contentWindow;
       if (iframeWindow) {
@@ -559,12 +556,20 @@ function openSettingsModal() {
       console.error('[Login] Failed to override settings iframe window.close:', e);
     }
   };
+
+  iframe.addEventListener('load', iframe._settingsLoadHandler);
+
+  // Load settings.html into iframe (triggers the load event above)
+  iframe.src = `settings.html?platform=${platform}`;
+
+  modal.style.display = 'flex';
 }
 
 /**
  * Close the settings modal overlay
  */
 function closeSettingsModal() {
+  console.trace('[Login] closeSettingsModal called!');
   const modal = document.getElementById('settingsModal');
   const iframe = document.getElementById('settingsFrame');
   if (!modal || !iframe) return;

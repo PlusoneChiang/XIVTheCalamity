@@ -44,4 +44,9 @@ public class LauncherConfig
     /// UI theme (dark, light, valentine)
     /// </summary>
     public string Theme { get; set; } = "dark";
+
+    /// <summary>
+    /// 設定檔說明 (Profile description)
+    /// </summary>
+    public string Description { get; set; } = "";
 }

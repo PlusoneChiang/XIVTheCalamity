@@ -10,9 +10,9 @@ import { getLastUsedAccount, deleteOTPSecret } from '../../utils/credentialsStor
 let currentConfig = null;
 let currentPlatform = 'win32';
 let localProfiles = ['default'];
-let profileQueue = []; // Action queue: { action: 'add'|'delete', name, copyDefault }
-let profileConfigsCache = {}; // Cache of unsaved profile form data
 let currentSelectedProfile = 'default';
+let startupActiveProfile = 'default';
+let profileDescriptions = {}; // Map of profileName -> description string
 
 /**
  * Konami Code 偵測引擎 - 使用 KeyCode 避免大小寫問題
@@ -48,6 +48,15 @@ const konamiCode = {
  */
 async function init() {
   console.log('[Settings] Initializing settings page');
+  
+  // Wrap window.close to log stack traces
+  const originalClose = window.close;
+  window.close = function() {
+    console.log('[Settings] window.close() triggered. Call stack:', new Error().stack);
+    if (originalClose) {
+      originalClose.apply(this, arguments);
+    }
+  };
   
   // Detect platform and add body class (synchronous)
   detectPlatform();
@@ -148,8 +157,11 @@ async function loadConfig(profile = null, applyVisuals = false) {
       populateForm(currentConfig, applyVisuals);
       if (profile) {
         currentSelectedProfile = profile;
+        profileDescriptions[profile] = configData.launcher?.description || '';
       }
       console.log('[Settings] Configuration loaded for profile:', profile || 'active', currentConfig);
+      // Update game path editable state after profile switch
+      updateGamePathReadonly();
     }
   } catch (error) {
     console.error('[Settings] Failed to load configuration:', error);
@@ -221,6 +233,7 @@ function populateForm(config, applyVisuals = false) {
     if (applyVisuals) {
       applyTheme(savedTheme);
     }
+
   }
   
   if (config.game) {
@@ -283,7 +296,8 @@ function collectFormData() {
       language: document.getElementById('language').value,
       theme: document.querySelector('input[name="theme"]:checked')?.value || 'dark',
       // Preserve showDalamudTab from current config (set via Konami code)
-      showDalamudTab: currentConfig?.launcher?.showDalamudTab || false
+      showDalamudTab: currentConfig?.launcher?.showDalamudTab || false,
+      description: profileDescriptions[currentSelectedProfile] || ''
     },
     game: {
       gamePath: document.getElementById('gamePath').value
@@ -338,7 +352,7 @@ async function persistConfig(closeWindow) {
   try {
     showLoadingOverlay(i18n.t('settings.applying'));
     
-    const selectedProfile = document.getElementById('profileSelect')?.value || 'default';
+    const selectedProfile = currentSelectedProfile;
     const formData = collectFormData();
     
     const oldGamePath = currentConfig?.game?.gamePath || '';
@@ -351,71 +365,37 @@ async function persistConfig(closeWindow) {
     
     applyTheme(formData.launcher.theme || 'dark');
     
-    console.log('[Settings] Saving configuration for profile:', selectedProfile, formData);
+    // Calculate differences before mutating currentConfig
+    // Only treat gamePathChanged as true when both paths are non-empty AND actually differ
+    // (avoids false positives from form initialization on first load)
+    const gamePathChanged = !!(oldGamePath && newGamePath && oldGamePath !== newGamePath);
+    const oldDalamudEnabled = currentConfig?.dalamud?.enabled || false;
+    const newDalamudEnabled = formData.dalamud?.enabled || false;
+    const dalamudEnabledChanged = oldDalamudEnabled !== newDalamudEnabled;
     
-    // Step 1: Execute the queued profile commands
-    if (profileQueue.length > 0) {
-      console.log('[Settings] Executing profile action queue:', profileQueue);
-      for (const op of profileQueue) {
-        if (op.action === 'add') {
-          try {
-            await window.xivtc.backend.call('/api/config/profiles', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ name: op.name, copyDefault: op.copyDefault })
-            });
-          } catch (err) {
-            console.error('[Settings] Queue ADD failed:', op.name, err);
-          }
-        } else if (op.action === 'delete') {
-          try {
-            await window.xivtc.backend.call(`/api/config/profiles/${op.name}`, { method: 'DELETE' });
-          } catch (err) {
-            console.error('[Settings] Queue DELETE failed:', op.name, err);
-          }
-        }
-      }
-    }
-
-    // Step 2: Save final selected profile configuration
+    console.log('[Settings] Saving configuration for profile:', selectedProfile);
+    
+    // Save current profile configuration directly (no profile switch needed)
     const response = await window.xivtc.backend.call(`/api/config?profile=${selectedProfile}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: formData
     });
     
-    console.log('[Settings] Save response:', response);
-    
     if (!response.ok) {
       throw new Error(response.data?.message || response.statusText || 'Save failed');
     }
-
-    // Step 3: Switch persistent active profile to the final selected profile
-    console.log('[Settings] Persistently switching active profile to:', selectedProfile);
-    const switchResponse = await window.xivtc.backend.call('/api/config/profiles/switch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: selectedProfile })
-    });
-
-    if (!switchResponse.ok) {
-      throw new Error('Failed to switch active profile');
-    }
     
-    console.log('[Settings] Action queue processed, config saved and active profile switched successfully');
+    console.log('[Settings] Config saved successfully for profile:', selectedProfile);
     currentConfig = formData;
-    profileQueue = []; // Clear transaction queue
-    profileConfigsCache = {}; // Clear cache
     
-    // Step 2: Apply Wine settings to registry (macOS only)
+    // Apply Wine settings to registry (macOS only)
     if (currentPlatform === 'darwin') {
       console.log('[Settings] Applying Wine settings to registry...');
       
       const applyResponse = await window.xivtc.backend.call('/api/wine/apply-settings', {
         method: 'POST'
       });
-      
-      console.log('[Settings] Apply Wine settings response:', applyResponse);
       
       if (!applyResponse.ok) {
         console.error('[Settings] Failed to apply Wine settings:', applyResponse.data?.message);
@@ -428,13 +408,7 @@ async function persistConfig(closeWindow) {
       await refreshDiscordRpcStatus();
     }
     
-    // Step 3: 通知登入頁設定已變更
-    const gamePathChanged = oldGamePath !== newGamePath;
-    const oldDalamudEnabled = currentConfig?.dalamud?.enabled || false;
-    const newDalamudEnabled = formData.dalamud?.enabled || false;
-    const dalamudEnabledChanged = oldDalamudEnabled !== newDalamudEnabled;
-    
-    console.log('[Settings] Notifying login page of config change');
+    // Notify login page of config changes (language/theme/dalamud/gamepath)
     await window.xivtc.events.send('config-changed', {
       gamePathChanged,
       dalamudEnabledChanged: dalamudEnabledChanged ? newDalamudEnabled : undefined,
@@ -458,6 +432,7 @@ async function persistConfig(closeWindow) {
  * Save configuration
  */
 async function saveConfig() {
+  console.log('[Settings] saveConfig() called');
   return persistConfig(true);
 }
 
@@ -465,6 +440,7 @@ async function saveConfig() {
  * Apply configuration without closing the window
  */
 async function applyConfig() {
+  console.log('[Settings] applyConfig() called');
   return persistConfig(false);
 }
 
@@ -557,6 +533,39 @@ function initGeneralTab() {
 
   // Initialize profile section
   initProfileSection();
+
+  // Apply game path readonly state based on current profile
+  updateGamePathReadonly();
+}
+
+/**
+ * Lock/unlock game path input based on whether the active profile is 'default'.
+ * Only the default profile may change the game installation path.
+ */
+function updateGamePathReadonly() {
+  const isDefault = currentSelectedProfile === 'default';
+  const input = document.getElementById('gamePath');
+  const browseBtn = document.getElementById('browseGamePathButton');
+  if (!input || !browseBtn) return;
+
+  if (isDefault) {
+    input.removeAttribute('readonly');
+    input.removeAttribute('disabled');
+    input.style.opacity = '';
+    browseBtn.disabled = false;
+    browseBtn.style.opacity = '';
+    browseBtn.title = '';
+  } else {
+    input.setAttribute('readonly', 'true');
+    input.style.opacity = '0.5';
+    browseBtn.disabled = true;
+    browseBtn.style.opacity = '0.4';
+    const hint = i18n.getLocale() === 'en-US'
+      ? 'Game path can only be changed in the default profile'
+      : '遊戲路徑只能在預設設定檔中修改';
+    browseBtn.title = hint;
+    input.title = hint;
+  }
 }
 
 /**
@@ -1111,72 +1120,330 @@ async function setDalamudTabEnabled(enabled) {
 }
 
 /**
+ * Show a custom confirmation modal. Returns a Promise that resolves true (confirm) or false (cancel).
+ */
+function showConfirmModal(title, message) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('confirmProfileApplyModal');
+    const titleEl = document.getElementById('confirmProfileApplyTitle');
+    const msgEl = document.getElementById('confirmProfileApplyMsg');
+    const confirmBtn = document.getElementById('confirmProfileApplyConfirmBtn');
+    const cancelBtn = document.getElementById('confirmProfileApplyCancelBtn');
+    if (!modal || !titleEl || !msgEl || !confirmBtn || !cancelBtn) {
+      // Fallback to native confirm if elements not found
+      resolve(window.confirm(message));
+      return;
+    }
+    titleEl.textContent = title;
+    msgEl.textContent = message;
+    modal.style.display = 'flex';
+
+    function onConfirm() {
+      modal.style.display = 'none';
+      cleanup();
+      resolve(true);
+    }
+    function onCancel() {
+      modal.style.display = 'none';
+      cleanup();
+      resolve(false);
+    }
+    function cleanup() {
+      confirmBtn.removeEventListener('click', onConfirm);
+      cancelBtn.removeEventListener('click', onCancel);
+    }
+    confirmBtn.addEventListener('click', onConfirm);
+    cancelBtn.addEventListener('click', onCancel);
+  });
+}
+
+/**
  * Initialize Profile Section
  */
 async function initProfileSection() {
-  const select = document.getElementById('profileSelect');
+  const container = document.getElementById('profilesListContainer');
   const addButton = document.getElementById('addProfileButton');
-  const deleteButton = document.getElementById('deleteProfileButton');
   
-  if (!select || !addButton || !deleteButton) return;
+  if (!container || !addButton) return;
 
   // 1. Fetch current profiles or fallback to default
   let active = 'default';
-  let profiles = ['default'];
   try {
     const response = await window.xivtc.backend.call('/api/config/profiles', { method: 'GET' });
     if (response.ok && response.data) {
       const result = response.data.success ? response.data.data : response.data;
       active = result.active || 'default';
-      profiles = result.profiles || ['default'];
-      localProfiles = [...profiles];
-      currentSelectedProfile = active; // Synchronize active profile name on startup
+      const profilesList = result.profiles || [];
+      localProfiles = profilesList.map(p => p.name);
+      currentSelectedProfile = active;
+      startupActiveProfile = active;
+      
+      // Update game path editable state after active profile is retrieved
+      updateGamePathReadonly();
+      
+      // Prepopulate profile descriptions map
+      profileDescriptions = {};
+      profilesList.forEach(p => {
+        profileDescriptions[p.name] = p.description || '';
+      });
     }
   } catch (err) {
     console.warn('[Settings] Failed to fetch profiles, using default fallback:', err);
   }
 
-  // Helper to populate dropdown
-  function updateDropdown(profilesList, selectedValue) {
-    select.innerHTML = '';
-    profilesList.forEach(p => {
-      const opt = document.createElement('option');
-      opt.value = p;
-      opt.textContent = p === 'default' ? '預設 (default)' : p;
-      select.appendChild(opt);
+  // Setup Edit Description Modal elements
+  const editDescModal = document.getElementById('editProfileDescModal');
+  const editDescInput = document.getElementById('editProfileDescInput');
+  const editDescCancelBtn = document.getElementById('editProfileDescCancelBtn');
+  const editDescConfirmBtn = document.getElementById('editProfileDescConfirmBtn');
+  let editingProfileDescName = '';
+
+  if (editDescCancelBtn && editDescModal) {
+    editDescCancelBtn.addEventListener('click', () => {
+      editDescModal.style.display = 'none';
     });
-    select.value = selectedValue;
   }
 
-  // 2. Populate dropdown initially
-  updateDropdown(profiles, active);
+  if (editDescConfirmBtn && editDescModal && editDescInput) {
+    editDescConfirmBtn.addEventListener('click', async () => {
+      const val = editDescInput.value.trim();
+      if (editingProfileDescName) {
+        // Read, modify, and write description back to backend immediately
+        try {
+          const getResponse = await window.xivtc.backend.call(`/api/config?profile=${editingProfileDescName}`, { method: 'GET' });
+          if (getResponse.ok && getResponse.data) {
+            const configData = getResponse.data.success ? getResponse.data.data : getResponse.data;
+            if (!configData.launcher) configData.launcher = {};
+            configData.launcher.description = val;
+            
+            const putResponse = await window.xivtc.backend.call(`/api/config?profile=${editingProfileDescName}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: configData
+            });
+            
+            if (putResponse.ok && editingProfileDescName === currentSelectedProfile) {
+              if (!currentConfig.launcher) currentConfig.launcher = {};
+              currentConfig.launcher.description = val;
+            }
+          }
+        } catch (err) {
+          console.error('[Settings] Failed to update description:', err);
+        }
+      }
+      editDescModal.style.display = 'none';
+      await initProfileSection();
+    });
+  }
 
-  // 3. Select change listener (Preview config with in-memory transaction support)
-  select.addEventListener('change', async (e) => {
-    const targetProfile = e.target.value;
-    console.log('[Settings] Previewing configuration for profile:', targetProfile);
+  function renderProfilesList() {
+    container.innerHTML = '';
     
-    // Save current form state to cache
-    profileConfigsCache[currentSelectedProfile] = collectFormData();
-    
-    if (profileConfigsCache[targetProfile]) {
-      populateForm(profileConfigsCache[targetProfile], false); // Preview only, do not apply live theme
-      currentSelectedProfile = targetProfile;
-    } else {
-      await loadConfig(targetProfile, false); // Preview only, do not apply live theme
-    }
-  });
+    localProfiles.forEach(p => {
+      const card = document.createElement('div');
+      card.className = `profile-card${p === currentSelectedProfile ? ' active' : ''}`;
+      
+      const info = document.createElement('div');
+      info.className = 'profile-info';
+      
+      const textContainer = document.createElement('div');
+      textContainer.style.display = 'flex';
+      textContainer.style.flexDirection = 'column';
+      textContainer.style.gap = '2px';
+      
+      const nameWrapper = document.createElement('div');
+      nameWrapper.style.display = 'flex';
+      nameWrapper.style.alignItems = 'center';
+      nameWrapper.style.gap = '8px';
+      
+      const name = document.createElement('span');
+      name.className = 'profile-name';
+      name.textContent = p === 'default' ? '預設 (default)' : p;
+      nameWrapper.appendChild(name);
+      
+      if (p === startupActiveProfile) {
+        const badge = document.createElement('span');
+        badge.className = 'profile-badge badge-active';
+        badge.setAttribute('data-i18n', 'settings.profile.active');
+        badge.textContent = i18n.t('settings.profile.active') || '使用中';
+        nameWrapper.appendChild(badge);
+      }
+      
+      textContainer.appendChild(nameWrapper);
+      
+      // Description field under the title
+      const desc = document.createElement('span');
+      desc.className = 'profile-desc';
+      desc.textContent = profileDescriptions[p] || '';
+      textContainer.appendChild(desc);
+      
+      info.appendChild(textContainer);
+      card.appendChild(info);
+      
+      const actions = document.createElement('div');
+      actions.className = 'profile-actions';
+      
+      // Edit Description Button
+      const editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.className = 'profile-btn btn-edit';
+      editBtn.setAttribute('data-i18n', 'settings.profile.edit_btn');
+      editBtn.textContent = i18n.t('settings.profile.edit_btn') || '編輯說明';
+      editBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        editingProfileDescName = p;
+        if (editDescModal && editDescInput) {
+          editDescInput.value = profileDescriptions[p] || '';
+          editDescModal.style.display = 'flex';
+          editDescInput.focus();
+        }
+      });
+      actions.appendChild(editBtn);
+
+      // Show "Apply" button (disabled if it is the current active profile)
+      const useBtn = document.createElement('button');
+      useBtn.type = 'button';
+      useBtn.className = 'profile-btn btn-use';
+      useBtn.setAttribute('data-i18n', 'settings.profile.use');
+      useBtn.textContent = i18n.t('settings.profile.use') || '應用';
+      
+      if (p === currentSelectedProfile) {
+        useBtn.disabled = true;
+        useBtn.style.opacity = '0.4';
+        useBtn.style.cursor = 'not-allowed';
+      } else {
+        useBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          const targetProfile = p;
+          
+          const confirmTitle = i18n.getLocale() === 'en-US'
+            ? `Apply Profile`
+            : `應用設定檔`;
+          const confirmMsg = i18n.getLocale() === 'en-US'
+            ? `Are you sure you want to apply profile "${targetProfile}"? Unsaved changes will be discarded.`
+            : `確定要應用設定檔「${targetProfile}」嗎？未儲存的變更將會捨棄。`;
+          
+          const confirmed = await showConfirmModal(confirmTitle, confirmMsg);
+          if (!confirmed) {
+            return;
+          }
+          
+          console.log('[Settings] Applying profile (discard current unsaved changes):', targetProfile);
+          
+          try {
+            showLoadingOverlay(i18n.t('settings.applying'));
+            
+            // Directly switch to target profile (discard unsaved changes)
+            // 直接切換設定檔，放棄當前未儲存的變更
+            const switchResponse = await window.xivtc.backend.call('/api/config/profiles/switch', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: targetProfile })
+            });
+            
+            if (switchResponse.ok) {
+              const oldGamePath = currentConfig?.game?.gamePath || '';
+              const oldDalamudEnabled = currentConfig?.dalamud?.enabled || false;
+
+              // 3. Load target profile settings into UI
+              await loadConfig(targetProfile, true); // true to apply theme immediately
+              
+              const newGamePath = currentConfig?.game?.gamePath || '';
+              const newDalamudEnabled = currentConfig?.dalamud?.enabled || false;
+              const gamePathChanged = oldGamePath !== newGamePath;
+              const dalamudEnabledChanged = oldDalamudEnabled !== newDalamudEnabled;
+
+              console.log('[Settings] Notifying login page of profile switch. gamePathChanged:', gamePathChanged, 'dalamudEnabledChanged:', dalamudEnabledChanged);
+              await window.xivtc.events.send('config-changed', {
+                gamePathChanged,
+                dalamudEnabledChanged: dalamudEnabledChanged ? newDalamudEnabled : undefined,
+                newGamePath
+              });
+
+              // Refresh list to update active badges/actions (do NOT close settings window)
+              await initProfileSection();
+            }
+          } catch (err) {
+            console.error('[Settings] Failed to switch profile:', err);
+            showError(i18n.t('settings.save_failed'));
+          } finally {
+            hideLoadingOverlay();
+          }
+        });
+      }
+      actions.appendChild(useBtn);
+      
+      // If not default profile, show "Delete" button
+      if (p !== 'default') {
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'profile-btn btn-delete';
+        deleteBtn.setAttribute('data-i18n', 'settings.general.delete_profile');
+        deleteBtn.textContent = i18n.t('settings.general.delete_profile') || '刪除';
+        deleteBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const delTitle = i18n.getLocale() === 'en-US'
+            ? `Delete Profile`
+            : `刪除設定檔`;
+          const confirmMsg = i18n.getLocale() === 'en-US'
+            ? `Are you sure you want to delete profile "${p}"? This will erase its settings and plugins.`
+            : `確定要刪除設定檔「${p}」嗎？這將會清除其專屬設定與插件。`;
+          const confirmed = await showConfirmModal(delTitle, confirmMsg);
+          if (confirmed) {
+            try {
+              showLoadingOverlay(i18n.t('settings.applying'));
+              
+              const response = await window.xivtc.backend.call(`/api/config/profiles/${p}`, { method: 'DELETE' });
+              if (response.ok) {
+                if (currentSelectedProfile === p) {
+                  // Deleted the active profile → switch to default, notify, refresh list (do NOT close)
+                  await window.xivtc.backend.call('/api/config/profiles/switch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: 'default' })
+                  });
+                  await loadConfig('default', true);
+                  await window.xivtc.events.send('config-changed', {
+                    gamePathChanged: true,
+                    newGamePath: currentConfig?.game?.gamePath || ''
+                  });
+                  await initProfileSection();
+                } else {
+                  // Deleted a non-active profile → just reload list
+                  await initProfileSection();
+                }
+              }
+            } catch (err) {
+              console.error('[Settings] Failed to delete profile:', err);
+            } finally {
+              hideLoadingOverlay();
+            }
+          }
+        });
+        actions.appendChild(deleteBtn);
+      }
+      
+      card.appendChild(actions);
+      container.appendChild(card);
+    });
+  }
+
+  // 2. Populate list initially
+  renderProfilesList();
 
   // 4. Add profile listener -> show custom modal
   const modal = document.getElementById('addProfileModal');
   const cancelBtn = document.getElementById('addProfileCancelBtn');
   const confirmBtn = document.getElementById('addProfileConfirmBtn');
   const nameInput = document.getElementById('newProfileNameInput');
+  const descInput = document.getElementById('newProfileDescInput');
   const copyCheckbox = document.getElementById('copyDefaultSettingsCheckbox');
 
   addButton.addEventListener('click', () => {
-    if (modal && nameInput && copyCheckbox) {
+    if (modal && nameInput && descInput && copyCheckbox) {
       nameInput.value = '';
+      descInput.value = '';
       copyCheckbox.checked = true;
       modal.style.display = 'flex';
       nameInput.focus();
@@ -1189,9 +1456,10 @@ async function initProfileSection() {
     });
   }
 
-  if (confirmBtn && modal && nameInput && copyCheckbox) {
+  if (confirmBtn && modal && nameInput && descInput && copyCheckbox) {
     confirmBtn.addEventListener('click', async () => {
       const name = nameInput.value.trim();
+      const description = descInput.value.trim();
       if (!name) {
         alert(i18n.getLocale() === 'en-US' ? "Please enter a profile name" : "請輸入設定檔名稱");
         return;
@@ -1203,69 +1471,75 @@ async function initProfileSection() {
       }
       modal.style.display = 'none';
       
-      // Save current selected profile form state to cache before switching
-      profileConfigsCache[currentSelectedProfile] = collectFormData();
-      
-      // Cancel any queued deletion for this profile name
-      profileQueue = profileQueue.filter(op => !(op.action === 'delete' && op.name === sanitized));
-      
-      if (!localProfiles.includes(sanitized)) {
-        localProfiles.push(sanitized);
-      }
-      
-      // Queue the ADD command/action
-      if (!profileQueue.some(op => op.action === 'add' && op.name === sanitized)) {
-        profileQueue.push({ action: 'add', name: sanitized, copyDefault: copyCheckbox.checked });
-      }
-      
-      // Create in-memory profile config
-      let newConfig = collectFormData(); // Defaults to currently active settings (copyDefault = true)
-      if (!copyCheckbox.checked) {
-        newConfig.game = { gamePath: "" };
-        newConfig.dalamud = { enabled: false, injectDelay: 5000, safeMode: false, pluginRepoUrl: "" };
-      }
-      profileConfigsCache[sanitized] = newConfig;
+      try {
+        showLoadingOverlay(i18n.t('settings.applying'));
+        
+        // 1. Save current profile changes
+        const currentForm = collectFormData();
+        await window.xivtc.backend.call(`/api/config?profile=${currentSelectedProfile}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: currentForm
+        });
+        
+        // 2. Create new profile immediately
+        const addResponse = await window.xivtc.backend.call('/api/config/profiles', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: sanitized, copyDefault: copyCheckbox.checked })
+        });
+        
+        if (addResponse.ok) {
+          // 3. Write description if provided
+          if (description) {
+            const getResponse = await window.xivtc.backend.call(`/api/config?profile=${sanitized}`, { method: 'GET' });
+            if (getResponse.ok && getResponse.data) {
+              const configData = getResponse.data.success ? getResponse.data.data : getResponse.data;
+              if (!configData.launcher) configData.launcher = {};
+              configData.launcher.description = description;
+              
+              await window.xivtc.backend.call(`/api/config?profile=${sanitized}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: configData
+              });
+            }
+          }
+          
+          // 4. Switch persistently to the new profile
+          await window.xivtc.backend.call('/api/config/profiles/switch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: sanitized })
+          });
+          
+          const oldGamePath = currentConfig?.game?.gamePath || '';
+          const oldDalamudEnabled = currentConfig?.dalamud?.enabled || false;
 
-      // Update select and set selected value to new profile
-      updateDropdown(localProfiles, sanitized);
-      currentSelectedProfile = sanitized;
-      populateForm(profileConfigsCache[sanitized], false); // Preview only, do not apply live theme
+          // 5. Load the new configuration and update UI
+          await loadConfig(sanitized, true);
+          
+          const newGamePath = currentConfig?.game?.gamePath || '';
+          const newDalamudEnabled = currentConfig?.dalamud?.enabled || false;
+          const gamePathChanged = oldGamePath !== newGamePath;
+          const dalamudEnabledChanged = oldDalamudEnabled !== newDalamudEnabled;
+
+          console.log('[Settings] Notifying login page of profile creation switch. gamePathChanged:', gamePathChanged, 'dalamudEnabledChanged:', dalamudEnabledChanged);
+          await window.xivtc.events.send('config-changed', {
+            gamePathChanged,
+            dalamudEnabledChanged: dalamudEnabledChanged ? newDalamudEnabled : undefined,
+            newGamePath
+          });
+          
+          await initProfileSection();
+        }
+      } catch (err) {
+        console.error('[Settings] Failed to add profile:', err);
+      } finally {
+        hideLoadingOverlay();
+      }
     });
   }
-
-  // 5. Delete profile listener
-  deleteButton.addEventListener('click', async () => {
-    const current = select.value;
-    if (current === 'default') {
-      alert(i18n.getLocale() === 'en-US' ? "Default profile cannot be deleted" : "預設設定檔不可刪除");
-      return;
-    }
-    const confirmMsg = i18n.getLocale() === 'en-US' 
-      ? `Are you sure you want to delete profile "${current}"?` 
-      : `確定要刪除設定檔「${current}」嗎？這將會清除其專屬設定與插件。`;
-    if (confirm(confirmMsg)) {
-      // Cancel any queued addition for this profile name
-      profileQueue = profileQueue.filter(op => !(op.action === 'add' && op.name === current));
-      
-      // Queue the DELETE command/action
-      if (!profileQueue.some(op => op.action === 'delete' && op.name === current)) {
-        profileQueue.push({ action: 'delete', name: current });
-      }
-      
-      localProfiles = localProfiles.filter(p => p !== current);
-      delete profileConfigsCache[current];
-      
-      // Save current state of default to cache if not already there
-      if (!profileConfigsCache['default']) {
-        profileConfigsCache['default'] = collectFormData();
-      }
-      
-      // Update select and set selected value back to default
-      updateDropdown(localProfiles, 'default');
-      currentSelectedProfile = 'default';
-      populateForm(profileConfigsCache['default'], false); // Preview only, do not apply live theme
-    }
-  });
 }
 
 /**

@@ -222,14 +222,17 @@ public static class ConfigEndpoints
         });
 
         // GET /api/config/profiles
-        group.MapGet("/profiles", (ILogger<Program> logger) =>
+        group.MapGet("/profiles", async (ConfigService configService, ILogger<Program> logger) =>
         {
             try
             {
                 var pathService = PlatformPathService.Instance;
                 var active = pathService.ActiveProfile;
                 var profilesDir = Path.Combine(pathService.AppDataDirectory, "profiles");
-                var profiles = new List<string> { "default" };
+                var profilesList = new List<ProfileItem>();
+
+                var defaultConfig = await configService.LoadConfigAsync("default");
+                profilesList.Add(new ProfileItem("default", defaultConfig.Launcher?.Description ?? ""));
 
                 if (Directory.Exists(profilesDir))
                 {
@@ -239,12 +242,13 @@ public static class ConfigEndpoints
                         var name = Path.GetFileName(dir);
                         if (!string.IsNullOrEmpty(name))
                         {
-                            profiles.Add(name);
+                            var profileConfig = await configService.LoadConfigAsync(name);
+                            profilesList.Add(new ProfileItem(name, profileConfig.Launcher?.Description ?? ""));
                         }
                     }
                 }
 
-                return Results.Ok(ApiResponse<ProfilesResponse>.Ok(new ProfilesResponse(active, profiles.ToArray())));
+                return Results.Ok(ApiResponse<ProfilesResponse>.Ok(new ProfilesResponse(active, profilesList.ToArray())));
             }
             catch (Exception ex)
             {
@@ -255,8 +259,9 @@ public static class ConfigEndpoints
         });
 
         // POST /api/config/profiles (Add Profile only, does NOT switch)
-        group.MapPost("/profiles", (
+        group.MapPost("/profiles", async (
             ProfileSwitchRequest request,
+            ConfigService configService,
             ILogger<Program> logger) =>
         {
             try
@@ -305,7 +310,10 @@ public static class ConfigEndpoints
 
                 var active = pathService.ActiveProfile;
                 var profilesDir = Path.Combine(pathService.AppDataDirectory, "profiles");
-                var profiles = new List<string> { "default" };
+                var profilesList = new List<ProfileItem>();
+
+                var defaultConfig = await configService.LoadConfigAsync("default");
+                profilesList.Add(new ProfileItem("default", defaultConfig.Launcher?.Description ?? ""));
 
                 if (Directory.Exists(profilesDir))
                 {
@@ -315,12 +323,13 @@ public static class ConfigEndpoints
                         var name = Path.GetFileName(dir);
                         if (!string.IsNullOrEmpty(name))
                         {
-                            profiles.Add(name);
+                            var profileConfig = await configService.LoadConfigAsync(name);
+                            profilesList.Add(new ProfileItem(name, profileConfig.Launcher?.Description ?? ""));
                         }
                     }
                 }
 
-                return Results.Ok(ApiResponse<ProfilesResponse>.Ok(new ProfilesResponse(active, profiles.ToArray())));
+                return Results.Ok(ApiResponse<ProfilesResponse>.Ok(new ProfilesResponse(active, profilesList.ToArray())));
             }
             catch (Exception ex)
             {

@@ -80,11 +80,6 @@ if (!window.xivtc) {
         return res.data || { success: false, error: res.error || 'Failed' };
       }
     },
-    openSettings: async () => {
-      const res = await apiCall('/api/window/open-settings', 'POST');
-      if (res.success && res.data) return res.data;
-      return { success: false, message: res.error || res.statusText || 'Failed to open settings' };
-    },
     selectDirectory: async (options) => {
       const res = await apiCall('/api/app/select-directory', 'POST', options);
       if (res.success && res.data) {
@@ -217,11 +212,44 @@ if (!window.xivtc) {
       onProgress: (cb) => { progressListeners.push(cb); return () => { progressListeners = progressListeners.filter(x => x !== cb); }; },
       onDownloaded: (cb) => { downloadedListeners.push(cb); return () => { downloadedListeners = downloadedListeners.filter(x => x !== cb); }; },
       onError: (cb) => { errorListeners.push(cb); return () => { errorListeners = errorListeners.filter(x => x !== cb); }; }
-    }
+    },
+    isDevMode: () => isDevMode
   };
 
   // Live DevMode state tracking
   let isDevMode = false;
+
+  // Block context menu and dev tools keyboard shortcuts on the frontend if dev mode is disabled
+  document.addEventListener('contextmenu', (e) => {
+    if (!isDevMode) {
+      e.preventDefault();
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (!isDevMode) {
+      // F12 key
+      if (e.key === 'F12') {
+        e.preventDefault();
+        return;
+      }
+      
+      // Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C (Windows/Linux)
+      // Cmd+Option+I, Cmd+Option+J, Cmd+Option+C (macOS)
+      const isCmdOrCtrl = e.ctrlKey || e.metaKey;
+      const isOptionOrShift = e.shiftKey || e.altKey;
+      if (isCmdOrCtrl && isOptionOrShift && (e.key === 'i' || e.key === 'I' || e.key === 'j' || e.key === 'J' || e.key === 'c' || e.key === 'C')) {
+        e.preventDefault();
+        return;
+      }
+      
+      // Ctrl+U (View Source)
+      if (isCmdOrCtrl && (e.key === 'u' || e.key === 'U')) {
+        e.preventDefault();
+        return;
+      }
+    }
+  });
 
   function updateLocalDevMode(config) {
     if (config && config.launcher) {

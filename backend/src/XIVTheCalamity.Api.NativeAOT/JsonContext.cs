@@ -101,6 +101,8 @@ namespace XIVTheCalamity.Api.NativeAOT;
 
 // Profile Response Types
 [JsonSerializable(typeof(ProfilesResponse))]
+[JsonSerializable(typeof(ProfileItem))]
+[JsonSerializable(typeof(ProfileItem[]))]
 [JsonSerializable(typeof(ProfileSwitchRequest))]
 [JsonSerializable(typeof(ApiResponse<ProfilesResponse>))]
 
@@ -136,5 +138,6 @@ public record GameLaunchResponse(int ProcessId, int? ExitCode = null);
 public record GameExitResponse(int ExitCode);
 
 // Profile response types (NativeAOT compatible)
-public record ProfilesResponse(string Active, string[] Profiles);
+public record ProfileItem(string Name, string Description);
+public record ProfilesResponse(string Active, ProfileItem[] Profiles);
 public record ProfileSwitchRequest(string Name, bool CopyDefault = false);

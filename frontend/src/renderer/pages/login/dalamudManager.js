@@ -243,15 +243,7 @@ export async function cancelDalamudUpdate() {
   console.log('[DALAMUD] Cancelling update...');
   dalamudCheckCancelled = true;
   closeDalamudSSE();
-  
-  try {
-    await window.xivtc.backend.call('/api/dalamud/cancel', {
-      method: 'POST'
-    });
-    console.log('[DALAMUD] Update cancelled');
-  } catch (error) {
-    console.error('[DALAMUD] Failed to cancel update:', error);
-  }
+  console.log('[DALAMUD] Update cancelled');
   
   isDalamudChecking = false;
   hideTitleBarProgress();

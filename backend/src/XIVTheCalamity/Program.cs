@@ -81,14 +81,34 @@ public class Program
 
             var isDevMode = IsDevelopmentMode();
             string vhScheme = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "https" : "xivtc";
-            int windowHeight = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 714 : 682; // macOS WKWebView 標題列高度較高，需額外調整
+            
             var window = new PhotinoWindow()
                 .SetTitle("XIV The Calamity")
-                .SetSize(910, windowHeight) // initial size; final size locked by /api/window/ready
                 .SetUseOsDefaultSize(false)
-                .SetResizable(true) // 初始可縮放，避免被系統/Parallels視為對話框而限制大小
-                .SetDevToolsEnabled(isDevMode)
-                .SetContextMenuEnabled(isDevMode)
+                .RegisterWindowCreatedHandler((sender, args) =>
+                {
+                    if (sender is not PhotinoWindow win) return;
+                    IntPtr hwnd = win.WindowHandle;
+                    
+                    int w = 910;
+                    int h = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? 714 : 682;
+                    double scale = 1.0;
+                    
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        scale = Math.Max(1.0, GetDpiForWindow(hwnd) / 96.0);
+                        const int windowChromeWidth = 13;
+                        const int windowChromeHeight = 35;
+                        w += windowChromeWidth;
+                        h += windowChromeHeight;
+                    }
+                    
+                    win.SetSize((int)Math.Round(w * scale), (int)Math.Round(h * scale));
+                    win.Center();
+                    win.SetResizable(false);
+                })
+                .SetDevToolsEnabled(true)
+                .SetContextMenuEnabled(true)
                 .SetWebSecurityEnabled(false)
                 .RegisterCustomSchemeHandler(vhScheme, (object sender, string scheme, string request, out string contentType) =>
                 {
@@ -640,4 +660,7 @@ public class Program
             Log.Error(ex, "Failed to perform native macOS window drag");
         }
     }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = false)]
+    private static extern uint GetDpiForWindow(IntPtr hwnd);
 }

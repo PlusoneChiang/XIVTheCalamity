@@ -12,7 +12,8 @@
   <div class="settings-container">
     <!-- Tab Navigation -->
     <nav class="tab-navigation">
-      <button class="tab-button active" data-tab="general" data-i18n="settings.tab.general">一般</button>
+      <button class="tab-button active" data-tab="profiles" data-i18n="settings.tab.profiles">設定檔</button>
+      <button class="tab-button" data-tab="general" data-i18n="settings.tab.general">一般</button>
       <button class="tab-button platform-darwin" data-tab="wine" data-i18n="settings.tab.wine">Wine</button>
       <button class="tab-button platform-linux" data-tab="protonge" data-i18n="settings.tab.protonge">GE-Proton</button>
       <button class="tab-button" data-tab="dalamud" data-i18n="settings.tab.dalamud">Dalamud</button>
@@ -22,7 +23,7 @@
     <!-- Tab Content Container -->
     <div class="tab-content-container">
       <!-- General Tab -->
-      <div id="tab-general" class="tab-content active">
+      <div id="tab-general" class="tab-content">
         <div class="settings-section">
           <h2 data-i18n="settings.general.basic">基本設定</h2>
           <div class="form-group">
@@ -50,22 +51,7 @@
           </div>
         </div>
 
-        <div class="settings-section">
-          <h2 data-i18n="settings.general.profile_management">設定檔管理</h2>
-          <div class="form-group">
-            <div class="full-width" style="display: flex; flex-direction: row; gap: 10px; align-items: flex-end; width: 100%;">
-              <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
-                <label for="profileSelect" data-i18n="settings.general.current_profile">當前設定檔</label>
-                <select id="profileSelect" style="width: 100%;">
-                  <option value="default">預設 (default)</option>
-                </select>
-              </div>
-              <button id="addProfileButton" class="btn btn-secondary" style="height: 30px; padding: 0 16px;" data-i18n="settings.general.add_profile">新增</button>
-              <button id="deleteProfileButton" class="btn btn-danger" style="height: 30px; padding: 0 16px;" data-i18n="settings.general.delete_profile">刪除</button>
-            </div>
-            <p class="help-text" data-i18n="settings.general.profile_help" style="grid-column: span 2;">切換設定檔會變更程式設定、遊戲個人設定與 Dalamud 插件。Wine 主程式與容器不受影響。</p>
-          </div>
-        </div>
+
 
         <div class="settings-section">
           <h2 data-i18n="settings.general.theme">主題設定</h2>
@@ -121,6 +107,21 @@
               <button id="testLaunchButton" class="btn btn-secondary" data-i18n="settings.general.test_launch">測試啟動遊戲</button>
               <p class="help-text" data-i18n="settings.general.test_launch_help">不需登入即可測試遊戲啟動，無法連線至伺服器</p>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Profiles Tab -->
+      <div id="tab-profiles" class="tab-content active">
+        <div class="settings-section">
+          <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h2 data-i18n="settings.general.profile_management" style="margin: 0; border: none; padding: 0;">設定檔管理</h2>
+            <button id="addProfileButton" class="btn btn-primary" style="height: 30px; padding: 0 16px;" data-i18n="settings.general.add_profile">+ 新增設定檔</button>
+          </div>
+          <p class="help-text" data-i18n="settings.general.profile_help" style="margin-bottom: 16px;">切換設定檔會變更程式設定、遊戲個人設定與 Dalamud 插件。Wine 主程式與容器不受影響。</p>
+          
+          <div class="profiles-list" id="profilesListContainer">
+            <!-- Dynamic profile cards will be inserted here -->
           </div>
         </div>
       </div>
@@ -440,9 +441,9 @@ data-styled.g160[id="sc-1ykasxb-0"]{content:"eDynhg,"}/*!sc*/
 
     <!-- Footer -->
     <div class="settings-footer">
-      <button id="cancelButton" class="btn btn-secondary" data-i18n="button.cancel">取消</button>
-      <button id="applyButton" class="btn btn-secondary" data-i18n="button.apply">套用</button>
-      <button id="saveButton" class="btn btn-primary" data-i18n="button.save">儲存</button>
+      <button id="cancelButton" type="button" class="btn btn-secondary" data-i18n="button.cancel">取消</button>
+      <button id="applyButton" type="button" class="btn btn-secondary" data-i18n="button.apply">套用</button>
+      <button id="saveButton" type="button" class="btn btn-primary" data-i18n="button.save">儲存</button>
     </div>
   </div>
 
@@ -455,6 +456,10 @@ data-styled.g160[id="sc-1ykasxb-0"]{content:"eDynhg,"}/*!sc*/
           <label for="newProfileNameInput" data-i18n="settings.profile.name_label" style="font-size: 11px; color: rgba(255,255,255,0.7); text-align: left;">設定檔名稱 (僅限英數字)</label>
           <input type="text" id="newProfileNameInput" placeholder="MyProfile" style="width: 100%; padding: 8px 12px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; font-size: 13px;">
         </div>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <label for="newProfileDescInput" data-i18n="settings.profile.desc_label" style="font-size: 11px; color: rgba(255,255,255,0.7); text-align: left;">設定檔說明</label>
+          <input type="text" id="newProfileDescInput" placeholder="例如：日常遊玩、高難度副本" style="width: 100%; padding: 8px 12px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; font-size: 13px;">
+        </div>
         <div class="checkbox-group" style="justify-content: flex-start; gap: 8px;">
           <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; font-size: 12px;">
             <input type="checkbox" id="copyDefaultSettingsCheckbox" checked style="margin: 0;">
@@ -465,6 +470,35 @@ data-styled.g160[id="sc-1ykasxb-0"]{content:"eDynhg,"}/*!sc*/
           <button id="addProfileCancelBtn" class="btn btn-secondary" style="flex: 1; padding: 8px;" data-i18n="button.cancel">取消</button>
           <button id="addProfileConfirmBtn" class="btn btn-primary" style="flex: 1; padding: 8px;" data-i18n="button.confirm">確定</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Profile Description Modal -->
+  <div id="editProfileDescModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 360px; padding: 24px;">
+      <h2 data-i18n="settings.profile.edit_desc_title" style="font-size: 16px; margin-bottom: 12px; text-align: left;">編輯設定檔說明</h2>
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <label for="editProfileDescInput" data-i18n="settings.profile.desc_label" style="font-size: 11px; color: rgba(255,255,255,0.7); text-align: left;">設定檔說明</label>
+          <input type="text" id="editProfileDescInput" placeholder="例如：日常遊玩、高難度副本" style="width: 100%; padding: 8px 12px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; font-size: 13px;">
+        </div>
+        <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px;">
+          <button id="editProfileDescCancelBtn" class="btn btn-secondary" style="flex: 1; padding: 8px;" data-i18n="button.cancel">取消</button>
+          <button id="editProfileDescConfirmBtn" class="btn btn-primary" style="flex: 1; padding: 8px;" data-i18n="button.confirm">確定</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Profile Apply Modal -->
+  <div id="confirmProfileApplyModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 380px; padding: 24px;">
+      <h2 id="confirmProfileApplyTitle" style="font-size: 16px; margin-bottom: 10px; text-align: left;"></h2>
+      <p id="confirmProfileApplyMsg" style="font-size: 13px; color: rgba(255,255,255,0.75); margin-bottom: 20px; line-height: 1.5;"></p>
+      <div style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button id="confirmProfileApplyCancelBtn" type="button" class="btn btn-secondary" style="flex: 1; padding: 8px;" data-i18n="button.cancel">取消</button>
+        <button id="confirmProfileApplyConfirmBtn" type="button" class="btn btn-primary" style="flex: 1; padding: 8px;" data-i18n="settings.profile.use">應用</button>
       </div>
     </div>
   </div>
