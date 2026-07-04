@@ -538,7 +538,7 @@ jobs:
           | 平台 Platform | 檔案 File | 說明 Description |
           |---|---|---|
           | **macOS** (Apple Silicon) | `XIVTheCalamity-VERSION-mac-arm64.dmg` | 安裝檔，雙擊後將 `XIVTheCalamity.app` 拖曳至 Applications 即可使用 |
-          | **Linux** (x64) | `XIVTheCalamity-VERSION-linux-x64.AppImage` | 執行前需加上執行權限：`chmod +x *.AppImage`</br> 如果在Steam App中使用或是透過Game Mode執行，需額外加上 `--no-sandbox` 執行參數 |
+          | **Linux** (x64) | `XIVTheCalamity-VERSION-linux-x64.AppImage` | 執行前需加上執行權限：`chmod +x *.AppImage` |
           | **Windows** (x64) Installer | `XIVTheCalamity-VERSION-win-x64-installer.exe` | 安裝檔，雙擊執行即可安裝 |
           | **Windows** (x64) Portable | `XIVTheCalamity-VERSION-win-x64.zip` | 免安裝壓縮檔，解壓後執行 `XIVTheCalamity.exe` 即可 |
           
