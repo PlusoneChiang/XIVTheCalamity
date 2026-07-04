@@ -12,4 +12,4 @@
 *.sh text eol=lf
 
 # Keep CRLF for Windows PowerShell scripts
-*.ps1 text eol=crlf
+*.ps1 -text
