@@ -103,6 +103,21 @@ echo "📦 Copying shared resources..."
 cp -R "$PROJECT_ROOT/shared/resources" "$OUTPUT_DIR/"
 echo "   ✅ Resources copied"
 
+# ================== Set up WebKitGTK Compatibility Links ==================
+echo ""
+echo "🔗 Checking WebKit2GTK compatibility..."
+# If old webkit2gtk 4.0 is not in default search directories, check if 4.1 is available to symlink it
+if ! ldconfig -p 2>/dev/null | grep -q "libwebkit2gtk-4.0.so.37"; then
+  if [ -f "/usr/lib64/libwebkit2gtk-4.1.so.0" ]; then
+    ln -sf /usr/lib64/libwebkit2gtk-4.1.so.0 "$OUTPUT_DIR/libwebkit2gtk-4.0.so.37"
+    echo "   🔗 Created symlink for libwebkit2gtk-4.0.so.37 -> libwebkit2gtk-4.1.so.0"
+  fi
+  if [ -f "/usr/lib64/libjavascriptcoregtk-4.1.so.0" ]; then
+    ln -sf /usr/lib64/libjavascriptcoregtk-4.1.so.0 "$OUTPUT_DIR/libjavascriptcoregtk-4.0.so.18"
+    echo "   🔗 Created symlink for libjavascriptcoregtk-4.0.so.18 -> libjavascriptcoregtk-4.1.so.0"
+  fi
+fi
+
 # ================== Run Test ==================
 APP_BIN="$OUTPUT_DIR/XIVTheCalamity"
 if [ -f "$APP_BIN" ]; then
@@ -115,7 +130,102 @@ if [ -f "$APP_BIN" ]; then
   echo "📏 Size: $(du -sh "$OUTPUT_DIR" | cut -f1)"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo ""
+  echo ""
   
+  # ================== Package AppImage ==================
+  echo ""
+  echo "📦 Packaging AppImage..."
+  APPDIR="$RELEASE_DIR/linux-x64/AppDir"
+  rm -rf "$APPDIR"
+  mkdir -p "$APPDIR/usr/bin"
+  mkdir -p "$APPDIR/usr/share/resources"
+  
+  cp "$OUTPUT_DIR/XIVTheCalamity" "$APPDIR/usr/bin/XIVTheCalamity"
+  cp "$OUTPUT_DIR/Photino.Native.so" "$APPDIR/usr/bin/Photino.Native.so"
+  cp -R "$PROJECT_ROOT/shared/resources/"* "$APPDIR/usr/share/resources/"
+  
+  # Copy icon
+  if [ -f "$PROJECT_ROOT/frontend/build/icons/256x256.png" ]; then
+    cp "$PROJECT_ROOT/frontend/build/icons/256x256.png" "$APPDIR/XIVTheCalamity.png"
+  fi
+  
+  # Desktop entry
+  cat << 'EOF' > "$APPDIR/XIVTheCalamity.desktop"
+[Desktop Entry]
+Type=Application
+Name=XIVTheCalamity
+Comment=Cross-platform FFXIV Launcher
+Exec=XIVTheCalamity %U
+Icon=XIVTheCalamity
+Categories=Game;
+EOF
+
+  # AppRun with WebKitGTK compatibility and local lib search
+  cat << 'EOF' > "$APPDIR/AppRun"
+#!/bin/sh
+SELF=$(readlink -f "$0")
+HERE=$(dirname "$SELF")
+
+# Setup WebKitGTK compatibility folder if system lacks WebKit 4.0 but has 4.1
+if ! ldconfig -p 2>/dev/null | grep -q "libwebkit2gtk-4.0.so.37"; then
+  COMPAT_DIR="/tmp/xivtc-compat-${USER}"
+  mkdir -p "$COMPAT_DIR"
+  
+  # Find libwebkit2gtk-4.1.so.0 path
+  WEBKIT_PATH=""
+  for p in "/usr/lib64/libwebkit2gtk-4.1.so.0" "/usr/lib/x86_64-linux-gnu/libwebkit2gtk-4.1.so.0" "/usr/lib/libwebkit2gtk-4.1.so.0"; do
+    if [ -f "$p" ]; then
+      WEBKIT_PATH="$p"
+      break
+    fi
+  done
+  
+  # Find libjavascriptcoregtk-4.1.so.0 path
+  JSC_PATH=""
+  for p in "/usr/lib64/libjavascriptcoregtk-4.1.so.0" "/usr/lib/x86_64-linux-gnu/libjavascriptcoregtk-4.1.so.0" "/usr/lib/libjavascriptcoregtk-4.1.so.0"; do
+    if [ -f "$p" ]; then
+      JSC_PATH="$p"
+      break
+    fi
+  done
+  
+  if [ -n "$WEBKIT_PATH" ]; then
+    ln -sf "$WEBKIT_PATH" "$COMPAT_DIR/libwebkit2gtk-4.0.so.37"
+  fi
+  if [ -n "$JSC_PATH" ]; then
+    ln -sf "$JSC_PATH" "$COMPAT_DIR/libjavascriptcoregtk-4.0.so.18"
+  fi
+  
+  export LD_LIBRARY_PATH="$COMPAT_DIR:$LD_LIBRARY_PATH"
+fi
+
+export LD_LIBRARY_PATH="${HERE}/usr/bin:$LD_LIBRARY_PATH"
+export PATH="${HERE}/usr/bin:${PATH}"
+exec XIVTheCalamity "$@"
+EOF
+  chmod +x "$APPDIR/AppRun"
+
+  # Find or download appimagetool
+  if ! command -v appimagetool &> /dev/null; then
+    APPIMAGETOOL="$RELEASE_DIR/appimagetool"
+    if [ ! -f "$APPIMAGETOOL" ]; then
+      echo "   📥 appimagetool not found, downloading to Release/appimagetool..."
+      curl -Lo "$APPIMAGETOOL" https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+      chmod +x "$APPIMAGETOOL"
+    fi
+  else
+    APPIMAGETOOL="appimagetool"
+  fi
+
+  # Build AppImage
+  VERSION=$(node -p "require('fs').readFileSync('$PROJECT_ROOT/backend/src/XIVTheCalamity/XIVTheCalamity.csproj', 'utf8').match(/<Version>(.*?)<\/Version>/)[1]")
+  export ARCH=x86_64
+  "$APPIMAGETOOL" "$APPDIR" "$RELEASE_DIR/XIVTheCalamity-${VERSION}-linux-x64.AppImage"
+  echo ""
+  echo "🎉 AppImage packaged successfully!"
+  echo "📦 Location: $RELEASE_DIR/XIVTheCalamity-${VERSION}-linux-x64.AppImage"
+  echo ""
+
   read -p "🧪 Do you want to run the application now? [y/N]: " run_choice
   
   if [[ "$run_choice" =~ ^[Yy]$ ]]; then
@@ -132,13 +242,26 @@ if [ -f "$APP_BIN" ]; then
       echo "✅ Development mode enabled"
     fi
 
-    echo ""
-    echo "🚀 Starting XIVTheCalamity..."
-    "$APP_BIN"
+    # Run the AppImage if we packaged it, otherwise run the unpacked version
+    VERSION=$(node -p "require('fs').readFileSync('$PROJECT_ROOT/backend/src/XIVTheCalamity/XIVTheCalamity.csproj', 'utf8').match(/<Version>(.*?)<\/Version>/)[1]")
+    if [ -f "$RELEASE_DIR/XIVTheCalamity-${VERSION}-linux-x64.AppImage" ]; then
+      echo ""
+      echo "🚀 Starting XIVTheCalamity (AppImage)..."
+      "$RELEASE_DIR/XIVTheCalamity-${VERSION}-linux-x64.AppImage"
+    else
+      echo ""
+      echo "🚀 Starting XIVTheCalamity (Unpacked)..."
+      LD_LIBRARY_PATH="$OUTPUT_DIR:$LD_LIBRARY_PATH" "$APP_BIN"
+    fi
   else
+    VERSION=$(node -p "require('fs').readFileSync('$PROJECT_ROOT/backend/src/XIVTheCalamity/XIVTheCalamity.csproj', 'utf8').match(/<Version>(.*?)<\/Version>/)[1]")
     echo ""
     echo "💡 You can run it manually with:"
-    echo "   $APP_BIN"
+    echo "   LD_LIBRARY_PATH=\"$OUTPUT_DIR\" $APP_BIN"
+    if [ -f "$RELEASE_DIR/XIVTheCalamity-${VERSION}-linux-x64.AppImage" ]; then
+      echo "   or run the AppImage:"
+      echo "   $RELEASE_DIR/XIVTheCalamity-${VERSION}-linux-x64.AppImage"
+    fi
   fi
 else
   echo "❌ Executable not found at $APP_BIN"

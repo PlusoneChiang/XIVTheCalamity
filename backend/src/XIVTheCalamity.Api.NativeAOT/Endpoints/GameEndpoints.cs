@@ -43,6 +43,108 @@ public static class GameEndpoints
                 {
                     dalamudRuntimePath = dalamudPathService.RuntimePath;
                     logger.LogInformation("[GAME] Dalamud enabled, runtime path: {Path}", dalamudRuntimePath);
+                    dalamudInjector.EnsureDotnetProgramFilesSymlink(dalamudPathService.RuntimePath);
+                }
+
+                // EntryPoint mode: Dalamud.Injector launches the game directly
+                if (config.Dalamud.Enabled && config.Dalamud.UseEntryPoint)
+                {
+                    logger.LogInformation("[GAME] Dalamud EntryPoint mode selected for fake launch");
+
+                    var (exePath, gameArgs) = gameLaunchService.BuildGameLaunchArgs(
+                        config.Game.GamePath, "0"); // sessionId is "0" for fake launch
+
+                    var options = new DalamudInjectionOptions
+                    {
+                        NoPlugin = config.Dalamud.SafeMode,
+                        NoThirdPartyPlugin = config.Dalamud.SafeMode,
+                        PluginRepoUrl = config.Dalamud.PluginRepoUrl
+                    };
+
+                    DalamudInjectionResult entryResult;
+
+                    WineLauncher? launcher = null;
+                    Dictionary<string, string>? environment = null;
+
+                    if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        // Run launch options wrapper in standalone mode first (to prepare game files)
+                        environmentService.RunLaunchWrapperStandalone(exePath);
+
+                        // IMPORTANT: For EntryPoint launch, use GetBaseLauncherCommand() (without LaunchOptions)
+                        // so that Dalamud.Injector.exe is not wrapped by user-defined launchers like fgmod
+                        launcher = environmentService.GetBaseLauncherCommand();
+
+                        if (!launcher.IsValid)
+                        {
+                            logger.LogError("[GAME] Wine/Proton executable not available for EntryPoint fake launch: {Exe}", launcher.Executable);
+                            return Results.BadRequest(ApiErrorResponse.Create(
+                                "WINE_NOT_AVAILABLE", "Wine executable not found"));
+                        }
+
+                        environment = environmentService.GetEnvironment();
+                    }
+
+                    entryResult = await dalamudInjector.LaunchWithEntryPointAsync(
+                        launcher, exePath, gameArgs, environment, options, cancellationToken);
+
+                    if (!entryResult.Success)
+                    {
+                        logger.LogError("[GAME] EntryPoint fake launch failed: {Error}", entryResult.ErrorMessage);
+                        return Results.BadRequest(ApiErrorResponse.Create(
+                            "GAME_LAUNCH_FAILED", entryResult.ErrorMessage ?? "EntryPoint launch failed"));
+                    }
+
+                    int reportedPid;
+
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        if (entryResult.GamePid.HasValue)
+                        {
+                            gameLaunchService.RegisterExternalGameProcess(entryResult.GamePid.Value);
+                            reportedPid = entryResult.GamePid.Value;
+                        }
+                        else
+                        {
+                            reportedPid = 0;
+                        }
+                    }
+                    else
+                    {
+                        if (entryResult.InjectorProcess != null)
+                        {
+                            gameLaunchService.SetMonitorProcess(entryResult.InjectorProcess);
+                            if (config.Wine?.AudioRouting == true)
+                            {
+                                environmentService.StartAudioRouter(entryResult.InjectorProcess.Id,
+                                    config.Wine?.Msync ?? false);
+                            }
+                            reportedPid = entryResult.InjectorProcess.Id;
+                        }
+                        else
+                        {
+                            reportedPid = 0;
+                        }
+                    }
+
+                    try
+                    {
+                        logger.LogInformation("[GAME] Waiting for EntryPoint fake launch game exit...");
+                        if (entryResult.InjectorProcess != null)
+                        {
+                            await entryResult.InjectorProcess.WaitForExitAsync(cancellationToken);
+                            var exitCode = entryResult.InjectorProcess.ExitCode;
+                            logger.LogInformation("[GAME] Game exited with code: {ExitCode}", exitCode);
+                            return Results.Ok(ApiResponse<GameLaunchResponse>.Ok(
+                                new GameLaunchResponse(reportedPid, exitCode)));
+                        }
+                        else
+                        {
+                            return Results.Ok(ApiResponse<GameLaunchResponse>.Ok(
+                                new GameLaunchResponse(reportedPid, 0)));
+                        }
+                    }
+                    finally { }
                 }
                 
                 var result = await gameLaunchService.FakeLaunchAsync(
@@ -165,7 +267,12 @@ public static class GameEndpoints
 
                     if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     {
-                        launcher = environmentService.GetLauncherCommand();
+                        // Run launch options wrapper in standalone mode first (to prepare game files)
+                        environmentService.RunLaunchWrapperStandalone(exePath);
+
+                        // IMPORTANT: For EntryPoint launch, use GetBaseLauncherCommand() (without LaunchOptions)
+                        // so that Dalamud.Injector.exe is not wrapped by user-defined launchers like fgmod
+                        launcher = environmentService.GetBaseLauncherCommand();
 
                         if (!launcher.IsValid)
                         {

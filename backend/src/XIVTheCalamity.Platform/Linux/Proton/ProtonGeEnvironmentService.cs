@@ -527,14 +527,113 @@ public class ProtonGeEnvironmentService(
         var config = configService.LoadConfigAsync().GetAwaiter().GetResult();
         var wineConfig = config.ProtonGe ?? new ProtonGeConfig();
 
+        Dictionary<string, string> env;
         // umu/pressure-vessel manages LD_LIBRARY_PATH and WINEDLLPATH internally.
         // Passing these manually causes library conflicts and crashes.
         if (umuDownloadService.IsAvailable())
         {
-            return GetUmuEnvironment(wineConfig);
+            env = GetUmuEnvironment(wineConfig);
+        }
+        else
+        {
+            env = GetDirectWineEnvironment(wineConfig);
         }
 
-        return GetDirectWineEnvironment(wineConfig);
+        // If LaunchOptions contains a dxgi.dll wrapper like fgmod, we MUST override winmm to native/builtin
+        // to avoid conflicts with Dalamud's dxgi DirectX hook.
+        var launchOptions = wineConfig.LaunchOptions ?? "";
+        if (launchOptions.Contains("fgmod") || launchOptions.Contains("dxgi") || launchOptions.Contains("winmm") || launchOptions.Contains("OptiScaler"))
+        {
+            // Instruct fgmod to use winmm.dll proxy
+            env["DLL"] = "winmm.dll";
+
+            if (env.TryGetValue("WINEDLLOVERRIDES", out var overrides))
+            {
+                if (!overrides.Contains("winmm"))
+                {
+                    env["WINEDLLOVERRIDES"] = string.IsNullOrEmpty(overrides) 
+                        ? "winmm=n,b" 
+                        : overrides + ";winmm=n,b";
+                }
+            }
+            else
+            {
+                env["WINEDLLOVERRIDES"] = "winmm=n,b";
+            }
+        }
+
+        return env;
+    }
+
+    /// <summary>
+    /// Executes the user-defined launch options wrapper in standalone (install) mode
+    /// before running utility commands (like Dalamud.Injector) that bypass the wrapper.
+    /// </summary>
+    public void RunLaunchWrapperStandalone(string gameExePath)
+    {
+        try
+        {
+            var config = configService.LoadConfigAsync().GetAwaiter().GetResult();
+            var launchOptions = config.ProtonGe?.LaunchOptions ?? "%command%";
+            var trimmed = launchOptions.Trim();
+            if (string.IsNullOrEmpty(trimmed) || trimmed == "%command%")
+                return;
+
+            var cmdIndex = trimmed.IndexOf("%command%", StringComparison.OrdinalIgnoreCase);
+            if (cmdIndex < 0)
+                return;
+
+            var prefix = trimmed[..cmdIndex].Trim();
+            if (string.IsNullOrEmpty(prefix))
+                return;
+
+            var tokens = TokenizeShellArgs(prefix);
+            if (tokens.Count == 0)
+                return;
+
+            var home = HomePathService.GetEffectiveHomePath();
+            var wrapperExe = tokens[0].Replace("~", home);
+            if (!File.Exists(wrapperExe))
+                return;
+
+            // Run in standalone mode: wrapperExe + gameExePath
+            logger?.LogInformation("[PROTON-GE] Running wrapper in standalone mode to prepare game files: {Wrapper} {GameExe}", wrapperExe, gameExePath);
+            
+            var psi = new ProcessStartInfo
+            {
+                FileName = wrapperExe,
+                Arguments = $"\"{gameExePath}\"",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+            
+            // Set home path
+            psi.Environment["HOME"] = home;
+
+            if (launchOptions.Contains("fgmod") || launchOptions.Contains("dxgi") || launchOptions.Contains("winmm") || launchOptions.Contains("OptiScaler"))
+            {
+                psi.Environment["DLL"] = "winmm.dll";
+            }
+
+            using var process = Process.Start(psi);
+            if (process != null)
+            {
+                process.WaitForExit(10000); // Wait up to 10 seconds
+                var output = process.StandardOutput.ReadToEnd();
+                var error = process.StandardError.ReadToEnd();
+                logger?.LogDebug("[PROTON-GE] Standalone wrapper exit code: {ExitCode}", process.ExitCode);
+                if (process.ExitCode != 0)
+                {
+                    logger?.LogWarning("[PROTON-GE] Standalone wrapper failed: {Error}", error);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            logger?.LogError(ex, "[PROTON-GE] Failed to execute standalone wrapper");
+        }
     }
 
     /// <summary>

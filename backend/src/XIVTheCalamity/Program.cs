@@ -342,6 +342,29 @@ public class Program
             }
         }
 
+        // Check if we can write to or create the webRoot directory.
+        // If it is read-only (like inside a mounted AppImage), fallback to a temp directory.
+        try
+        {
+            var targetWebRoot = Path.Combine(contentRoot, webRoot);
+            if (!Directory.Exists(targetWebRoot))
+            {
+                Directory.CreateDirectory(targetWebRoot);
+            }
+        }
+        catch
+        {
+            webRoot = Path.Combine(Path.GetTempPath(), "xivtc-wwwroot");
+            try
+            {
+                if (!Directory.Exists(webRoot))
+                {
+                    Directory.CreateDirectory(webRoot);
+                }
+            }
+            catch { }
+        }
+
         var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions
         {
             Args = args,

@@ -196,7 +196,15 @@ public class WineDalamudInjector : IDalamudInjector
 
             _ = Task.Run(async () =>
             {
-                try { while (!process.StandardOutput.EndOfStream) await process.StandardOutput.ReadLineAsync(); } catch { }
+                try
+                {
+                    while (!process.StandardOutput.EndOfStream)
+                    {
+                        var line = await process.StandardOutput.ReadLineAsync();
+                        if (line != null) _logger.LogInformation("[DALAMUD-INJECT] stdout: {Line}", line);
+                    }
+                }
+                catch { }
             });
             _ = Task.Run(async () =>
             {

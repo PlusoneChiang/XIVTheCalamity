@@ -251,6 +251,7 @@ jobs:
           mkdir -p "$APPDIR/usr/share/resources"
           
           cp Release/linux-out/XIVTheCalamity "$APPDIR/usr/bin/XIVTheCalamity"
+          cp Release/linux-out/Photino.Native.so "$APPDIR/usr/bin/Photino.Native.so"
           cp -R shared/resources/ "$APPDIR/usr/share/resources/"
           
           # Copy icon
@@ -271,6 +272,41 @@ jobs:
           #!/bin/sh
           SELF=$(readlink -f "$0")
           HERE=$(dirname "$SELF")
+          
+          # Setup WebKitGTK compatibility folder if system lacks WebKit 4.0 but has 4.1
+          if ! ldconfig -p 2>/dev/null | grep -q "libwebkit2gtk-4.0.so.37"; then
+            COMPAT_DIR="/tmp/xivtc-compat-${USER}"
+            mkdir -p "$COMPAT_DIR"
+            
+            # Find libwebkit2gtk-4.1.so.0 path
+            WEBKIT_PATH=""
+            for p in "/usr/lib64/libwebkit2gtk-4.1.so.0" "/usr/lib/x86_64-linux-gnu/libwebkit2gtk-4.1.so.0" "/usr/lib/libwebkit2gtk-4.1.so.0"; do
+              if [ -f "$p" ]; then
+                WEBKIT_PATH="$p"
+                break
+              fi
+            done
+            
+            # Find libjavascriptcoregtk-4.1.so.0 path
+            JSC_PATH=""
+            for p in "/usr/lib64/libjavascriptcoregtk-4.1.so.0" "/usr/lib/x86_64-linux-gnu/libjavascriptcoregtk-4.1.so.0" "/usr/lib/libjavascriptcoregtk-4.1.so.0"; do
+              if [ -f "$p" ]; then
+                JSC_PATH="$p"
+                break
+              fi
+            done
+            
+            if [ -n "$WEBKIT_PATH" ]; then
+              ln -sf "$WEBKIT_PATH" "$COMPAT_DIR/libwebkit2gtk-4.0.so.37"
+            fi
+            if [ -n "$JSC_PATH" ]; then
+              ln -sf "$JSC_PATH" "$COMPAT_DIR/libjavascriptcoregtk-4.0.so.18"
+            fi
+            
+            export LD_LIBRARY_PATH="$COMPAT_DIR:$LD_LIBRARY_PATH"
+          fi
+
+          export LD_LIBRARY_PATH="${HERE}/usr/bin:$LD_LIBRARY_PATH"
           export PATH="${HERE}/usr/bin:${PATH}"
           exec XIVTheCalamity "$@"
           EOF

@@ -60,6 +60,12 @@ public interface IEnvironmentService
     Dictionary<string, string> GetEnvironment();
     
     /// <summary>
+    /// Executes the user-defined launch options wrapper in standalone (install) mode
+    /// before running utility commands (like Dalamud.Injector) that bypass the wrapper.
+    /// </summary>
+    void RunLaunchWrapperStandalone(string gameExePath) { }
+    
+    /// <summary>
     /// Execute environment command
     /// </summary>
     Task<ProcessResult> ExecuteAsync(string command, string[] args, CancellationToken cancellationToken = default);
