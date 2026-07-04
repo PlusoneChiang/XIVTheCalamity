@@ -33,13 +33,18 @@ public class WinePrefixService
     /// 1. Execute wineboot -u to initialize prefix
     /// 2. Execute wineserver -w to wait for initialization completion
     /// </summary>
-    public async Task EnsurePrefixAsync(CancellationToken cancellationToken = default)
+    public Task EnsurePrefixAsync(CancellationToken cancellationToken = default)
+    {
+        return EnsurePrefixAsync(false, cancellationToken);
+    }
+
+    public async Task EnsurePrefixAsync(bool force, CancellationToken cancellationToken = default)
     {
         // Check if prefix already exists and contains basic files
         var userRegPath = Path.Combine(_paths.WinePrefix, "user.reg");
         var systemRegPath = Path.Combine(_paths.WinePrefix, "system.reg");
         
-        if (Directory.Exists(_paths.PrefixDriveC) && 
+        if (!force && Directory.Exists(_paths.PrefixDriveC) && 
             File.Exists(userRegPath) && 
             File.Exists(systemRegPath))
         {
@@ -204,12 +209,13 @@ public class WinePrefixService
     /// NEW: Returns async enumerable for SSE-friendly progress reporting
     /// </summary>
     public async IAsyncEnumerable<WineInitProgress> InitializePrefixAsyncEnumerable(
+        bool force = false,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         _logger?.LogInformation("[WINE-INIT] ========== Wine Prefix Initialization Started ==========");
 
         // Check if already fully initialized
-        if (IsFullyInitialized())
+        if (!force && IsFullyInitialized())
         {
             _logger?.LogInformation("[WINE-INIT] Wine Prefix already fully initialized, skipping");
             yield return new WineInitProgress
@@ -222,7 +228,7 @@ public class WinePrefixService
             yield break;
         }
         
-        _logger?.LogInformation("[WINE-INIT] Not fully initialized, proceeding with initialization");
+        _logger?.LogInformation("[WINE-INIT] Not fully initialized or update forced, proceeding with initialization");
 
         // Yield each progress event BEFORE doing the work so frontend gets real-time updates.
         // Since C# doesn't allow yield in try-catch, each step wraps its work
@@ -237,17 +243,17 @@ public class WinePrefixService
         _logger?.LogDebug("[WINE-INIT] Stage 1: Checking Wine Prefix at {Path}", _paths.WinePrefix);
 
         // 2. Create Prefix
-        if (!Directory.Exists(_paths.PrefixDriveC))
+        if (force || !Directory.Exists(_paths.PrefixDriveC))
         {
             yield return new WineInitProgress
             {
                 Stage = WineInitStage.CreatingPrefix,
                 MessageKey = "progress.creating_prefix"
             };
-            _logger?.LogInformation("[WINE-INIT] Stage 2: Creating Wine Prefix");
+            _logger?.LogInformation("[WINE-INIT] Stage 2: Creating/Updating Wine Prefix");
             
             string? prefixError = null;
-            try { await EnsurePrefixAsync(cancellationToken); }
+            try { await EnsurePrefixAsync(force, cancellationToken); }
             catch (Exception ex) { prefixError = ex.Message; }
             
             if (prefixError != null)

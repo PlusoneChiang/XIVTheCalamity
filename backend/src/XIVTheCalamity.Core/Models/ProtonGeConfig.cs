@@ -51,6 +51,26 @@ public class ProtonGeConfig
     public Dictionary<string, string> ExtraEnvironmentVariables { get; set; } = new();
 
     /// <summary>
+    /// Enable ALSA spatial downmix override.
+    /// </summary>
+    public bool WineAlsaSpacialEnabled { get; set; } = false;
+
+    /// <summary>
+    /// Override ALSA audio channel count (e.g. 2 for stereo, 6 for 5.1).
+    /// </summary>
+    public int? WineAlsaChannels { get; set; } = null;
+
+    /// <summary>
+    /// Use Proton 11's built-in Optiscaler support (PROTON_USE_OPTISCALER=1).
+    /// </summary>
+    public bool UseProtonOptiscaler { get; set; } = false;
+
+    /// <summary>
+    /// Use Proton 11's built-in Discord Bridge support (PROTON_DISCORD_BRIDGE=1).
+    /// </summary>
+    public bool UseProtonDiscordBridge { get; set; } = false;
+
+    /// <summary>
     /// Launch options string, supports %command% placeholder (like Steam launch options).
     /// Example: "~/fgmod/fgmod %command%"
     /// Default is "%command%" which means no wrapper.

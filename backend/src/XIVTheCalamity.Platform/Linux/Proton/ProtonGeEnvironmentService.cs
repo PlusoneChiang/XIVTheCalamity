@@ -46,7 +46,7 @@ public class ProtonGeEnvironmentService(
         };
 
         var protonStatus = await downloadService.GetStatusAsync();
-        var needsDownload = !protonStatus.IsInstalled;
+        var needsDownload = !protonStatus.IsInstalled || protonStatus.Version != ProtonGeDownloadService.PinnedVersion;
 
         if (needsDownload)
         {
@@ -121,7 +121,7 @@ public class ProtonGeEnvironmentService(
             TotalItems = 100
         };
 
-        await EnsurePrefixAsync(cancellationToken);
+        await EnsurePrefixAsync(needsDownload, cancellationToken);
 
         yield return new EnvironmentProgressEvent
         {
@@ -135,12 +135,17 @@ public class ProtonGeEnvironmentService(
         logger?.LogInformation("[PROTON-GE] Environment initialization complete");
     }
 
-    public async Task EnsurePrefixAsync(CancellationToken cancellationToken = default)
+    public Task EnsurePrefixAsync(CancellationToken cancellationToken = default)
+    {
+        return EnsurePrefixAsync(false, cancellationToken);
+    }
+
+    public async Task EnsurePrefixAsync(bool force, CancellationToken cancellationToken = default)
     {
         var driveC = Path.Combine(WinePrefix, "drive_c");
         var userReg = Path.Combine(WinePrefix, "user.reg");
         var systemReg = Path.Combine(WinePrefix, "system.reg");
-        if (Directory.Exists(driveC) && File.Exists(userReg) && File.Exists(systemReg))
+        if (!force && Directory.Exists(driveC) && File.Exists(userReg) && File.Exists(systemReg))
         {
             EnsureProtonSystemDllsInPrefix();
             logger?.LogDebug("[PROTON-GE] Wine prefix already initialized: {Prefix}", WinePrefix);
@@ -152,7 +157,7 @@ public class ProtonGeEnvironmentService(
             throw new FileNotFoundException($"Proton wine64 executable not found: {ProtonWine}");
         }
 
-        logger?.LogInformation("[PROTON-GE] Initializing Wine prefix: {Prefix}", WinePrefix);
+        logger?.LogInformation("[PROTON-GE] Initializing/Updating Wine prefix (force={Force}): {Prefix}", force, WinePrefix);
         Directory.CreateDirectory(WinePrefix);
 
         var env = GetEnvironment();
@@ -678,6 +683,24 @@ public class ProtonGeEnvironmentService(
             logger?.LogInformation("[PROTON-GE] IME detected: {Framework}, set XMODIFIERS/GTK_IM_MODULE/QT_IM_MODULE", imeFramework);
         }
 
+        // Apply advanced settings
+        if (wineConfig.WineAlsaSpacialEnabled)
+        {
+            env["WINEALSA_SPACIAL"] = "1";
+        }
+        if (wineConfig.WineAlsaChannels.HasValue && wineConfig.WineAlsaChannels.Value > 0)
+        {
+            env["WINEALSA_CHANNELS"] = wineConfig.WineAlsaChannels.Value.ToString();
+        }
+        if (wineConfig.UseProtonOptiscaler)
+        {
+            env["PROTON_USE_OPTISCALER"] = "1";
+        }
+        if (wineConfig.UseProtonDiscordBridge)
+        {
+            env["PROTON_DISCORD_BRIDGE"] = "1";
+        }
+
         // Apply extra user-defined environment variables (these override defaults)
         foreach (var (key, value) in wineConfig.ExtraEnvironmentVariables)
         {
@@ -800,7 +823,7 @@ public class ProtonGeEnvironmentService(
             ["WINEESYNC"] = wineConfig.EsyncEnabled ? "1" : "0",
             ["WINEFSYNC"] = wineConfig.FsyncEnabled ? "1" : "0",
             ["DXVK_HUD"] = wineConfig.DxvkHudEnabled ? "fps,frametime,memory" : "0",
-            ["DXVK_ASYNC"] = "1",
+            ["DXVK_ASYNC"] = wineConfig.DxvkAsyncEnabled ? "1" : "0",
             ["WINEDEBUG"] = string.IsNullOrEmpty(wineConfig.WineDebug) ? "-all" : wineConfig.WineDebug,
             ["XL_WINEONLINUX"] = "true",
         };
@@ -811,6 +834,24 @@ public class ProtonGeEnvironmentService(
         // Framerate limit: DXVK_FRAME_RATE=0 means unlimited; only set when user configured a limit.
         if (wineConfig.MaxFramerate > 0)
             env["DXVK_FRAME_RATE"] = wineConfig.MaxFramerate.ToString();
+
+        // Apply advanced settings
+        if (wineConfig.WineAlsaSpacialEnabled)
+        {
+            env["WINEALSA_SPACIAL"] = "1";
+        }
+        if (wineConfig.WineAlsaChannels.HasValue && wineConfig.WineAlsaChannels.Value > 0)
+        {
+            env["WINEALSA_CHANNELS"] = wineConfig.WineAlsaChannels.Value.ToString();
+        }
+        if (wineConfig.UseProtonOptiscaler)
+        {
+            env["PROTON_USE_OPTISCALER"] = "1";
+        }
+        if (wineConfig.UseProtonDiscordBridge)
+        {
+            env["PROTON_DISCORD_BRIDGE"] = "1";
+        }
 
         // Apply extra user-defined environment variables (these override defaults)
         foreach (var (key, value) in wineConfig.ExtraEnvironmentVariables)

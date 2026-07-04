@@ -91,7 +91,7 @@ public class WineEnvironmentService(
         var prefixStart = needsDownload ? 70 : 10;
         var prefixRange = needsDownload ? 30 : 90; // remaining percentage for prefix init
         
-        await foreach (var wineProgress in _prefixService.InitializePrefixAsyncEnumerable(cancellationToken))
+        await foreach (var wineProgress in _prefixService.InitializePrefixAsyncEnumerable(needsDownload, cancellationToken))
         {
             // Map prefix stage (0-100) to remaining percentage range
             var stagePercent = wineProgress.Stage switch

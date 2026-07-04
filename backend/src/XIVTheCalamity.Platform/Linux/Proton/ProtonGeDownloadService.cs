@@ -16,13 +16,15 @@ public class ProtonGeDownloadService(
     private readonly PlatformPathService _platformPaths = PlatformPathService.Instance;
     private readonly HttpClient _httpClient = new();
 
-    private const string PinnedVersion = "GE-Proton10-33";
-    private const string PinnedReleaseApiUrl = "https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/tags/GE-Proton10-33";
+    public const string PinnedVersion = "GE-Proton11-1";
+    private const string PinnedReleaseApiUrl = $"https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/tags/{PinnedVersion}";
     private const string RequestUserAgent = "XIVTheCalamity/1.0";
 
     public string ProtonBaseDirectory => Path.Combine(_platformPaths.UserDataDirectory, "proton");
     public string ProtonCurrentDirectory => Path.Combine(ProtonBaseDirectory, "current");
-    public string ProtonWinePath => Path.Combine(ProtonCurrentDirectory, "files", "bin", "wine64");
+    public string ProtonWinePath => File.Exists(Path.Combine(ProtonCurrentDirectory, "files", "bin", "wine64")) 
+        ? Path.Combine(ProtonCurrentDirectory, "files", "bin", "wine64") 
+        : Path.Combine(ProtonCurrentDirectory, "files", "bin", "wine");
     public string ProtonVersionFilePath => Path.Combine(ProtonBaseDirectory, "version.txt");
 
     public async Task<DownloadStatus> GetStatusAsync()
@@ -83,6 +85,16 @@ public class ProtonGeDownloadService(
                 yield return progress;
             }
 
+            if (File.Exists(archivePath))
+            {
+                var fileInfo = new FileInfo(archivePath);
+                logger?.LogInformation("[PROTON-GE] Download complete. Archive size: {Size} bytes", fileInfo.Length);
+            }
+            else
+            {
+                logger?.LogError("[PROTON-GE] Downloaded archive file not found at: {Path}", archivePath);
+            }
+
             yield return new DownloadProgressEvent
             {
                 Stage = "extracting",
@@ -100,8 +112,21 @@ public class ProtonGeDownloadService(
             };
 
             var extractedDir = FindExtractedDirectory(tempDir);
+            
+            // Log folders in tempDir for debugging
+            try
+            {
+                var dirs = Directory.GetDirectories(tempDir);
+                logger?.LogInformation("[PROTON-GE] Extracted directories found in tempDir: {Dirs}", string.Join(", ", dirs));
+            }
+            catch (Exception ex)
+            {
+                logger?.LogWarning(ex, "[PROTON-GE] Failed to list tempDir directories");
+            }
+
             if (string.IsNullOrEmpty(extractedDir))
             {
+                logger?.LogError("[PROTON-GE] Extracted Proton-GE directory not found in tempDir");
                 yield return new DownloadProgressEvent
                 {
                     Stage = "error",
@@ -202,7 +227,8 @@ public class ProtonGeDownloadService(
                 continue;
             }
 
-            if (assetName.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase))
+            if (assetName.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase) &&
+                !assetName.Contains("aarch64", StringComparison.OrdinalIgnoreCase))
             {
                 return new ProtonReleaseAsset(tagName, assetName, downloadUrl);
             }
@@ -266,6 +292,7 @@ public class ProtonGeDownloadService(
 
     private async Task ExtractArchiveAsync(string archivePath, string destinationDir, CancellationToken cancellationToken)
     {
+        logger?.LogInformation("[PROTON-GE] Running tar command: tar xzf \"{Archive}\" -C \"{Dest}\"", archivePath, destinationDir);
         var startInfo = new ProcessStartInfo
         {
             FileName = "tar",
@@ -282,9 +309,11 @@ public class ProtonGeDownloadService(
         }
 
         await process.WaitForExitAsync(cancellationToken);
+        logger?.LogInformation("[PROTON-GE] Tar process exited with code: {Code}", process.ExitCode);
         if (process.ExitCode != 0)
         {
             var error = await process.StandardError.ReadToEndAsync(cancellationToken);
+            logger?.LogError("[PROTON-GE] Tar extraction failed: {Error}", error);
             throw new Exception($"Proton archive extraction failed: {error}");
         }
     }
@@ -292,11 +321,26 @@ public class ProtonGeDownloadService(
     private string? FindExtractedDirectory(string tempDir)
     {
         var directCandidate = Directory.GetDirectories(tempDir)
-            .FirstOrDefault(d => File.Exists(Path.Combine(d, "files", "bin", "wine64")));
+            .FirstOrDefault(d => File.Exists(Path.Combine(d, "files", "bin", "wine64")) || File.Exists(Path.Combine(d, "files", "bin", "wine")));
 
         if (!string.IsNullOrEmpty(directCandidate))
         {
             return directCandidate;
+        }
+
+        foreach (var file in Directory.EnumerateFiles(tempDir, "wine", SearchOption.AllDirectories))
+        {
+            var normalized = file.Replace('\\', '/');
+            if (!normalized.EndsWith("/files/bin/wine", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var root = Directory.GetParent(Directory.GetParent(Directory.GetParent(file)!.FullName)!.FullName)!.FullName;
+            if (Directory.Exists(root))
+            {
+                return root;
+            }
         }
 
         foreach (var file in Directory.EnumerateFiles(tempDir, "wine64", SearchOption.AllDirectories))

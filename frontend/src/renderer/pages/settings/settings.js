@@ -326,6 +326,10 @@ function collectFormData() {
       gameModeEnabled: false, // GameMode disabled by default due to compatibility issues
       esyncEnabled: document.getElementById('protongeEsyncEnabled')?.checked !== false,
       fsyncEnabled: document.getElementById('protongeFsyncEnabled')?.checked !== false,
+      wineAlsaSpacialEnabled: document.getElementById('protongeWineAlsaSpacialEnabled')?.checked || false,
+      wineAlsaChannels: document.getElementById('protongeWineAlsaChannels')?.value ? parseInt(document.getElementById('protongeWineAlsaChannels').value) : null,
+      useProtonOptiscaler: document.getElementById('protongeUseProtonOptiscaler')?.checked || false,
+      useProtonDiscordBridge: document.getElementById('protongeUseProtonDiscordBridge')?.checked || false,
       wineDebug: document.getElementById('protongeWineDebug')?.value || '',
       extraEnvironmentVariables: parseExtraEnvVars(document.getElementById('protongeExtraEnvVars')?.value || ''),
       launchOptions: document.getElementById('protongeLaunchOptions')?.value || '%command%'
@@ -793,6 +797,10 @@ function initProtonGeTab() {
   // Advanced
   document.getElementById('protongeEsyncEnabled').checked = config.esyncEnabled !== false; // default true
   document.getElementById('protongeFsyncEnabled').checked = config.fsyncEnabled !== false; // default true
+  document.getElementById('protongeWineAlsaSpacialEnabled').checked = config.wineAlsaSpacialEnabled || false;
+  document.getElementById('protongeWineAlsaChannels').value = config.wineAlsaChannels !== undefined && config.wineAlsaChannels !== null ? config.wineAlsaChannels : '';
+  document.getElementById('protongeUseProtonOptiscaler').checked = config.useProtonOptiscaler || false;
+  document.getElementById('protongeUseProtonDiscordBridge').checked = config.useProtonDiscordBridge || false;
   document.getElementById('protongeWineDebug').value = config.wineDebug || '';
   document.getElementById('protongeExtraEnvVars').value = formatExtraEnvVars(config.extraEnvironmentVariables || {});
   document.getElementById('protongeLaunchOptions').value = config.launchOptions || '%command%';
