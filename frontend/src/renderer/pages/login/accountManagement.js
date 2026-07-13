@@ -3,13 +3,14 @@
  * Handles account dropdown, password toggle, and OTP management
  */
 
-import { getSavedAccounts, getAccount, deleteAccount, getDecryptedPassword, hasOTPSecret, getDecryptedOTPSecret, saveOTPSecret, getAutoFillOTP, saveAutoFillOTP, getLastUsedAccount } from '../../utils/credentialsStore.js';
+import { getSavedAccounts, getAccount, deleteAccount, getDecryptedPassword, hasOTPSecret, getDecryptedOTPSecret, saveOTPSecret, getAutoFillOTP, saveAutoFillOTP, getLastUsedAccount, getBoundProfile, initializeAccountProfileBindings } from '../../utils/credentialsStore.js';
 import { generateTOTP, getRemainingSeconds, isValidTOTPSecret } from '../../utils/totp.js';
 import i18n from '../../i18n/index.js';
 
 // State
 let otpInterval = null;
 let currentEmail = '';
+let currentActiveProfile = 'default';
 
 // Track auto-filled fields for reCaptcha consideration
 // When all fields are auto-filled, we require user interaction (click login button)
@@ -48,6 +49,20 @@ export async function initAccountManagement() {
   bindEmailChange();
   bindOTPSecretConfirm();
   
+  // Subscribe to config-changed to keep currentActiveProfile in sync
+  window.xivtc.events.on('config-changed', async () => {
+    try {
+      const res = await window.xivtc.backend.call('/api/config/profiles', { method: 'GET' });
+      if (res.ok && res.data) {
+        const result = res.data.success ? res.data.data : res.data;
+        currentActiveProfile = result.active || 'default';
+        console.log('[AccountManagement] Synced currentActiveProfile to:', currentActiveProfile);
+      }
+    } catch (e) {
+      console.error('[AccountManagement] Failed to sync currentActiveProfile on config-changed:', e);
+    }
+  });
+
   // Load saved accounts
   await loadAccountDropdown();
   
@@ -132,6 +147,14 @@ async function selectAccount(email, isStartup = false) {
   document.getElementById('email').value = email;
   currentEmail = email;
   autoFilledFields.email = true;
+
+  // Save active email to localStorage for settings page access
+  localStorage.setItem('activeAccountEmail', email);
+  
+  // Switch profile if not startup
+  if (!isStartup) {
+    await switchProfileForAccount(email);
+  }
   
   // Fill password and set remember checkbox
   const password = await getDecryptedPassword(email);
@@ -179,11 +202,71 @@ async function autoFillLastUsedAccount() {
   try {
     const lastEmail = await getLastUsedAccount();
     
+    // Fetch active profile from backend to initialize bindings
+    let activeProfile = 'default';
+    try {
+      const res = await window.xivtc.backend.call('/api/config/profiles', { method: 'GET' });
+      if (res.ok && res.data) {
+        const result = res.data.success ? res.data.data : res.data;
+        activeProfile = result.active || 'default';
+      }
+    } catch (e) {
+      console.error('[AccountManagement] Failed to fetch active profile on startup:', e);
+    }
+    
+    currentActiveProfile = activeProfile;
+    const targetProfileToSwitch = await initializeAccountProfileBindings(activeProfile);
+    
+    if (targetProfileToSwitch) {
+      console.log(`[AccountManagement] Startup active profile mismatch. Switching launcher active profile to: ${targetProfileToSwitch}`);
+      const switchResponse = await window.xivtc.backend.call('/api/config/profiles/switch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: targetProfileToSwitch })
+      });
+      if (switchResponse.ok) {
+        currentActiveProfile = targetProfileToSwitch;
+        await window.xivtc.events.send('config-changed', { gamePathChanged: true });
+      }
+    }
+    
     if (lastEmail) {
+      localStorage.setItem('activeAccountEmail', lastEmail);
       await selectAccount(lastEmail, true); // isStartup = true for focus handling
     }
   } catch (error) {
     console.error('[AccountManagement] Failed to auto-fill last account:', error);
+  }
+}
+
+/**
+ * Switch active profile based on account binding
+ */
+async function switchProfileForAccount(email) {
+  try {
+    const targetProfile = await getBoundProfile(email);
+    console.log(`[AccountManagement] Account ${email} is bound to profile ${targetProfile}`);
+    if (targetProfile !== currentActiveProfile) {
+      console.log(`[AccountManagement] Switching active profile to: ${targetProfile}`);
+      const switchResponse = await window.xivtc.backend.call('/api/config/profiles/switch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: targetProfile })
+      });
+      
+      if (switchResponse.ok) {
+        currentActiveProfile = targetProfile;
+        console.log(`[AccountManagement] Active profile switched successfully to ${targetProfile}`);
+        // Broadcast config-changed to update language/theme/game path
+        await window.xivtc.events.send('config-changed', {
+          gamePathChanged: true
+        });
+      } else {
+        console.error('[AccountManagement] Failed to switch active profile:', switchResponse.statusText);
+      }
+    }
+  } catch (error) {
+    console.error('[AccountManagement] Error switching profile for account:', error);
   }
 }
 
@@ -360,6 +443,7 @@ function bindEmailChange() {
     // Only reset if email actually changed
     if (email !== previousEmail) {
       currentEmail = email;
+      localStorage.setItem('activeAccountEmail', email);
       
       // Reset password and OTP
       document.getElementById('password').value = '';
@@ -377,6 +461,7 @@ function bindEmailChange() {
       // Try to load account data
       const account = await getAccount(email);
       if (account) {
+        await switchProfileForAccount(email);
         const password = await getDecryptedPassword(email);
         if (password) {
           document.getElementById('password').value = password;
@@ -473,6 +558,7 @@ export function getOTPSecretInput() {
  */
 export function cleanupAccountManagement() {
   stopOTPTimer();
+  window.xivtc.events.off('config-changed');
 }
 
 /**

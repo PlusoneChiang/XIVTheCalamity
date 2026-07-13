@@ -56,7 +56,6 @@ async function legacyDecryptText(encryptedBase64, password) {
   return decoder.decode(decrypted);
 }
 
-let storeCache = null;
 let migrationPromise = null;
 
 /**
@@ -212,29 +211,22 @@ async function loadStore() {
     await migrationPromise;
   }
   
-  if (storeCache) {
-    return storeCache;
-  }
-  
+  let store = {};
   try {
     const result = await window.xivtc.storage.load(CREDENTIALS_FILE);
     if (result.success && result.data) {
-      storeCache = result.data;
-    } else {
-      storeCache = {};
+      store = result.data;
     }
   } catch (error) {
     console.error('[CredentialsStore] Load store failed:', error);
-    storeCache = {};
   }
-  return storeCache;
+  return store;
 }
 
 /**
  * Save store data
  */
 async function saveStore(store) {
-  storeCache = store;
   try {
     const result = await window.xivtc.storage.save(CREDENTIALS_FILE, store);
     return result.success;
@@ -324,6 +316,17 @@ export async function savePassword(email, password) {
     const masterPassword = await getEncryptionKey();
     const encryptedPassword = await encryptText(password, masterPassword);
     
+    let activeProfile = 'default';
+    try {
+      const res = await window.xivtc.backend.call('/api/config/profiles', { method: 'GET' });
+      if (res.ok && res.data) {
+        const result = res.data.success ? res.data.data : res.data;
+        activeProfile = result.active || 'default';
+      }
+    } catch (e) {
+      console.error('[CredentialsStore] Failed to fetch active profile during savePassword:', e);
+    }
+
     if (!store[email]) {
       store[email] = {
         email,
@@ -331,11 +334,15 @@ export async function savePassword(email, password) {
         otpSecret: null,
         autoFillOTP: false,
         savedAt: Date.now(),
-        lastUsedAt: Date.now()
+        lastUsedAt: Date.now(),
+        boundProfile: activeProfile
       };
     } else {
       store[email].password = encryptedPassword;
       store[email].lastUsedAt = Date.now();
+      if (!store[email].boundProfile) {
+        store[email].boundProfile = activeProfile;
+      }
     }
     
     const success = await saveStore(store);
@@ -529,5 +536,133 @@ export async function saveAutoFillOTP(email, autoFillOTP) {
   } catch (error) {
     console.error('[CredentialsStore] Failed to save autoFillOTP:', error);
     return false;
+  }
+}
+
+/**
+ * Get profile bound to specific account
+ * @param {string} email
+ * @returns {Promise<string>}
+ */
+export async function getBoundProfile(email) {
+  try {
+    const store = await loadStore();
+    return store[email]?.boundProfile || 'default';
+  } catch (error) {
+    console.error('[CredentialsStore] Failed to get bound profile:', error);
+    return 'default';
+  }
+}
+
+/**
+ * Bind specific account to a profile
+ * @param {string} email
+ * @param {string} profileName
+ * @returns {Promise<boolean>}
+ */
+export async function bindProfile(email, profileName) {
+  try {
+    const store = await loadStore();
+    if (store[email]) {
+      store[email].boundProfile = profileName;
+      const success = await saveStore(store);
+      if (success) {
+        console.log(`[CredentialsStore] Bound account ${email} to profile ${profileName}`);
+      }
+      return success;
+    }
+    return false;
+  } catch (error) {
+    console.error('[CredentialsStore] Failed to bind profile:', error);
+    return false;
+  }
+}
+
+/**
+ * Reset profile bindings to 'default' when a profile is deleted
+ * @param {string} profileName
+ * @returns {Promise<void>}
+ */
+export async function unbindProfile(profileName) {
+  try {
+    const store = await loadStore();
+    let changed = false;
+    Object.keys(store).forEach(email => {
+      if (store[email].boundProfile === profileName) {
+        store[email].boundProfile = 'default';
+        changed = true;
+      }
+    });
+    if (changed) {
+      await saveStore(store);
+      console.log(`[CredentialsStore] Unbound profile ${profileName} from all accounts`);
+    }
+  } catch (error) {
+    console.error('[CredentialsStore] Failed to unbind profile:', error);
+  }
+}
+
+/**
+ * Initialize profile bindings on startup
+ * @param {string} activeProfile
+ * @returns {Promise<string|null>}
+ */
+export async function initializeAccountProfileBindings(activeProfile) {
+  try {
+    const store = await loadStore();
+    const lastUsedEmail = await getLastUsedAccount();
+    let changed = false;
+    let targetProfileToSwitch = null;
+    
+    Object.keys(store).forEach(email => {
+      if (store[email].password) {
+        if (email === lastUsedEmail) {
+          if (!store[email].boundProfile) {
+            store[email].boundProfile = activeProfile;
+            changed = true;
+            console.log(`[CredentialsStore] Startup: Bound active account ${email} to profile ${activeProfile}`);
+          } else {
+            // Already has a boundProfile. Check if it matches active profile.
+            // If not, we will return the target profile name to switch to it on startup.
+            if (store[email].boundProfile !== activeProfile) {
+              targetProfileToSwitch = store[email].boundProfile;
+            }
+          }
+        } else {
+          if (!store[email].boundProfile) {
+            store[email].boundProfile = 'default';
+            changed = true;
+            console.log(`[CredentialsStore] Startup (compat): Bound unbound account ${email} to default profile`);
+          }
+        }
+      }
+    });
+    
+    if (changed) {
+      await saveStore(store);
+    }
+    return targetProfileToSwitch;
+  } catch (error) {
+    console.error('[CredentialsStore] Failed to initialize profile bindings:', error);
+    return null;
+  }
+}
+
+/**
+ * Get all saved accounts with their bound profiles
+ * @returns {Promise<Array<{email: string, boundProfile: string}>>}
+ */
+export async function getAccountsWithProfiles() {
+  try {
+    const store = await loadStore();
+    return Object.keys(store)
+      .filter(email => !!store[email].password)
+      .map(email => ({
+        email,
+        boundProfile: store[email].boundProfile || 'default'
+      }));
+  } catch (error) {
+    console.error('[CredentialsStore] Failed to get accounts with profiles:', error);
+    return [];
   }
 }

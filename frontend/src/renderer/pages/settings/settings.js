@@ -5,7 +5,7 @@
 import '../../utils/polyfill.js';
 import i18n from '../../i18n/index.js';
 import { applyTheme } from '../../utils/theme.js';
-import { getLastUsedAccount, deleteOTPSecret } from '../../utils/credentialsStore.js';
+import { getLastUsedAccount, deleteOTPSecret, getAccountsWithProfiles, bindProfile, unbindProfile } from '../../utils/credentialsStore.js';
 
 let currentConfig = null;
 let currentPlatform = 'win32';
@@ -969,6 +969,28 @@ function setupEventListeners() {
       hideKonamiCodeDialog();
     }
   });
+
+  // Subscribe to config-changed to reload settings when profile or active account changes externally
+  window.xivtc.events.on('config-changed', async () => {
+    try {
+      const response = await window.xivtc.backend.call('/api/config/profiles', { method: 'GET' });
+      if (response.ok && response.data) {
+        const result = response.data.success ? response.data.data : response.data;
+        const latestActive = result.active || 'default';
+        
+        // If the active profile changed externally, reload config form fields
+        if (latestActive !== currentSelectedProfile) {
+          console.log(`[Settings] Active profile changed externally to: ${latestActive}. Reloading form...`);
+          await loadConfig(latestActive, true);
+        }
+        
+        // Always redraw profile section to update green/gray badges and blue borders
+        await initProfileSection();
+      }
+    } catch (err) {
+      console.error('[Settings] Failed to handle config-changed event:', err);
+    }
+  });
 }
 
 let toastTimeout = null;
@@ -1174,6 +1196,16 @@ async function initProfileSection() {
   
   if (!container || !addButton) return;
 
+  // Fetch accounts and active email to display profile bindings
+  let accounts = [];
+  let activeEmail = null;
+  try {
+    accounts = await getAccountsWithProfiles();
+    activeEmail = localStorage.getItem('activeAccountEmail') || await getLastUsedAccount();
+  } catch (err) {
+    console.error('[Settings] Failed to fetch accounts or active email for profile binding:', err);
+  }
+
   // 1. Fetch current profiles or fallback to default
   let active = 'default';
   try {
@@ -1263,19 +1295,33 @@ async function initProfileSection() {
       nameWrapper.style.display = 'flex';
       nameWrapper.style.alignItems = 'center';
       nameWrapper.style.gap = '8px';
+      nameWrapper.style.flexWrap = 'wrap';
       
       const name = document.createElement('span');
       name.className = 'profile-name';
       name.textContent = p === 'default' ? '預設 (default)' : p;
       nameWrapper.appendChild(name);
       
-      if (p === startupActiveProfile) {
+      // Find accounts bound to this profile
+      const boundAccounts = accounts.filter(acc => acc.boundProfile === p);
+      const hasCurrentActiveAccount = boundAccounts.some(acc => acc.email === activeEmail);
+      
+      // If there are no saved accounts in the launcher at all, show the fallback "使用中" badge for active profile
+      if (accounts.length === 0 && p === startupActiveProfile) {
         const badge = document.createElement('span');
         badge.className = 'profile-badge badge-active';
         badge.setAttribute('data-i18n', 'settings.profile.active');
         badge.textContent = i18n.t('settings.profile.active') || '使用中';
         nameWrapper.appendChild(badge);
       }
+      
+      // Render account badges (active is green, others are gray)
+      boundAccounts.forEach(acc => {
+        const badge = document.createElement('span');
+        badge.className = `profile-badge ${acc.email === activeEmail ? 'badge-account-active' : 'badge-account-inactive'}`;
+        badge.textContent = acc.email;
+        nameWrapper.appendChild(badge);
+      });
       
       textContainer.appendChild(nameWrapper);
       
@@ -1354,6 +1400,11 @@ async function initProfileSection() {
               const oldGamePath = currentConfig?.game?.gamePath || '';
               const oldDalamudEnabled = currentConfig?.dalamud?.enabled || false;
 
+              // Bind current active account to this profile
+              if (activeEmail) {
+                await bindProfile(activeEmail, targetProfile);
+              }
+
               // 3. Load target profile settings into UI
               await loadConfig(targetProfile, true); // true to apply theme immediately
               
@@ -1404,13 +1455,17 @@ async function initProfileSection() {
               
               const response = await window.xivtc.backend.call(`/api/config/profiles/${p}`, { method: 'DELETE' });
               if (response.ok) {
+                await unbindProfile(p);
                 if (currentSelectedProfile === p) {
                   // Deleted the active profile → switch to default, notify, refresh list (do NOT close)
-                  await window.xivtc.backend.call('/api/config/profiles/switch', {
+                  const switchRes = await window.xivtc.backend.call('/api/config/profiles/switch', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name: 'default' })
                   });
+                  if (switchRes.ok && activeEmail) {
+                    await bindProfile(activeEmail, 'default');
+                  }
                   await loadConfig('default', true);
                   await window.xivtc.events.send('config-changed', {
                     gamePathChanged: true,
@@ -1515,11 +1570,15 @@ async function initProfileSection() {
           }
           
           // 4. Switch persistently to the new profile
-          await window.xivtc.backend.call('/api/config/profiles/switch', {
+          const switchRes = await window.xivtc.backend.call('/api/config/profiles/switch', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: sanitized })
           });
+          
+          if (switchRes.ok && activeEmail) {
+            await bindProfile(activeEmail, sanitized);
+          }
           
           const oldGamePath = currentConfig?.game?.gamePath || '';
           const oldDalamudEnabled = currentConfig?.dalamud?.enabled || false;

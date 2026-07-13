@@ -1066,3 +1066,36 @@ html[data-theme="light"] .profile-btn.btn-edit:hover {
   background: #2980b9;
   color: #ffffff;
 }
+
+/* Account binding labels on profile cards */
+.profile-badge.badge-account-active {
+  background: #2ecc71;
+  color: #ffffff;
+}
+
+.profile-badge.badge-account-inactive {
+  background: rgba(255, 255, 255, 0.12);
+  color: #a0a0a0;
+}
+
+/* Light Theme overrides for Account badges */
+html[data-theme="light"] .profile-badge.badge-account-active {
+  background: #27ae60;
+  color: #ffffff;
+}
+
+html[data-theme="light"] .profile-badge.badge-account-inactive {
+  background: rgba(0, 0, 0, 0.08);
+  color: #666666;
+}
+
+/* Valentine Theme overrides for Account badges */
+html[data-theme="valentine"] .profile-badge.badge-account-active {
+  background: #10ac84; /* Soft bright green */
+  color: #ffffff;
+}
+
+html[data-theme="valentine"] .profile-badge.badge-account-inactive {
+  background: rgba(255, 107, 129, 0.15); /* Translucent pink */
+  color: #ff6b81; /* Valentine theme pink */
+}
