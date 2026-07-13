@@ -312,6 +312,36 @@ rm -- ""$0""
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
+                var appImagePath = Environment.GetEnvironmentVariable("APPIMAGE");
+                if (!string.IsNullOrEmpty(appImagePath))
+                {
+                    Log.Information("[AppUpdater] Running as AppImage. Original path: {AppImagePath}", appImagePath);
+                    try
+                    {
+                        var scriptPath = Path.Combine(Path.GetTempPath(), "update-linux.sh");
+                        var scriptContent = $@"#!/bin/sh
+sleep 1
+if mv -f ""{path}"" ""{appImagePath}""; then
+    chmod +x ""{appImagePath}""
+    ""{appImagePath}"" &
+else
+    chmod +x ""{path}""
+    ""{path}"" &
+fi
+rm -- ""$0""
+";
+                        File.WriteAllText(scriptPath, scriptContent);
+                        Process.Start("chmod", $"+x \"{scriptPath}\"")?.WaitForExit();
+                        Process.Start("/bin/sh", $"\"{scriptPath}\"");
+                        Environment.Exit(0);
+                        return;
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error(ex, "[AppUpdater] Failed to perform AppImage update via script, falling back to direct run");
+                    }
+                }
+
                 // Linux 系統沒有 HomeAlias 功能，其環境變數從未被修改，故可以直接啟動新版並繼承當前正常的系統環境
                 Process.Start("chmod", $"+x \"{path}\"")?.WaitForExit();
                 Process.Start(path);
