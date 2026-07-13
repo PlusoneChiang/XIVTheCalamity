@@ -547,7 +547,16 @@ jobs:
           | **Windows** (x64) Portable | `XIVTheCalamity-VERSION-win-x64.zip` | 免安裝壓縮檔，解壓後執行 `XIVTheCalamity.exe` 即可 |
           
           > ⚠️ 以下檔案為自動更新系統使用，一般使用者請勿下載：
-          > - `*.yml` — 自動更新元資料（`latest-mac.yml`、`latest-linux.yml`、`latest.yml`）
+          > - `*.yml` — 自動更新元資料（`latest-mac.yml`、`latest-linux.yml` ,`latest.yml`）
+          
+          > 💡 **Linux 啟動疑難排解 / Troubleshooting**:
+          > 本啟動器底層依賴 `webkit2gtk` 進行圖形介面渲染。若雙擊 AppImage 無法啟動，請確認系統是否已安裝 `webkit2gtk-4.1` 或 `webkit2gtk-4.0`：
+          > * **檢查是否安裝 (Check installation)**:
+          >   `ldconfig -p | grep libwebkit2gtk`
+          > * **安裝指令 (Install commands)**:
+          >   - **Arch Linux / CachyOS / Manjaro**: `sudo pacman -S webkit2gtk-4.1`
+          >   - **Ubuntu / Debian**: `sudo apt install libwebkit2gtk-4.1-0` (或 `libwebkit2gtk-4.0-37`)
+          >   - **Fedora**: `sudo dnf install webkit2gtk4.1`
           
           ---
           
