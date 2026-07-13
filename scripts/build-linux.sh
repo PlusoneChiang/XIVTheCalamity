@@ -217,10 +217,22 @@ EOF
     APPIMAGETOOL="appimagetool"
   fi
 
+  # Test if appimagetool can run directly (FUSE check)
+  APPIMAGETOOL_CMD=("$APPIMAGETOOL")
+  FUSE_AVAILABLE=true
+  if ! "$APPIMAGETOOL" --version &> /dev/null; then
+    # Try with --appimage-extract-and-run
+    if "$APPIMAGETOOL" --appimage-extract-and-run --version &> /dev/null; then
+      echo "   ⚠️ FUSE is not available or cannot mount. Running appimagetool with --appimage-extract-and-run..."
+      APPIMAGETOOL_CMD=("$APPIMAGETOOL" "--appimage-extract-and-run")
+      FUSE_AVAILABLE=false
+    fi
+  fi
+
   # Build AppImage
   VERSION=$(node -p "require('fs').readFileSync('$PROJECT_ROOT/backend/src/XIVTheCalamity/XIVTheCalamity.csproj', 'utf8').match(/<Version>(.*?)<\/Version>/)[1]")
   export ARCH=x86_64
-  "$APPIMAGETOOL" "$APPDIR" "$RELEASE_DIR/XIVTheCalamity-${VERSION}-linux-x64.AppImage"
+  "${APPIMAGETOOL_CMD[@]}" "$APPDIR" "$RELEASE_DIR/XIVTheCalamity-${VERSION}-linux-x64.AppImage"
   echo ""
   echo "🎉 AppImage packaged successfully!"
   echo "📦 Location: $RELEASE_DIR/XIVTheCalamity-${VERSION}-linux-x64.AppImage"
@@ -247,7 +259,12 @@ EOF
     if [ -f "$RELEASE_DIR/XIVTheCalamity-${VERSION}-linux-x64.AppImage" ]; then
       echo ""
       echo "🚀 Starting XIVTheCalamity (AppImage)..."
-      "$RELEASE_DIR/XIVTheCalamity-${VERSION}-linux-x64.AppImage"
+      if [ "$FUSE_AVAILABLE" = "true" ]; then
+        "$RELEASE_DIR/XIVTheCalamity-${VERSION}-linux-x64.AppImage"
+      else
+        echo "   ⚠️ FUSE not available, running AppImage with --appimage-extract-and-run..."
+        "$RELEASE_DIR/XIVTheCalamity-${VERSION}-linux-x64.AppImage" --appimage-extract-and-run
+      fi
     else
       echo ""
       echo "🚀 Starting XIVTheCalamity (Unpacked)..."

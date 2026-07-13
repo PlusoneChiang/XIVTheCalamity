@@ -204,6 +204,8 @@ public static class NativeBridgeEndpoints
             try
             {
                 Directory.CreateDirectory(req.Url);
+                Directory.CreateDirectory(Path.Combine(req.Url, "boot"));
+                Directory.CreateDirectory(Path.Combine(req.Url, "game"));
                 return Results.Ok(new SelectDirectoryResponse(true, Path: req.Url));
             }
             catch
