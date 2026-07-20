@@ -119,7 +119,7 @@ public class WinePathService
         
         // Application paths
         LogsPath = Path.Combine(AppSupport, "logs");
-        DalamudLogsPath = Path.Combine(LogsPath, "Dalamud");
+        DalamudLogsPath = Path.Combine(LogsPath, "dalamud");
         
         GstLib = Path.Combine(WineRoot, "lib");
         GstPlugin = Path.Combine(GstLib, "gstreamer-1.0");

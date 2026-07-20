@@ -176,8 +176,8 @@ public class PlatformPathService
     public string GetDalamudDirectory()
     {
         return _activeProfile == "default"
-            ? Path.Combine(UserDataDirectory, "Dalamud")
-            : Path.Combine(UserDataDirectory, "profiles", _activeProfile, "Dalamud");
+            ? Path.Combine(UserDataDirectory, "dalamud")
+            : Path.Combine(UserDataDirectory, "profiles", _activeProfile, "dalamud");
     }
 
     /// <summary>

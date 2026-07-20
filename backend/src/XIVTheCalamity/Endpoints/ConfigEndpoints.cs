@@ -293,15 +293,15 @@ public static class ConfigEndpoints
                     }
 
                     // Copy Dalamud Config & Plugins if they exist in default profile
-                    var defaultDalamudConfig = Path.Combine(pathService.UserDataDirectory, "Dalamud", "Config");
-                    var targetDalamudConfig = Path.Combine(pathService.UserDataDirectory, "profiles", targetName, "Dalamud", "Config");
+                    var defaultDalamudConfig = Path.Combine(pathService.UserDataDirectory, "dalamud", "config");
+                    var targetDalamudConfig = Path.Combine(pathService.UserDataDirectory, "profiles", targetName, "dalamud", "config");
                     if (Directory.Exists(defaultDalamudConfig) && !Directory.Exists(targetDalamudConfig))
                     {
                         CopyDirectoryRecursive(defaultDalamudConfig, targetDalamudConfig);
                     }
 
-                    var defaultDalamudPlugins = Path.Combine(pathService.UserDataDirectory, "Dalamud", "Plugins");
-                    var targetDalamudPlugins = Path.Combine(pathService.UserDataDirectory, "profiles", targetName, "Dalamud", "Plugins");
+                    var defaultDalamudPlugins = Path.Combine(pathService.UserDataDirectory, "dalamud", "installedPlugins");
+                    var targetDalamudPlugins = Path.Combine(pathService.UserDataDirectory, "profiles", targetName, "dalamud", "installedPlugins");
                     if (Directory.Exists(defaultDalamudPlugins) && !Directory.Exists(targetDalamudPlugins))
                     {
                         CopyDirectoryRecursive(defaultDalamudPlugins, targetDalamudPlugins);

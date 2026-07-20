@@ -60,6 +60,8 @@ public class DalamudUpdater
     /// <summary>Get current status</summary>
     public async Task<DalamudStatus> GetStatusAsync()
     {
+        MigrateOldDalamudDirectories();
+
         var status = new DalamudStatus
         {
             LocalVersion = _pathService.GetLocalVersion(),
@@ -197,6 +199,8 @@ public class DalamudUpdater
     {
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var currentProgress = new DalamudUpdateProgress();
+        
+        MigrateOldDalamudDirectories();
         
         _pathService.EnsureDirectoriesExist();
         
@@ -986,6 +990,109 @@ public class DalamudUpdater
             CompletedItems = 0
         };
     }
+    
+    #region 相容性遷移
+
+    public void MigrateOldDalamudDirectories()
+    {
+        try
+        {
+            var userDataDir = PlatformPathService.Instance.UserDataDirectory;
+            
+            // 1. 遷移共享的 BasePath 內的 Dalamud 目錄
+            MigrateDalamudDirectory(userDataDir);
+
+            // 2. 遷移 profiles 底下所有 Profile 的 Dalamud 目錄
+            var profilesParentDir = Path.Combine(userDataDir, "profiles");
+            if (Directory.Exists(profilesParentDir))
+            {
+                foreach (var profileDir in Directory.GetDirectories(profilesParentDir))
+                {
+                    MigrateDalamudDirectory(profileDir);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Dalamud 相容性遷移時發生錯誤");
+        }
+    }
+
+    private void MigrateDalamudDirectory(string parentDir)
+    {
+        if (!Directory.Exists(parentDir)) return;
+
+        var subDirs = Directory.GetDirectories(parentDir);
+        var originalDalamud = subDirs.FirstOrDefault(d => Path.GetFileName(d).Equals("Dalamud", StringComparison.Ordinal));
+
+        if (originalDalamud != null)
+        {
+            var localPath = Path.Combine(parentDir, "Dalamud_local");
+            
+            _logger.LogInformation("發現舊的 Dalamud 目錄: {OriginalPath}，準備進行相容性遷移至: {LocalPath}", originalDalamud, localPath);
+
+            // 如果 Dalamud_local 已經存在（可能之前遷移失敗殘留），先刪除它
+            if (Directory.Exists(localPath))
+            {
+                Directory.Delete(localPath, true);
+            }
+
+            Directory.Move(originalDalamud, localPath);
+
+            // 建立dalamud目錄
+            var newDalamudPath = Path.Combine(parentDir, "dalamud");
+            Directory.CreateDirectory(newDalamudPath);
+
+            // 將Dalamud_local下的各個子目錄中的檔案，複製到新的預設目錄中。
+            foreach (var subDir in Directory.GetDirectories(localPath))
+            {
+                var subDirName = Path.GetFileName(subDir);
+                var targetSubDirName = ToCamelCase(subDirName);
+                var targetSubDir = Path.Combine(newDalamudPath, targetSubDirName);
+
+                CopyDirectoryRecursiveKeepNames(subDir, targetSubDir);
+            }
+            
+            // 複製 Dalamud_local 根目錄下的檔案（如果有）
+            foreach (var file in Directory.GetFiles(localPath))
+            {
+                var targetFile = Path.Combine(newDalamudPath, Path.GetFileName(file));
+                File.Copy(file, targetFile, true);
+            }
+
+            // 遷移完成後，刪除Dalamud_local好完成遷移。
+            Directory.Delete(localPath, true);
+            
+            _logger.LogInformation("舊的 Dalamud 目錄遷移完成並已刪除暫存的 Dalamud_local");
+        }
+    }
+
+    private string ToCamelCase(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return name;
+        if (name.Equals("Plugins", StringComparison.OrdinalIgnoreCase)) return "installedPlugins";
+        return char.ToLowerInvariant(name[0]) + name.Substring(1);
+    }
+
+    private void CopyDirectoryRecursiveKeepNames(string sourceDir, string targetDir)
+    {
+        Directory.CreateDirectory(targetDir);
+
+        foreach (var file in Directory.GetFiles(sourceDir))
+        {
+            var targetFile = Path.Combine(targetDir, Path.GetFileName(file));
+            File.Copy(file, targetFile, true);
+        }
+
+        foreach (var subDir in Directory.GetDirectories(sourceDir))
+        {
+            var subDirName = Path.GetFileName(subDir);
+            var targetSubDir = Path.Combine(targetDir, subDirName);
+            CopyDirectoryRecursiveKeepNames(subDir, targetSubDir);
+        }
+    }
+
+    #endregion
     
     #endregion
 }

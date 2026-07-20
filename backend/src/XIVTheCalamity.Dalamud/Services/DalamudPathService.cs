@@ -15,27 +15,27 @@ public class DalamudPathService
     
     /// <summary>Dalamud root directory (shared among all profiles)</summary>
     public string BasePath => 
-        Path.Combine(PlatformPathService.Instance.UserDataDirectory, "Dalamud");
+        Path.Combine(PlatformPathService.Instance.UserDataDirectory, "dalamud");
     
     /// <summary>Hooks directory (Dalamud main program)</summary>
-    public string HooksPath => Path.Combine(BasePath, "Hooks");
+    public string HooksPath => Path.Combine(BasePath, "hooks");
     
     /// <summary>Runtime directory (.NET Runtime)</summary>
-    public string RuntimePath => Path.Combine(BasePath, "Runtime");
+    public string RuntimePath => Path.Combine(BasePath, "runtime");
     
     /// <summary>Assets directory (UI resources)</summary>
-    public string AssetsPath => Path.Combine(BasePath, "Assets");
+    public string AssetsPath => Path.Combine(BasePath, "assets");
 
     /// <summary>Profile-specific Dalamud directory</summary>
     private string ProfileDalamudPath => PlatformPathService.Instance.ActiveProfile == "default"
         ? BasePath
-        : Path.Combine(PlatformPathService.Instance.UserDataDirectory, "profiles", PlatformPathService.Instance.ActiveProfile, "Dalamud");
+        : Path.Combine(PlatformPathService.Instance.UserDataDirectory, "profiles", PlatformPathService.Instance.ActiveProfile, "dalamud");
     
     /// <summary>Configuration directory (Profile-specific)</summary>
-    public string ConfigPath => Path.Combine(ProfileDalamudPath, "Config");
+    public string ConfigPath => Path.Combine(ProfileDalamudPath, "config");
     
     /// <summary>Plugins directory (Profile-specific)</summary>
-    public string PluginsPath => Path.Combine(ProfileDalamudPath, "Plugins");
+    public string PluginsPath => Path.Combine(ProfileDalamudPath, "installedPlugins");
     
     /// <summary>Get Hooks directory for specific version</summary>
     public string GetHooksVersionPath(string version) => 
@@ -63,13 +63,13 @@ public class DalamudPathService
     /// <summary>Dalamud config file path</summary>
     public string DalamudConfigPath => Path.Combine(ConfigPath, "dalamudConfig.json");
     
-    /// <summary>Dalamud Log directory (stored in application logs/Dalamud directory)</summary>
+    /// <summary>Dalamud Log directory (stored in application logs/dalamud directory)</summary>
     public string LogPath
     {
         get
         {
             var platformPaths = PlatformPathService.Instance;
-            return Path.Combine(platformPaths.LogsDirectory, "Dalamud");
+            return Path.Combine(platformPaths.LogsDirectory, "dalamud");
         }
     }
     
