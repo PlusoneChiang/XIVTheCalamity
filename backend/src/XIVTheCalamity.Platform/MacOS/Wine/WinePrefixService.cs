@@ -799,7 +799,7 @@ public class WinePrefixService
         }
 
         // 方案 2：打包後的 macOS app bundle
-        var bundleResourcesPath = Path.Combine(appDir, "..", "..", "Resources", "resources", "fonts", fontFile);
+        var bundleResourcesPath = Path.Combine(appDir, "..", "Resources", "resources", "fonts", fontFile);
         bundleResourcesPath = Path.GetFullPath(bundleResourcesPath);
         if (File.Exists(bundleResourcesPath))
         {

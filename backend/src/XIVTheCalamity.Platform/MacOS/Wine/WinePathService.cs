@@ -86,7 +86,7 @@ public class WinePathService
         // Strategy 3: Bundle environment (legacy)
         if (string.IsNullOrEmpty(WineRoot))
         {
-            var bundleWinePath = Path.Combine(appDir, "..", "..", "Resources", "wine");
+            var bundleWinePath = Path.Combine(appDir, "..", "Resources", "wine");
             bundleWinePath = Path.GetFullPath(bundleWinePath);
             if (Directory.Exists(bundleWinePath) && Directory.Exists(Path.Combine(bundleWinePath, "bin")))
             {

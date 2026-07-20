@@ -114,8 +114,8 @@ public class AudioRouterService
         var appDir = AppContext.BaseDirectory;
         
         // Strategy 1: Bundle environment
-        // XIVTheCalamity.app/Contents/MacOS/backend/ -> XIVTheCalamity.app/Contents/Resources/resources/bin/
-        var bundlePath = Path.Combine(appDir, "..", "..", "Resources", "resources", "bin", "XTCAudioRouter");
+        // XIVTheCalamity.app/Contents/MacOS/ -> XIVTheCalamity.app/Contents/Resources/resources/bin/
+        var bundlePath = Path.Combine(appDir, "..", "Resources", "resources", "bin", "XTCAudioRouter");
         bundlePath = Path.GetFullPath(bundlePath);
         if (File.Exists(bundlePath))
         {
