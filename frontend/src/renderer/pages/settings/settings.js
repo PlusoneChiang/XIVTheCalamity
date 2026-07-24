@@ -921,6 +921,18 @@ function initAboutTab() {
   });
   
   document.getElementById('showLicenseButton').addEventListener('click', showLicense);
+
+  // Handle all external links in the page (e.g., sponsor buttons)
+  document.querySelectorAll('a[target="_blank"]').forEach(link => {
+    link.addEventListener('click', async (e) => {
+      e.preventDefault();
+      try {
+        await window.xivtc.openExternal(link.href);
+      } catch (error) {
+        console.error('[Settings] Failed to open external link:', error);
+      }
+    });
+  });
 }
 
 /**
