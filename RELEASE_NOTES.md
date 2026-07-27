@@ -1,5 +1,38 @@
 # Release Notes
 
+## v2.1.0
+#### 🇹🇼 zh-TW
+### 🚀 核心架構
+- **輕量化重構**：移除 Electron 依賴，全面遷移至 Photino.NET 架構，大幅降低記憶體佔用與啟動延遲。
+- **資安防護**：前端靜態資源改為內建 Resource 檔案打包，防止檔案被意外修改或篡改。
+
+### ✨ 新功能
+- **多設定檔支援**：新增多設定檔（Profiles）管理功能。
+- **帳號綁定**：支援遊戲帳號與特定設定檔綁定，方便多帳號快速切換。
+- **Linux 升級**：Linux 環境升級支援 GE-Proton 11，並實現 AppImage 自動化打包發布。
+
+### 🐛 錯誤修正
+- **macOS**：修正 App Bundle 相對路徑讀取與執行錯誤。
+- **Linux**：修正版本檢查、更新邏輯與執行相容性問題。
+- **Windows**：修復部分環境下的遊戲路徑初始化及設定檔寫入問題。
+- **介面修正**：修復前端彈出視窗與元件互動體驗問題。
+
+#### 🇺🇸 English
+### 🚀 Core Architecture
+- **Lightweight Refactor**: Replaced Electron with Photino.NET, significantly reducing memory footprint and startup time.
+- **Security & Integrity**: Embedded frontend assets directly as built-in resources to prevent tampering.
+
+### ✨ New Features
+- **Multi-Profile Support**: Added management for multiple user profiles.
+- **Account Binding**: Added feature to bind game accounts to specific profiles for quick switching.
+- **Linux Improvements**: Upgraded Linux runtime to GE-Proton 11 with automated AppImage build packaging.
+
+### 🐛 Bug Fixes
+- **macOS**: Fixed App Bundle relative path resolution issue.
+- **Linux**: Fixed version check and update compatibility issues.
+- **Windows**: Fixed game path initialization and configuration issues on certain environments.
+- **UI**: Fixed modal dialog rendering and interactive frontend issues.
+
 ## v1.9.4
 #### 🇹🇼 zh-TW
 ### 🐛 修復
