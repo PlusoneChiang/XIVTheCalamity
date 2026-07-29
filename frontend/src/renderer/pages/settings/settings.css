@@ -208,6 +208,7 @@ body {
 
 .form-group input[type="text"],
 .form-group input[type="number"],
+.form-group textarea,
 .form-group select {
   width: 100%;
   padding: 6px 10px;
@@ -221,6 +222,7 @@ body {
 
 .form-group input[type="text"]:focus,
 .form-group input[type="number"]:focus,
+.form-group textarea:focus,
 .form-group select:focus {
   outline: none;
   border-color: rgba(52, 152, 219, 0.8);
@@ -717,6 +719,7 @@ html[data-theme="light"] .form-group label {
 
 html[data-theme="light"] .form-group input[type="text"],
 html[data-theme="light"] .form-group input[type="number"],
+html[data-theme="light"] .form-group textarea,
 html[data-theme="light"] .form-group select {
   background: var(--color-input-bg);
   border-color: var(--color-input-border);
@@ -725,6 +728,7 @@ html[data-theme="light"] .form-group select {
 
 html[data-theme="light"] .form-group input[type="text"]:focus,
 html[data-theme="light"] .form-group input[type="number"]:focus,
+html[data-theme="light"] .form-group textarea:focus,
 html[data-theme="light"] .form-group select:focus {
   border-color: rgba(52, 152, 219, 0.8);
   background: rgba(255, 255, 255, 1);

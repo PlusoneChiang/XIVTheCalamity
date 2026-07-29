@@ -279,7 +279,8 @@ function populateForm(config, applyVisuals = false) {
     document.getElementById('dalamudEnabled').checked = config.dalamud.enabled || false;
     document.getElementById('injectDelay').value = config.dalamud.injectDelay || 5000;
     document.getElementById('safeMode').checked = config.dalamud.safeMode || false;
-    document.getElementById('pluginRepoUrl').value = config.dalamud.pluginRepoUrl || '';
+    const repoUrls = (config.dalamud.pluginRepoUrl || '').split(';').map(u => u.trim()).filter(Boolean);
+    document.getElementById('pluginRepoUrl').value = repoUrls.join('\n');
     document.getElementById('entryPointMode').checked = config.dalamud.useEntryPoint ?? true;
     document.getElementById('useLatestPreRelease').checked = config.dalamud.useLatestPreRelease || false;
   }
@@ -339,7 +340,7 @@ function collectFormData() {
       enabled: document.getElementById('dalamudEnabled').checked,
       injectDelay: parseInt(document.getElementById('injectDelay').value),
       safeMode: document.getElementById('safeMode').checked,
-      pluginRepoUrl: document.getElementById('pluginRepoUrl').value,
+      pluginRepoUrl: (document.getElementById('pluginRepoUrl').value || '').split('\n').map(u => u.trim()).filter(Boolean).join(';'),
       useEntryPoint: document.getElementById('entryPointMode').checked,
       useLatestPreRelease: document.getElementById('useLatestPreRelease').checked
     }
