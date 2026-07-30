@@ -1,5 +1,16 @@
 # Release Notes
 
+## v2.1.2
+#### 🇹🇼 zh-TW
+### 🐛 錯誤修正
+- **macOS**：修復 `d3dcompiler_47.dll` Not Found問題。
+- **Dalamud**：新增多重預設主庫功能。 
+
+#### 🇺🇸 English
+### 🐛 Bug Fixes & Features
+- **macOS**: Fixed `d3dcompiler_47.dll` Not Found issue.
+- **Dalamud**: Added support for multiple default plugin repositories.
+
 ## v2.1.0
 #### 🇹🇼 zh-TW
 ### 🚀 核心架構

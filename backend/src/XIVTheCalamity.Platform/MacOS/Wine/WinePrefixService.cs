@@ -124,12 +124,59 @@ public class WinePrefixService
                 throw new Exception("Prefix initialization failed: user.reg not found");
             }
 
+            EnsureD3DCompilerSymlink();
+
             _logger?.LogInformation("Wine Prefix initialized successfully");
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Failed to initialize prefix");
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Ensure d3dcompiler_47.dll symlink exists in system32 pointing to Wine builtin DLL
+    /// </summary>
+    public void EnsureD3DCompilerSymlink()
+    {
+        try
+        {
+            var targetPath = Path.Combine(_paths.PrefixSystem32, "d3dcompiler_47.dll");
+
+            // Check if file or valid symlink already exists
+            if (File.Exists(targetPath) || Directory.Exists(targetPath))
+            {
+                _logger?.LogDebug("[WINE-INIT] d3dcompiler_47.dll already exists at {Path}", targetPath);
+                return;
+            }
+
+            // Remove broken symlink if present
+            var fileInfo = new FileInfo(targetPath);
+            if (fileInfo.Exists || fileInfo.LinkTarget != null)
+            {
+                File.Delete(targetPath);
+            }
+
+            var sourcePath = Path.Combine(_paths.WineDll, "x86_64-windows", "d3dcompiler_47.dll");
+            if (!File.Exists(sourcePath))
+            {
+                sourcePath = Path.Combine(_paths.WineRoot, "lib", "wine", "x86_64-windows", "d3dcompiler_47.dll");
+            }
+
+            if (!File.Exists(sourcePath))
+            {
+                _logger?.LogWarning("[WINE-INIT] Source d3dcompiler_47.dll not found at {Path}", sourcePath);
+                return;
+            }
+
+            Directory.CreateDirectory(_paths.PrefixSystem32);
+            File.CreateSymbolicLink(targetPath, sourcePath);
+            _logger?.LogInformation("[WINE-INIT] Created symlink for d3dcompiler_47.dll: {Target} -> {Source}", targetPath, sourcePath);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "[WINE-INIT] Failed to create symlink for d3dcompiler_47.dll");
         }
     }
 
@@ -173,12 +220,13 @@ public class WinePrefixService
                 return false;
             }
 
-            // Check if graphics DLLs are installed (DXMT d3d11.dll should be ~4.7MB)
+            // Check if graphics DLLs and d3dcompiler_47.dll are installed
             var d3d11Path = Path.Combine(_paths.PrefixSystem32, "d3d11.dll");
             var dxgiPath = Path.Combine(_paths.PrefixSystem32, "dxgi.dll");
-            if (!File.Exists(d3d11Path) || !File.Exists(dxgiPath))
+            var d3dCompilerPath = Path.Combine(_paths.PrefixSystem32, "d3dcompiler_47.dll");
+            if (!File.Exists(d3d11Path) || !File.Exists(dxgiPath) || !File.Exists(d3dCompilerPath))
             {
-                _logger?.LogDebug("Prefix not fully initialized: Graphics DLLs not installed");
+                _logger?.LogDebug("Prefix not fully initialized: Graphics DLLs or d3dcompiler_47.dll missing");
                 return false;
             }
             
@@ -345,6 +393,9 @@ public class WinePrefixService
             };
             yield break;
         }
+
+        // 5.5. Ensure d3dcompiler_47.dll symlink
+        EnsureD3DCompilerSymlink();
 
         // 6. Complete
         _logger?.LogInformation("[WINE-INIT] ========== Completed Successfully ==========");
