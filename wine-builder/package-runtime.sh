@@ -163,6 +163,19 @@ process_binary() {
     install_name_tool -add_rpath "@loader_path/../.." "$binaryPath"
 }
 
+# Nix wraps gst-inspect with a shell script that points back into /nix/store.
+# Package the wrapped Mach-O itself so the released runtime is self-contained.
+gstInspect="$targetDir/bin/gst-inspect-1.0"
+if [[ -f "$gstInspect" ]] && ! file "$gstInspect" | grep -q "Mach-O"; then
+    gstInspectBinary=$(sed -n 's|^exec -a "\$0" "\([^"]*\.gst-inspect-1\.0-wrapped\)".*|\1|p' "$gstInspect")
+    if [[ ! -f "$gstInspectBinary" ]]; then
+        echo "error: Could not resolve the gst-inspect-1.0 Nix wrapper."
+        exit 1
+    fi
+    cp "$gstInspectBinary" "$gstInspect"
+    chmod +w,+x "$gstInspect"
+fi
+
 find "$targetDir" -type f | while read file; do
     if [[ -d "$file" ]]; then
         continue

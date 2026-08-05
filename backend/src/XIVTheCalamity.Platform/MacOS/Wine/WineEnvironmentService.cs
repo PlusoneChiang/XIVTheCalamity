@@ -90,9 +90,18 @@ public class WineEnvironmentService(
         // Prefix stages map to different ranges depending on whether download occurred
         var prefixStart = needsDownload ? 70 : 10;
         var prefixRange = needsDownload ? 30 : 90; // remaining percentage for prefix init
+        var waitForGStreamerWarmup = needsDownload || !_prefixService.IsFullyInitialized();
         
         await foreach (var wineProgress in _prefixService.InitializePrefixAsyncEnumerable(needsDownload, cancellationToken))
         {
+            if (wineProgress.IsComplete)
+            {
+                if (waitForGStreamerWarmup)
+                    await WarmupGStreamerAsync();
+                else
+                    _ = WarmupGStreamerAsync();
+            }
+
             // Map prefix stage (0-100) to remaining percentage range
             var stagePercent = wineProgress.Stage switch
             {
@@ -135,6 +144,42 @@ public class WineEnvironmentService(
     {
         logger?.LogDebug("[WINE-ENV] EnsurePrefixAsync called");
         await _prefixService.EnsurePrefixAsync(cancellationToken);
+    }
+
+    private async Task WarmupGStreamerAsync()
+    {
+        var executable = Path.Combine(_paths.WineBin, "gst-inspect-1.0");
+        if (!File.Exists(executable))
+            return;
+
+        try
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = executable,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+            startInfo.ArgumentList.Add("avdec_wmv3");
+
+            foreach (var (key, value) in _paths.GetEnvironment())
+            {
+                startInfo.Environment[key] = value;
+            }
+            startInfo.Environment["GST_DEBUG"] = "0";
+
+            using var process = Process.Start(startInfo);
+            if (process is null)
+                return;
+
+            await Task.WhenAll(process.WaitForExitAsync(), process.StandardOutput.ReadToEndAsync(),
+                process.StandardError.ReadToEndAsync());
+        }
+        catch
+        {
+            // Warmup is best-effort and must never affect game startup.
+        }
     }
 
     public string GetEmulatorDirectory()

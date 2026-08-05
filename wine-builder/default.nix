@@ -162,6 +162,8 @@ pkgs.stdenv.mkDerivation rec {
 
   installPhase = ''
     make install-lib DESTDIR=${placeholder "out"} -j$NIX_BUILD_CORES
+    cp ${pkgs.lib.getBin pkgs.gst_all_1.gstreamer}/bin/gst-inspect-1.0 \
+      $out${placeholder "out"}/bin/
   '';
 
   meta = {
