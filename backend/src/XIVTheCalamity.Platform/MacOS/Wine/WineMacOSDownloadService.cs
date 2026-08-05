@@ -31,6 +31,8 @@ public class WineMacOSDownloadService(
     /// </summary>
     public bool IsInstalled()
     {
+        CleanupStaleTempDirs();
+
         var binaryExists = Directory.Exists(WineRoot) && File.Exists(WinePath);
         if (!binaryExists)
         {
@@ -133,9 +135,17 @@ public class WineMacOSDownloadService(
         };
         
         // Download with progress
-        await foreach (var progress in DownloadFileAsync(DownloadUrl, archivePath, cancellationToken))
+        var downloadCompleted = false;
+        try
         {
-            yield return progress;
+            await foreach (var progress in DownloadFileAsync(DownloadUrl, archivePath, cancellationToken))
+                yield return progress;
+            downloadCompleted = true;
+        }
+        finally
+        {
+            if (!downloadCompleted)
+                CleanupTempDir(tempDir);
         }
         
         // Step 2: Extract archive
@@ -404,6 +414,20 @@ public class WineMacOSDownloadService(
             logger?.LogWarning(ex, "[WINE-DL] Failed to clean up temp directory");
         }
     }
+
+    private void CleanupStaleTempDirs()
+    {
+        try
+        {
+            var parentDir = Path.GetDirectoryName(WineRoot)!;
+            if (!Directory.Exists(parentDir)) return;
+
+            foreach (var tempDir in Directory.EnumerateDirectories(parentDir, "wine-temp-*"))
+                CleanupTempDir(tempDir);
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "[WINE-DL] Failed to enumerate stale temp directories");
+        }
+    }
 }
-
-

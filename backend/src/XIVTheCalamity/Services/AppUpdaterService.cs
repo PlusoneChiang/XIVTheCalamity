@@ -134,7 +134,8 @@ public class AppUpdaterService
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            return Array.Find(release.Assets, a => a.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            return Array.Find(release.Assets, a => a.Name.EndsWith("-win-x64.zip", StringComparison.OrdinalIgnoreCase))
+                ?? Array.Find(release.Assets, a => a.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
                 ?? Array.Find(release.Assets, a => a.Name.EndsWith(".msi", StringComparison.OrdinalIgnoreCase));
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
@@ -260,6 +261,13 @@ public class AppUpdaterService
         {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
+                if (path.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                {
+                    InstallWindowsZip(path);
+                    Environment.Exit(0);
+                    return;
+                }
+
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = path,
@@ -355,6 +363,61 @@ rm -- ""$0""
             Log.Error(ex, "[AppUpdater] Failed to launch installer/update");
             throw;
         }
+    }
+
+    private static void InstallWindowsZip(string archivePath)
+    {
+        var extractPath = Path.Combine(Path.GetTempPath(), "xivtc-update-" + Guid.NewGuid().ToString("N"));
+        System.IO.Compression.ZipFile.ExtractToDirectory(archivePath, extractPath);
+
+        var sourcePath = Path.Combine(extractPath, "XIVTheCalamity");
+        var sourceExecutable = Path.Combine(sourcePath, "XIVTheCalamity.exe");
+        if (!File.Exists(sourceExecutable))
+        {
+            Directory.Delete(extractPath, true);
+            throw new InvalidDataException("Windows update archive does not contain XIVTheCalamity.exe");
+        }
+
+        var destinationPath = Path.TrimEndingDirectorySeparator(AppContext.BaseDirectory);
+        var executablePath = Environment.ProcessPath ?? Path.Combine(destinationPath, "XIVTheCalamity.exe");
+        var scriptPath = Path.Combine(Path.GetTempPath(), "xivtc-update-" + Guid.NewGuid().ToString("N") + ".ps1");
+        File.WriteAllText(scriptPath, """
+param([int]$LauncherPid, [string]$Source, [string]$Destination, [string]$Executable, [string]$ExtractRoot)
+$ErrorActionPreference = 'Stop'
+Wait-Process -Id $LauncherPid -ErrorAction SilentlyContinue
+try {
+    Get-ChildItem -LiteralPath $Source -Force | Copy-Item -Destination $Destination -Recurse -Force
+    Start-Process -FilePath $Executable -WorkingDirectory $Destination
+    Remove-Item -LiteralPath $ExtractRoot -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
+} catch {
+    $_ | Out-File -FilePath (Join-Path $env:TEMP 'xivtc-update-error.log') -Encoding utf8
+    if (Test-Path -LiteralPath $Executable) {
+        Start-Process -FilePath $Executable -WorkingDirectory $Destination
+    }
+    exit 1
+}
+""");
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "powershell.exe",
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        startInfo.ArgumentList.Add("-NoProfile");
+        startInfo.ArgumentList.Add("-NonInteractive");
+        startInfo.ArgumentList.Add("-ExecutionPolicy");
+        startInfo.ArgumentList.Add("Bypass");
+        startInfo.ArgumentList.Add("-File");
+        startInfo.ArgumentList.Add(scriptPath);
+        startInfo.ArgumentList.Add(Environment.ProcessId.ToString());
+        startInfo.ArgumentList.Add(sourcePath);
+        startInfo.ArgumentList.Add(destinationPath);
+        startInfo.ArgumentList.Add(executablePath);
+        startInfo.ArgumentList.Add(extractPath);
+
+        _ = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start Windows update process");
     }
 }
 
