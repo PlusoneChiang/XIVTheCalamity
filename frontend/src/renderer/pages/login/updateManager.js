@@ -192,6 +192,7 @@ function startUpdateWithSSE(gamePath) {
         // 顯示錯誤訊息
         if (errorData.message) {
           console.error('[UPDATE] Error message:', errorData.message);
+          alert(errorData.message);
         }
       } else {
         console.error('[UPDATE] SSE connection error (no data)');
@@ -200,14 +201,10 @@ function startUpdateWithSSE(gamePath) {
       console.error('[UPDATE] SSE error event (parse failed):', parseError);
     }
     
-    // 檢查連接狀態
-    if (progressEventSource?.readyState === 2) {
-      console.log('[UPDATE] SSE connection closed, stopping monitoring');
-      stopProgressMonitoring();
-      hideTitleBarProgress();
-      isUpdateChecking = false;
-      completeUpdate();
-    }
+    stopProgressMonitoring();
+    hideTitleBarProgress();
+    isUpdateChecking = false;
+    completeUpdate();
   });
   
   progressEventSource.addEventListener('open', () => {

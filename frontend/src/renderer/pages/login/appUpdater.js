@@ -7,6 +7,7 @@
 
 import i18n from '../../i18n/index.js';
 import { showTitleBarProgress, hideTitleBarProgress } from './login.js';
+import { parseReleaseNotes } from './releaseNotes.js';
 
 let updateState = 'idle'; // idle | checking | available | downloading | downloaded | error
 let pendingVersion = null;
@@ -107,55 +108,6 @@ export async function initAppUpdater() {
 }
 
 // ── Dialog helpers ──────────────────────────────────
-
-/** Parse release notes from GitHub Atom feed (HTML format) */
-function parseReleaseNotes(releaseNotes, locale) {
-  if (!releaseNotes) return '';
-  
-  // Handle array format (multi-version jump): take latest
-  let raw = releaseNotes;
-  if (Array.isArray(releaseNotes)) {
-    raw = releaseNotes[0]?.note || releaseNotes[0] || '';
-  }
-  if (typeof raw !== 'string') return '';
-  
-  // Content from GitHub Atom feed is HTML (Markdown already rendered)
-  // Strip content after first <hr> (auto-gen notes and download guide)
-  const hrIndex = raw.indexOf('<hr>');
-  let changelog = hrIndex >= 0 ? raw.substring(0, hrIndex) : raw;
-  
-  // Split by <h4> locale headings: "🇹🇼 zh-TW" / "🇺🇸 English"
-  const isEn = locale === 'en' || locale === 'en-US';
-  const localePattern = isEn ? /🇺🇸\s*English/i : /🇹🇼\s*zh-TW/i;
-  const h4Regex = /<h4>.*?<\/h4>/gi;
-  const h4Matches = [...changelog.matchAll(h4Regex)];
-  
-  let localeBlock = '';
-  for (let i = 0; i < h4Matches.length; i++) {
-    if (localePattern.test(h4Matches[i][0])) {
-      const start = h4Matches[i].index + h4Matches[i][0].length;
-      const end = i + 1 < h4Matches.length ? h4Matches[i + 1].index : changelog.length;
-      localeBlock = changelog.substring(start, end).trim();
-      break;
-    }
-  }
-  
-  if (!localeBlock) {
-    // No locale heading found: no release notes written, show nothing
-    return '';
-  }
-  
-  if (!localeBlock) return '';
-  
-  // Wrap headings and list items with styled classes
-  localeBlock = localeBlock
-    .replace(/<h3>(.*?)<\/h3>/gi, '<div class="notes-heading">$1</div>')
-    .replace(/<li>(.*?)<\/li>/gi, '<div class="notes-item">• $1</div>')
-    .replace(/<\/?ul>/gi, '')
-    .replace(/<\/?ol>/gi, '');
-  
-  return localeBlock;
-}
 
 let pendingReleaseNotes = null;
 
