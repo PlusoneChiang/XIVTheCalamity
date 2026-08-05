@@ -1,5 +1,12 @@
 # Release Notes
 
+## v2.1.4
+#### 🇹🇼 zh-TW
+- 改善 Windows 更新與 macOS Wine 暫存清理。
+
+#### 🇺🇸 English
+- Improved Windows updates and macOS Wine temporary cleanup.
+
 ## v2.1.3
 #### 🇹🇼 zh-TW
 - 修正 macOS 過場動畫播放問題。
