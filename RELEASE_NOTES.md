@@ -1,5 +1,18 @@
 # Release Notes
 
+## v2.1.3
+#### 🇹🇼 zh-TW
+- 修正 macOS 過場動畫播放問題。
+- 修正 Windows 更新權限問題。
+- 修正更新說明無法顯示。
+- Wine Runtime 更新至 `v2026.08.05`。
+
+#### 🇺🇸 English
+- Fixed cutscene playback on macOS.
+- Fixed Windows update permissions.
+- Fixed missing update notes.
+- Updated the Wine Runtime to `v2026.08.05`.
+
 ## v2.1.2
 #### 🇹🇼 zh-TW
 ### 🐛 錯誤修正
