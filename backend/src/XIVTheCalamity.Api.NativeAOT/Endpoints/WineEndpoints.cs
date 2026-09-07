@@ -86,43 +86,7 @@ public static class WineEndpoints
                 logger.LogInformation("Applying Wine settings to registry");
 
                 var config = await configService.LoadConfigAsync();
-                var wineConfig = config.Wine;
-
-                await winePrefixService.BeginBatchAsync(cancellationToken);
-
-                logger.LogInformation("Applying NativeResolution (RetinaMode={Value})", wineConfig.NativeResolution ? "y" : "n");
-                await winePrefixService.AddRegAsync(
-                    "HKEY_CURRENT_USER\\Software\\Wine\\Mac Driver",
-                    "RetinaMode",
-                    wineConfig.NativeResolution ? "y" : "n",
-                    cancellationToken);
-
-                logger.LogInformation("Applying keyboard mapping");
-                await winePrefixService.AddRegAsync(
-                    "HKEY_CURRENT_USER\\Software\\Wine\\Mac Driver",
-                    "LeftOptionIsAlt",
-                    wineConfig.LeftOptionIsAlt ? "y" : "n",
-                    cancellationToken);
-                
-                await winePrefixService.AddRegAsync(
-                    "HKEY_CURRENT_USER\\Software\\Wine\\Mac Driver",
-                    "RightOptionIsAlt",
-                    wineConfig.RightOptionIsAlt ? "y" : "n",
-                    cancellationToken);
-                
-                await winePrefixService.AddRegAsync(
-                    "HKEY_CURRENT_USER\\Software\\Wine\\Mac Driver",
-                    "LeftCommandIsCtrl",
-                    wineConfig.LeftCommandIsCtrl ? "y" : "n",
-                    cancellationToken);
-                
-                await winePrefixService.AddRegAsync(
-                    "HKEY_CURRENT_USER\\Software\\Wine\\Mac Driver",
-                    "RightCommandIsCtrl",
-                    wineConfig.RightCommandIsCtrl ? "y" : "n",
-                    cancellationToken);
-
-                await winePrefixService.CommitBatchAsync(cancellationToken);
+                await winePrefixService.ApplyGraphicsSettingsAsync(config.Wine!, cancellationToken);
 
                 logger.LogInformation("Wine settings applied successfully");
                 return Results.Ok(ApiResponse<WineSettingsAppliedResponse>.Ok(

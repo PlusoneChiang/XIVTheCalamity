@@ -94,6 +94,8 @@ public class WineEnvironmentService(
         {
             if (wineProgress.IsComplete)
             {
+                await ApplyConfigAsync(cancellationToken);
+
                 if (waitForGStreamerWarmup)
                     await WarmupGStreamerAsync();
                 else
@@ -312,7 +314,7 @@ public class WineEnvironmentService(
         var config = await configService.LoadConfigAsync();
         if (config.Wine != null)
         {
-            await _prefixService.ApplyGraphicsSettingsAsync(config.Wine);
+            await _prefixService.ApplyGraphicsSettingsAsync(config.Wine, cancellationToken);
             logger?.LogInformation("[WINE-ENV] Wine configuration applied successfully");
         }
         else
