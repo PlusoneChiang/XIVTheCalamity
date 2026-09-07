@@ -1,5 +1,16 @@
 # Release Notes
 
+## v2.2.0
+#### 🇹🇼 zh-TW
+- macOS Wine Runtime 更新至 `v2026.09.07`。
+- macOS 音訊裝置切換改由 Wine 自動處理，移除啟動器的音訊路由工具與設定選項。
+- 修正 Wine 更新或首次初始化後，Retina 與鍵盤映射設定需重新儲存才會生效的問題。
+
+#### 🇺🇸 English
+- Updated the macOS Wine Runtime to `v2026.09.07`.
+- Wine now handles macOS audio device changes automatically, replacing the launcher's audio routing tool and settings.
+- Fixed Retina and keyboard mapping settings requiring a manual save to take effect after a Wine update or initial setup.
+
 ## v2.1.4
 #### 🇹🇼 zh-TW
 - 改善 Windows 更新與 macOS Wine 暫存清理。
