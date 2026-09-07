@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging;
 using XIVTheCalamity.Core.Models;
 using XIVTheCalamity.Core.Models.Progress;
 using XIVTheCalamity.Core.Services;
-using XIVTheCalamity.Platform.MacOS.Audio;
 
 namespace XIVTheCalamity.Platform.MacOS.Wine;
 
@@ -15,7 +14,6 @@ namespace XIVTheCalamity.Platform.MacOS.Wine;
 public class WineEnvironmentService(
     ConfigService configService,
     WineMacOSDownloadService downloadService,
-    AudioRouterService? audioRouterService = null,
     ILogger<WineEnvironmentService>? logger = null
 ) : IEnvironmentService
 {
@@ -323,35 +321,4 @@ public class WineEnvironmentService(
         }
     }
 
-    public void StartAudioRouter(int gamePid, bool msyncEnabled)
-    {
-        if (audioRouterService == null)
-        {
-            logger?.LogWarning("[WINE-ENV] AudioRouterService not available");
-            return;
-        }
-
-        try
-        {
-            logger?.LogInformation("[WINE-ENV] Starting audio router for game PID: {Pid}, Msync: {Msync}", 
-                gamePid, msyncEnabled);
-            logger?.LogInformation("[WINE-ENV] Audio router params - WinePath: {WinePath}, WinePrefix: {WinePrefix}", 
-                _paths.Wine, _paths.WinePrefix);
-            
-            var result = audioRouterService.StartRouter(gamePid, _paths.WinePrefix, _paths.Wine, msyncEnabled);
-            
-            if (result)
-            {
-                logger?.LogInformation("[WINE-ENV] Audio router started successfully");
-            }
-            else
-            {
-                logger?.LogWarning("[WINE-ENV] Audio router failed to start");
-            }
-        }
-        catch (Exception ex)
-        {
-            logger?.LogWarning(ex, "[WINE-ENV] Failed to start audio router");
-        }
-    }
 }

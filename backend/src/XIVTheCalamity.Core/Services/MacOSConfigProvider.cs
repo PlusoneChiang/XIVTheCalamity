@@ -20,7 +20,6 @@ public class MacOSConfigProvider : IPlatformConfigProvider
             HudScale = 1.0,
             NativeResolution = false,
             MaxFramerate = 60,
-            AudioRouting = false,
             Msync = true,
             WineDebug = "",
             UseHomeAlias = false,
@@ -48,7 +47,6 @@ public class MacOSConfigProvider : IPlatformConfigProvider
 
         config.WineCompat ??= new WineCompatConfig
         {
-            AudioRouting = config.Wine.AudioRouting,
             UseHomeAlias = config.Wine.UseHomeAlias,
             LeftOptionIsAlt = config.Wine.LeftOptionIsAlt,
             RightOptionIsAlt = config.Wine.RightOptionIsAlt,

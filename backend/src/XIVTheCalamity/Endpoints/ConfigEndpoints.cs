@@ -103,7 +103,6 @@ public static class ConfigEndpoints
                     currentConfig.Wine.HudScale = partialConfig.Wine.HudScale;
                     currentConfig.Wine.NativeResolution = partialConfig.Wine.NativeResolution;
                     currentConfig.Wine.MaxFramerate = partialConfig.Wine.MaxFramerate;
-                    currentConfig.Wine.AudioRouting = partialConfig.Wine.AudioRouting;
                     currentConfig.Wine.Msync = partialConfig.Wine.Msync;
                     currentConfig.Wine.WineDebug = partialConfig.Wine.WineDebug;
                     currentConfig.Wine.UseHomeAlias = partialConfig.Wine.UseHomeAlias;

@@ -97,7 +97,6 @@ public class ConfigService
                 };
                 config.WineCompat ??= new WineCompatConfig
                 {
-                    AudioRouting = config.Wine.AudioRouting,
                     UseHomeAlias = config.Wine.UseHomeAlias,
                     LeftOptionIsAlt = config.Wine.LeftOptionIsAlt,
                     RightOptionIsAlt = config.Wine.RightOptionIsAlt,
@@ -183,7 +182,6 @@ public class ConfigService
                 WineDebug = config.WinePerformance?.WineDebug ?? "",
                 
                 // Compat
-                AudioRouting = config.WineCompat?.AudioRouting ?? false,
                 UseHomeAlias = config.WineCompat?.UseHomeAlias ?? false,
                 LeftOptionIsAlt = config.WineCompat?.LeftOptionIsAlt ?? true,
                 RightOptionIsAlt = config.WineCompat?.RightOptionIsAlt ?? true,

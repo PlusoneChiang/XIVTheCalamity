@@ -66,7 +66,6 @@ try
         builder.Services.AddSingleton<WineMacOSDownloadService>();
         builder.Services.AddSingleton<WinePrefixService>();
         builder.Services.AddSingleton<WineConfigService>();
-        builder.Services.AddSingleton<XIVTheCalamity.Platform.MacOS.Audio.AudioRouterService>();
     }
     else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
     {

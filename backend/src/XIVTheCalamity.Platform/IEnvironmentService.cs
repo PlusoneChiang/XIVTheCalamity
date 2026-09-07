@@ -83,12 +83,6 @@ public interface IEnvironmentService
     /// </summary>
     Task ApplyConfigAsync(CancellationToken cancellationToken = default);
     
-    /// <summary>
-    /// Start audio routing for game process (macOS only)
-    /// </summary>
-    /// <param name="gamePid">Game process ID</param>
-    /// <param name="msyncEnabled">Msync enabled</param>
-    void StartAudioRouter(int gamePid, bool msyncEnabled);
 }
 
 /// <summary>

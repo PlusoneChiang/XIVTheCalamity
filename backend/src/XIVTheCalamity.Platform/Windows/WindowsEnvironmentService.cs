@@ -67,8 +67,4 @@ public class WindowsEnvironmentService(
         return Task.CompletedTask;
     }
 
-    public void StartAudioRouter(int gamePid, bool msyncEnabled)
-    {
-        logger?.LogDebug("[WIN-ENV] Audio router not needed on Windows");
-    }
 }

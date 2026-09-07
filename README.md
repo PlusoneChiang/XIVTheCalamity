@@ -110,9 +110,9 @@
 
 ### 平台特定組件
 
-| 平台 | Wine / 相容層版本 | 圖形層 | 音訊路由 |
+| 平台 | Wine / 相容層版本 | 圖形層 | 音訊處理 |
 |------|-------------------|--------|----------|
-| **macOS** | Wine Crossover (Wine 11) | DXMT (DX→Metal) | XTCAudioRouter |
+| **macOS** | Wine Crossover (Wine 11) | DXMT (DX→Metal) | Wine 內建 CoreAudio 裝置監聽 |
 | **Linux** | GE-Proton 11 | DXVK (DX→Vulkan) | PulseAudio / PipeWire |
 | **Windows** | 原生 (Native) | 原生 DirectX | 原生 |
 
@@ -124,7 +124,6 @@
 | **後端核心** | ASP.NET Core 9 NativeAOT | 遊戲邏輯、下載更新、平台與帳號管理 |
 | **Wine (macOS)** | Wine Crossover (Fork) | macOS Wine 運行環境 |
 | **Wine (Linux)** | GE-Proton 11 | Linux Wine 運行環境（自動下載 AppImage 包裝）|
-| **音訊工具 (macOS)**| Swift (XTCAudioRouter) | macOS 音訊路由控制 |
 
 ### 專案架構
 
@@ -143,7 +142,6 @@ XIVTheCalamity/
 │       └── XIVTheCalamity.Platform/       # 跨平台 (macOS/Linux/Win) 特性
 │
 ├── shared/                # 共用資源 (字型、圖標、預建二進位檔)
-├── XTCAudioRouter/        # macOS 音訊路由工具 (Swift)
 ├── wine-builder/          # Wine 編譯工具 (macOS)
 └── scripts/               # 跨平台自動化打包與建置腳本
 ```

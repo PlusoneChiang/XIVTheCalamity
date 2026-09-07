@@ -59,13 +59,6 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
-
-      # Build XTCAudioRouter
-      - name: Build XTCAudioRouter
-        run: |
-          mkdir -p shared/resources/bin
-          swiftc XTCAudioRouter/AudioRouter.swift -framework CoreAudio -framework AudioToolbox -o shared/resources/bin/XTCAudioRouter
-
       # Build frontend
       - name: Build frontend
         run: |
@@ -150,7 +143,6 @@ jobs:
           if [ -n "$IDENTITY" ]; then
             echo "Signing with identity: $IDENTITY"
             find "Release/mac-arm64/XIVTheCalamity.app/Contents/MacOS" -name "*.dylib" -exec codesign --force --options runtime --sign "Developer ID Application: $IDENTITY" {} \;
-            codesign --force --options runtime --sign "Developer ID Application: $IDENTITY" "Release/mac-arm64/XIVTheCalamity.app/Contents/Resources/resources/bin/XTCAudioRouter"
             codesign --force --options runtime --sign "Developer ID Application: $IDENTITY" "Release/mac-arm64/XIVTheCalamity.app/Contents/MacOS/XIVTheCalamity"
             codesign --force --options runtime --sign "Developer ID Application: $IDENTITY" "Release/mac-arm64/XIVTheCalamity.app"
           else

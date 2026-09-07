@@ -38,11 +38,6 @@ public class WineConfig
     public int MaxFramerate { get; set; } = 60;
     
     /// <summary>
-    /// Enable audio routing
-    /// </summary>
-    public bool AudioRouting { get; set; } = false;
-    
-    /// <summary>
     /// Enable Msync synchronization
     /// </summary>
     public bool Msync { get; set; } = true;

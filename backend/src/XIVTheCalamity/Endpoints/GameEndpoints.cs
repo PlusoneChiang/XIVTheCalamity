@@ -114,11 +114,6 @@ public static class GameEndpoints
                         if (entryResult.InjectorProcess != null)
                         {
                             gameLaunchService.SetMonitorProcess(entryResult.InjectorProcess);
-                            if (config.Wine?.AudioRouting == true)
-                            {
-                                environmentService.StartAudioRouter(entryResult.InjectorProcess.Id,
-                                    config.Wine?.Msync ?? false);
-                            }
                             reportedPid = entryResult.InjectorProcess.Id;
                         }
                         else
@@ -157,12 +152,6 @@ public static class GameEndpoints
                 if (result.Success && result.Process != null)
                 {
                     logger.LogInformation("[GAME] Fake launch successful, PID: {Pid}", result.ProcessId);
-                    
-                    if (config.Wine?.AudioRouting == true && result.ProcessId.HasValue)
-                    {
-                        environmentService.StartAudioRouter(result.ProcessId.Value,
-                            config.Wine?.Msync ?? false);
-                    }
                     
                     if (config.Dalamud.Enabled)
                     {
@@ -321,12 +310,6 @@ public static class GameEndpoints
                             gameLaunchService.SetMonitorProcess(entryResult.InjectorProcess);
                             logger.LogInformation("[GAME] EntryPoint launch successful, tracking via injector PID: {Pid}", entryResult.InjectorProcess.Id);
 
-                            if (config.Wine?.AudioRouting == true)
-                            {
-                                environmentService.StartAudioRouter(entryResult.InjectorProcess.Id,
-                                    config.Wine?.Msync ?? false);
-                            }
-
                             reportedPid = entryResult.InjectorProcess.Id;
                         }
                         else
@@ -351,12 +334,6 @@ public static class GameEndpoints
                 if (result.Success)
                 {
                     logger.LogInformation("[GAME] Launch successful, PID: {Pid}", result.ProcessId);
-                    
-                    if (config.Wine?.AudioRouting == true && result.ProcessId.HasValue)
-                    {
-                        environmentService.StartAudioRouter(result.ProcessId.Value,
-                            config.Wine?.Msync ?? false);
-                    }
                     
                     if (config.Dalamud.Enabled)
                     {

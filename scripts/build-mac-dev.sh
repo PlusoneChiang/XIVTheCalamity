@@ -36,7 +36,6 @@ fi
 
 # Ensure directories exist
 mkdir -p "$PROJECT_ROOT/backend/src/XIVTheCalamity/wwwroot"
-mkdir -p "$PROJECT_ROOT/shared/resources/bin"
 
 echo "   ✅ Cleanup complete"
 
@@ -53,14 +52,6 @@ echo "   📦 Current version from XIVTheCalamity.csproj: $VERSION"
 # Copy static assets to C# project
 echo "   Copying frontend assets to C# wwwroot..."
 cp -R dist/* "$PROJECT_ROOT/backend/src/XIVTheCalamity/wwwroot/"
-
-# Build Audio Router CLI
-echo ""
-echo "📦 Building Swift Audio Router CLI..."
-swiftc "$PROJECT_ROOT/XTCAudioRouter/AudioRouter.swift" \
-  -framework CoreAudio \
-  -framework AudioToolbox \
-  -o "$PROJECT_ROOT/shared/resources/bin/XTCAudioRouter"
 
 # Build C# Entrypoint (NativeAOT)
 echo ""
@@ -94,7 +85,7 @@ plutil -replace CFBundleShortVersionString -string "$VERSION" "$APP_DIR/Contents
 plutil -replace CFBundleVersion -string "$VERSION" "$APP_DIR/Contents/Info.plist"
 cp "$PROJECT_ROOT/frontend/build/XIVTC.icns" "$APP_DIR/Contents/Resources/"
 
-# Copy shared resources (including XTCAudioRouter in bin/)
+# Copy shared resources
 cp -R "$PROJECT_ROOT/shared/resources/"* "$APP_DIR/Contents/Resources/resources/"
 
 # Codesign app bundle — 優先使用本機開發憑證，若無則回退至 Ad-hoc 簽名
@@ -143,7 +134,7 @@ if [ -d "$APP_DIR" ]; then
   # Check resources directory
   if [ -d "$APP_DIR/Contents/Resources/resources" ]; then
     RESOURCES_SIZE=$(du -sh "$APP_DIR/Contents/Resources/resources" | cut -f1)
-    echo -e "  ${GREEN}✅${NC} Resources: $RESOURCES_SIZE (XTCAudioRouter, d3dcompiler, dxmt, dxvk, fonts)"
+    echo -e "  ${GREEN}✅${NC} Resources: $RESOURCES_SIZE (d3dcompiler, dxmt, dxvk, fonts)"
   else
     echo -e "  ${RED}❌${NC} Resources: Not found"
   fi

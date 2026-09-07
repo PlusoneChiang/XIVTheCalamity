@@ -6,11 +6,6 @@ namespace XIVTheCalamity.Core.Models;
 public class WineCompatConfig
 {
     /// <summary>
-    /// Enable audio routing
-    /// </summary>
-    public bool AudioRouting { get; set; } = false;
-    
-    /// <summary>
     /// Enable Home alias compatibility mode on macOS.
     /// </summary>
     public bool UseHomeAlias { get; set; } = false;
