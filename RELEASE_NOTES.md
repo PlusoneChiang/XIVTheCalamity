@@ -1,5 +1,14 @@
 # Release Notes
 
+## v2.2.1
+#### 🇹🇼 zh-TW
+- macOS Wine Runtime 更新至 `v2026.09.10`。
+- 修正視窗縮放的畫面顯示錯誤問題。
+
+#### 🇺🇸 English
+- Updated the macOS Wine Runtime to `v2026.09.10`.
+- Fixed rendering issues when resizing the game window.
+
 ## v2.2.0
 #### 🇹🇼 zh-TW
 - macOS Wine Runtime 更新至 `v2026.09.07`。
