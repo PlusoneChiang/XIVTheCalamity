@@ -10,7 +10,7 @@
 }:
 
 let
-  mingwGccs = with pkgsCross; [ mingwW64.windows.crossThreadsStdenv.cc ]; # mingw32.windows.crossThreadsStdenv.cc ];
+  mingwGccs = with pkgsCross; [ mingwW64.stdenv.cc ];
   setupHookDarwin = pkgs.makeSetupHook {
     name = "darwin-mingw-hook";
     substitutions = {
@@ -113,6 +113,7 @@ pkgs.stdenv.mkDerivation rec {
 
   preConfigure = ''
     export CC="clang"
+    export x86_64_CXX="x86_64-w64-mingw32-g++"
     export CFLAGS="-O3 -march=native -mno-avx -Wno-int-conversion"
     export CROSSCFLAGS="-s -O3 -march=native -mno-avx"
     export ac_cv_lib_soname_vulkan=""
