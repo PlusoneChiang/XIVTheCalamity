@@ -1,3 +1,4 @@
+import { apiEventSource } from '../../utils/polyfill.js';
 /**
  * Dalamud Update Manager
  * Handles Dalamud download, update and status checking
@@ -118,7 +119,7 @@ function startDalamudUpdateWithSSE() {
     const sseUrl = 'http://localhost:5050/api/dalamud/update-stream';
     console.log('[DALAMUD] Connecting to SSE:', sseUrl);
     
-    dalamudEventSource = new EventSource(sseUrl);
+    dalamudEventSource = apiEventSource(sseUrl);
     
     dalamudEventSource.addEventListener('progress', (event) => {
       if (dalamudCheckCancelled) {

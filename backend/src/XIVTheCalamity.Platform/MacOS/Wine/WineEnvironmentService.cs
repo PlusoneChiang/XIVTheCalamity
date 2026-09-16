@@ -25,6 +25,31 @@ public class WineEnvironmentService(
     {
         logger?.LogInformation("[WINE-ENV] Starting Wine environment initialization");
         
+        var rosettaAvailability = RosettaAvailabilityCheck.Check(cancellationToken);
+        if (rosettaAvailability != RosettaAvailability.NotRequired)
+        {
+            yield return new EnvironmentProgressEvent
+            {
+                Stage = "checking",
+                MessageKey = "progress.checking_rosetta",
+                Percentage = 5
+            };
+
+        }
+        if (rosettaAvailability == RosettaAvailability.Missing)
+        {
+            const string errorKey = "error.rosetta_required";
+            logger?.LogError("[WINE-ENV] Rosetta check failed: {Result}", rosettaAvailability);
+            yield return new EnvironmentProgressEvent
+            {
+                Stage = "error",
+                MessageKey = errorKey,
+                ErrorMessageKey = errorKey,
+                HasError = true
+            };
+            yield break;
+        }
+
         yield return new EnvironmentProgressEvent
         {
             Stage = "checking",

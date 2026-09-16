@@ -1,3 +1,4 @@
+import { apiEventSource } from './polyfill.js';
 /**
  * 環境初始化工具
  */
@@ -11,7 +12,7 @@ const API_BASE_URL = 'http://localhost:5050';
  * @param {Function} onError - 錯誤回調函數 (error) => void
  */
 export function initializeEnvironment(onProgress, onComplete, onError) {
-  const eventSource = new EventSource(`${API_BASE_URL}/api/environment/initialize`);
+  const eventSource = apiEventSource(`${API_BASE_URL}/api/environment/initialize`);
   
   eventSource.addEventListener('progress', (event) => {
     try {

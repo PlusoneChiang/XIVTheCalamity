@@ -1,3 +1,4 @@
+import { apiFetch } from '../../utils/polyfill.js';
 /**
  * App Auto-Update UI Manager
  * Handles launcher self-update notifications as a floating dialog.
@@ -246,4 +247,128 @@ function removeReminder() {
 
 export function isAppUpdateDownloading() {
   return updateState === 'downloading';
+}
+
+// Rosetta 安裝提示，沿用更新視窗樣式。
+
+async function postRosettaAction(path) {
+  const response = await apiFetch(`http://localhost:5050${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: '{}'
+  });
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {
+    // The HTTP status below is still enough to report the failed request.
+  }
+
+  if (!response.ok || !data?.success) {
+    throw new Error(data?.error?.message || '');
+  }
+}
+
+export function showRosettaDialog() {
+  if (window.xivtc?.getPlatform?.() !== 'darwin' || document.getElementById('rosettaOverlay')) return;
+
+  const previouslyFocused = document.activeElement;
+  const overlay = document.createElement('div');
+  overlay.id = 'rosettaOverlay';
+  overlay.className = 'app-update-overlay rosetta-overlay';
+  overlay.innerHTML = `
+    <div class="app-update-dialog rosetta-dialog" role="dialog" aria-modal="true" aria-labelledby="rosettaDialogTitle" aria-describedby="rosettaDialogDescription">
+      <div class="app-update-dialog-icon">🍎</div>
+      <p class="app-update-dialog-title" id="rosettaDialogTitle">${i18n.t('rosetta.title')}</p>
+      <div class="app-update-dialog-notes rosetta-dialog-content" id="rosettaDialogDescription">
+        <p>${i18n.t('rosetta.description')}</p>
+        <p>${i18n.t('rosetta.terms_prefix')} <a href="https://www.apple.com/legal/sla/" target="_blank" rel="noopener noreferrer">${i18n.t('rosetta.terms_link')}</a>${i18n.t('rosetta.terms_suffix')}</p>
+        <p class="rosetta-dialog-error" role="alert" hidden></p>
+      </div>
+      <div class="app-update-dialog-buttons">
+        <button class="app-update-btn app-update-btn-primary app-update-btn-green" type="button" id="rosettaInstallBtn">${i18n.t('rosetta.install_restart')}</button>
+        <button class="app-update-btn app-update-btn-secondary" type="button" id="rosettaCancelBtn">${i18n.t('button.cancel')}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const dialog = overlay.querySelector('.rosetta-dialog');
+  const installButton = overlay.querySelector('#rosettaInstallBtn');
+  const cancelButton = overlay.querySelector('#rosettaCancelBtn');
+  const error = overlay.querySelector('.rosetta-dialog-error');
+  let busy = false;
+  let installed = false;
+
+  const close = () => {
+    if (busy) return;
+    overlay.remove();
+    previouslyFocused?.focus?.();
+  };
+
+  const setBusy = (message) => {
+    busy = true;
+    installButton.disabled = true;
+    cancelButton.disabled = true;
+    installButton.innerHTML = `<span class="app-update-spinner" aria-hidden="true"></span><span>${message}</span>`;
+    error.hidden = true;
+    overlay.querySelector('a').focus();
+  };
+
+  const setError = (message) => {
+    busy = false;
+    installButton.disabled = false;
+    cancelButton.disabled = false;
+    installButton.textContent = installed ? i18n.t('rosetta.restart') : i18n.t('rosetta.install_restart');
+    error.textContent = message;
+    error.hidden = false;
+    installButton.focus();
+  };
+
+  installButton.addEventListener('click', async () => {
+    try {
+      if (!installed) {
+        setBusy(i18n.t('rosetta.installing'));
+        await postRosettaAction('/api/environment/install-rosetta');
+        installed = true;
+      }
+      setBusy(i18n.t('rosetta.restarting'));
+      await postRosettaAction('/api/environment/restart');
+    } catch (exception) {
+      console.error('[Rosetta] Installation or restart failed:', exception);
+      const errorKey = exception.message?.startsWith('rosetta.')
+        ? exception.message
+        : (installed ? 'rosetta.restart_failed' : 'rosetta.install_failed');
+      setError(i18n.t(errorKey));
+    }
+  });
+
+  cancelButton.addEventListener('click', close);
+  overlay.querySelector('a').addEventListener('click', (event) => {
+    event.preventDefault();
+    window.xivtc?.openExternal?.(event.currentTarget.href);
+  });
+  dialog.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !busy) {
+      event.preventDefault();
+      close();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+
+    const focusable = [...dialog.querySelectorAll('a[href], button:not([disabled])')];
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
+
+  installButton.focus();
 }

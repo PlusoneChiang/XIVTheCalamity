@@ -1,3 +1,4 @@
+import { apiEventSource } from '../../utils/polyfill.js';
 /**
  * Game Update Manager
  * Handles game patch checking, downloading, and installation
@@ -130,7 +131,7 @@ function startUpdateWithSSE(gamePath) {
   const url = `http://localhost:5050/api/update/install?gamePath=${encodedPath}`;
   console.log('[UPDATE] SSE URL:', url);
   
-  progressEventSource = new EventSource(url);
+  progressEventSource = apiEventSource(url);
   console.log('[UPDATE] EventSource created, readyState:', progressEventSource.readyState);
   
   // 處理進度事件

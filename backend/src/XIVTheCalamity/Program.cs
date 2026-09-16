@@ -26,6 +26,7 @@ namespace XIVTheCalamity;
 public class Program
 {
     private static WebApplication? _webApp;
+    private static readonly string ApiToken = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
 
     [DllImport("libc", EntryPoint = "getuid")]
     private static extern uint GetUid();
@@ -61,7 +62,7 @@ public class Program
             // 2. 載入配置並決定是否啟用 Home Alias (僅 macOS 支援)
             PrepareEnvironment();
 
-            // 3. 於背景非同步啟動 Kestrel 伺服器 (Hosting Kestrel + Static files)
+            // 3. 確認 Kestrel 啟動成功後才開啟視窗
             MainWindowContainer.Port = port;
             StartKestrelServer(port, args, logPath);
 
@@ -122,6 +123,13 @@ public class Program
 
                             var response = virtualHostClient.GetAsync(pathAndQuery).GetAwaiter().GetResult();
                             contentType = response.Content.Headers.ContentType?.MediaType ?? "text/html";
+                            if ((uri.AbsolutePath == "/login.html" || uri.AbsolutePath == "/settings.html") && contentType == "text/html")
+                            {
+                                // 僅注入內嵌視窗，不透過 localhost 靜態頁面暴露 API 存取權限。
+                                var html = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                                html = html.Replace("<head>", $"<head><meta name=\"xivtc-api-token\" content=\"{ApiToken}\">");
+                                return new MemoryStream(System.Text.Encoding.UTF8.GetBytes(html));
+                            }
                             return response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
                         }
                     }
@@ -469,6 +477,27 @@ public class Program
         _ = AdjustLogLevelAsync(_webApp, logPath);
 
         _webApp.UseCors();
+        _webApp.Use(async (context, next) =>
+        {
+            if (context.Request.Path.StartsWithSegments("/api"))
+            {
+                var token = context.Request.Headers["X-XIVTC-Token"].ToString();
+                // EventSource 無法設定 header，僅這些 SSE GET 端點接受 query token。
+                if (HttpMethods.IsGet(context.Request.Method) &&
+                    context.Request.Path.Value is "/api/events/stream" or "/api/environment/initialize" or
+                        "/api/update/install" or "/api/dalamud/update-stream")
+                {
+                    if (string.IsNullOrEmpty(token))
+                        token = context.Request.Query["access_token"].ToString();
+                }
+                if (!string.Equals(token, ApiToken, StringComparison.Ordinal))
+                {
+                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    return;
+                }
+            }
+            await next(context);
+        });
         _webApp.UseStaticFiles(new StaticFileOptions
         {
             FileProvider = new Microsoft.Extensions.FileProviders.ManifestEmbeddedFileProvider(
@@ -491,7 +520,7 @@ public class Program
         _webApp.MapGet("/health", () => Results.Ok(new HealthResponse("healthy", DateTime.UtcNow)))
            .WithName("HealthCheck");
 
-        _ = _webApp.RunAsync();
+        _webApp.StartAsync().GetAwaiter().GetResult();
         Log.Information("[Kestrel] API Server and Static Files started on http://localhost:{Port}", port);
     }
 

@@ -4,14 +4,14 @@
  */
 
 // Import utilities
-import '../../utils/polyfill.js';
+import { apiEventSource } from '../../utils/polyfill.js';
 import { toHex } from '../../utils/encoding.js';
 import { initAccountManagement, handleAutoFillOTPChange, getOTPSecretInput, cleanupAccountManagement, clearAutoFilledState, isAllAutoFilled, refreshAccountState } from './accountManagement.js';
 import { savePassword, saveOTPSecret, saveAutoFillOTP, hasOTPSecret } from '../../utils/credentialsStore.js';
 import i18n from '../../i18n/index.js';
 import { startBackgroundUpdate, setAppVersionText, isUpdating, handleConfigChanged } from './updateManager.js';
 import { startDalamudUpdate, cancelDalamudUpdate, handleDalamudConfigChanged, isDalamudUpdating } from './dalamudManager.js';
-import { initAppUpdater } from './appUpdater.js';
+import { initAppUpdater, showRosettaDialog } from './appUpdater.js';
 import { handleApiResponse, getErrorMessage as getApiErrorMessage } from '../../utils/apiError.js';
 import { applyTheme } from '../../utils/theme.js';
 
@@ -240,6 +240,9 @@ async function init() {
   // Step 3: Environment initialization (Wine download + prefix)
   console.log('[Login] Starting environment initialization...');
   await startEnvironmentInitialization();
+  if (!isEnvironmentInitialized) {
+    return;
+  }
   
   // Step 4: Game version check
   console.log('[Login] Starting game update check...');
@@ -1019,7 +1022,7 @@ function startEnvironmentInitialization() {
   console.log('[ENV-INIT] SSE URL:', sseUrl);
   
   try {
-    const eventSource = new EventSource(sseUrl);
+    const eventSource = apiEventSource(sseUrl);
     console.log('[ENV-INIT] EventSource created, readyState:', eventSource.readyState);
     
     eventSource.onopen = () => {
@@ -1116,6 +1119,7 @@ function startEnvironmentInitialization() {
       if (event.data) {
         try {
           const data = JSON.parse(event.data);
+          if (data.errorMessageKey === 'error.rosetta_required' && platform !== 'darwin') return;
           console.error('[ENV-INIT] Error data:', data);
           
           const errorMsg = data.errorMessageKey
@@ -1126,7 +1130,11 @@ function startEnvironmentInitialization() {
             : i18n.t('error.unknown');
           
           showError(errorMsg);
-          alert(errorMsg);
+          if (data.errorMessageKey === 'error.rosetta_required') {
+            showRosettaDialog();
+          } else {
+            alert(errorMsg);
+          }
           
           titleBarCard.classList.remove('progress-mode');
           setTimeout(() => {

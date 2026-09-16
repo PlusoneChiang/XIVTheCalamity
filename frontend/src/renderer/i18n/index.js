@@ -42,6 +42,7 @@ const translations = {
     
     // Progress (Environment Initialization)
     'progress.checking_wine': '檢查 Wine 狀態',
+    'progress.checking_rosetta': '檢查 Rosetta 狀態',
     'progress.downloading_wine': '下載 Wine 中',
     'progress.extracting_wine': '解壓縮 Wine',
     'progress.installing_wine': '安裝 Wine',
@@ -78,6 +79,7 @@ const translations = {
     
     // Error Messages
     'error.wine_download_failed': 'Wine 下載失敗',
+    'error.rosetta_required': '目前的 Wine 需要 Rosetta 2，但此 Mac 尚未安裝 Rosetta。\n\n請開啟「終端機」，執行以下指令並依照畫面指示完成安裝：\nsoftwareupdate --install-rosetta\n\n安裝完成後，請完全結束並重新啟動 XIVTheCalamity。',
     'error.dxvk_download_failed': 'DXVK 下載失敗',
     'error.init_failed': '初始化失敗',
     'error.download_failed': '下載失敗',
@@ -463,7 +465,22 @@ const translations = {
     'app_update.restart_later': '下次啟動時安裝',
     'app_update.reminder_available': '🔔 發現新版本',
     'app_update.reminder_ready': '✅ 更新已就緒，點此重啟',
-    'app_update.whats_new': '📋 更新內容'
+    'app_update.whats_new': '📋 更新內容',
+    'rosetta.title': '需要安裝 Rosetta 2',
+    'rosetta.description': '目前的 Wine 需要 Rosetta 2 才能執行。安裝過程可能需要幾分鐘，完成後 Launcher 會自動重新啟動。',
+    'rosetta.terms_prefix': '按下「安裝 Rosetta 並重新啟動」即表示您同意 Apple 的',
+    'rosetta.terms_link': '軟體授權條款',
+    'rosetta.terms_suffix': '。',
+    'rosetta.install_restart': '安裝 Rosetta 並重新啟動',
+    'rosetta.installing': '正在安裝 Rosetta…',
+    'rosetta.restarting': '正在重新啟動 Launcher…',
+    'rosetta.restart': '重新啟動 Launcher',
+    'rosetta.install_failed': '無法安裝 Rosetta，請確認網路連線後重試。',
+    'rosetta.invalid_request': '安裝請求無效，請重新啟動 Launcher 後再試。',
+    'rosetta.install_in_progress': 'Rosetta 正在安裝中，請稍候。',
+    'rosetta.not_ready': '請先完成 Rosetta 安裝，再重新啟動 Launcher。',
+    'rosetta.restart_in_progress': 'Launcher 正在重新啟動，請稍候。',
+    'rosetta.restart_failed': 'Rosetta 已安裝，但無法自動重新啟動。請完全結束並重新啟動 Launcher。'
   },
   
   'en-US': {
@@ -505,6 +522,7 @@ const translations = {
     
     // Progress (Environment Initialization)
     'progress.checking_wine': 'Checking Wine status',
+    'progress.checking_rosetta': 'Checking Rosetta status',
     'progress.downloading_wine': 'Downloading Wine',
     'progress.extracting_wine': 'Extracting Wine',
     'progress.installing_wine': 'Installing Wine',
@@ -541,6 +559,7 @@ const translations = {
     
     // Error Messages
     'error.wine_download_failed': 'Wine download failed',
+    'error.rosetta_required': 'The current Wine runtime requires Rosetta 2, but Rosetta is not installed on this Mac.\n\nOpen Terminal, run the following command, and follow the installation instructions:\nsoftwareupdate --install-rosetta\n\nAfter installation, fully quit and restart XIVTheCalamity.',
     'error.dxvk_download_failed': 'DXVK download failed',
     'error.init_failed': 'Initialization failed',
     'error.download_failed': 'Download failed',
@@ -924,7 +943,22 @@ const translations = {
     'app_update.restart_later': 'Install on next launch',
     'app_update.reminder_available': '🔔 Update available',
     'app_update.reminder_ready': '✅ Update ready, click to restart',
-    'app_update.whats_new': "📋 What's New"
+    'app_update.whats_new': "📋 What's New",
+    'rosetta.title': 'Rosetta 2 is required',
+    'rosetta.description': 'The current Wine runtime requires Rosetta 2. Installation may take a few minutes; the Launcher will restart automatically when it is complete.',
+    'rosetta.terms_prefix': 'By selecting “Install Rosetta and Restart”, you agree to Apple’s',
+    'rosetta.terms_link': 'Software License Agreement',
+    'rosetta.terms_suffix': '.',
+    'rosetta.install_restart': 'Install Rosetta and Restart',
+    'rosetta.installing': 'Installing Rosetta…',
+    'rosetta.restarting': 'Restarting Launcher…',
+    'rosetta.restart': 'Restart Launcher',
+    'rosetta.install_failed': 'Rosetta could not be installed. Check your internet connection and try again.',
+    'rosetta.invalid_request': 'The installation request is invalid. Restart the Launcher and try again.',
+    'rosetta.install_in_progress': 'Rosetta installation is already in progress. Please wait.',
+    'rosetta.not_ready': 'Complete the Rosetta installation before restarting the Launcher.',
+    'rosetta.restart_in_progress': 'The Launcher is already restarting. Please wait.',
+    'rosetta.restart_failed': 'Rosetta is installed, but the Launcher could not restart automatically. Fully quit and restart the Launcher.'
   }
 };
 

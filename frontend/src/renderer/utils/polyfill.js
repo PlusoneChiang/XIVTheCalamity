@@ -1,4 +1,19 @@
 import { Buffer } from 'buffer';
+// Token 僅由原生視窗注入，每次啟動都會重新產生。
+const apiToken = document.querySelector('meta[name="xivtc-api-token"]')?.content || '';
+
+export function apiFetch(url, options = {}) {
+  const headers = new Headers(options.headers);
+  headers.set('X-XIVTC-Token', apiToken);
+  return fetch(url, { ...options, headers });
+}
+
+export function apiEventSource(url) {
+  const endpoint = new URL(url);
+  endpoint.searchParams.set('access_token', apiToken);
+  return new EventSource(endpoint.href);
+}
+
 window.Buffer = Buffer;
 console.log('[Polyfill] Global Buffer initialized');
 
@@ -16,7 +31,7 @@ if (!window.xivtc) {
       options.body = JSON.stringify(body);
     }
     try {
-      const res = await fetch(`${backendUrl}${path}`, options);
+      const res = await apiFetch(`${backendUrl}${path}`, options);
       if (!res.ok) {
         let errData;
         try { errData = await res.json(); } catch(e) {}
@@ -141,7 +156,7 @@ if (!window.xivtc) {
       },
       on: (eventName, callback) => {
         if (!window.__photinoEventSource) {
-          window.__photinoEventSource = new EventSource(`http://localhost:5050/api/events/stream`);
+          window.__photinoEventSource = apiEventSource(`http://localhost:5050/api/events/stream`);
           window.__photinoEventListeners = {};
           window.__photinoEventSource.onmessage = (e) => {
             try {
@@ -259,7 +274,7 @@ if (!window.xivtc) {
   }
 
   // Fetch initial configuration from backend
-  fetch(`${backendUrl}/api/config`)
+  apiFetch(`${backendUrl}/api/config`)
     .then(res => res.json())
     .then(json => {
       if (json && json.success && json.data) {

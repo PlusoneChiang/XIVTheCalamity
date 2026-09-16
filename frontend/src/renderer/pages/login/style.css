@@ -956,6 +956,39 @@ body {
     animation: spin 0.8s linear infinite;
 }
 
+.rosetta-dialog-content {
+    box-sizing: border-box;
+}
+
+.rosetta-dialog-content p {
+    margin: 0 0 10px;
+}
+
+.rosetta-dialog-content p:last-child {
+    margin-bottom: 0;
+}
+
+.rosetta-dialog-content a {
+    color: #93c5fd;
+}
+
+.rosetta-dialog-error {
+    color: #fca5a5;
+}
+
+.rosetta-dialog .app-update-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.rosetta-dialog .app-update-spinner {
+    width: 14px;
+    height: 14px;
+    border-width: 2px;
+}
+
 /* Minimized update reminder button */
 .app-update-reminder {
     position: absolute;
