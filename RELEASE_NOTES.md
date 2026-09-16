@@ -1,5 +1,14 @@
 # Release Notes
 
+## v2.2.2
+#### 🇹🇼 zh-TW
+- macOS 新增 Rosetta 2 檢查與安裝提示。
+- 改善啟動器安全性與啟動流程。
+
+#### 🇺🇸 English
+- Added Rosetta 2 detection and an installation prompt on macOS.
+- Improved launcher security and startup handling.
+
 ## v2.2.1
 #### 🇹🇼 zh-TW
 - macOS Wine Runtime 更新至 `v2026.09.10`。
