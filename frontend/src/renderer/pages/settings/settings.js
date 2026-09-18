@@ -319,7 +319,6 @@ function collectFormData() {
     },
     protonGe: {
       dxvkHudEnabled: document.getElementById('protongeDxvkHudEnabled')?.checked || false,
-      dxvkAsyncEnabled: document.getElementById('protongeDxvkAsyncEnabled')?.checked || false,
       maxFramerate: parseInt(document.getElementById('protongeMaxFramerate')?.value || 60),
       gameModeEnabled: false, // GameMode disabled by default due to compatibility issues
       esyncEnabled: document.getElementById('protongeEsyncEnabled')?.checked !== false,
@@ -785,7 +784,6 @@ function initProtonGeTab() {
   
   // Graphics
   document.getElementById('protongeDxvkHudEnabled').checked = config.dxvkHudEnabled || false;
-  document.getElementById('protongeDxvkAsyncEnabled').checked = config.dxvkAsyncEnabled || false;
   document.getElementById('protongeMaxFramerate').value = config.maxFramerate || 60;
   
   // Performance - GameMode is now disabled by default and hidden from UI

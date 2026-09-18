@@ -24,12 +24,6 @@ if [ ! -f "$ENTITLEMENTS_PATH" ]; then
   exit 1
 fi
 
-if [ -f "$SIGNED_FLAG" ]; then
-  echo "✅ Wine is already signed ($SIGNED_FLAG exists)."
-  echo "   Remove $SIGNED_FLAG to force rebuild/sign."
-  exit 0
-fi
-
 echo "🍷 Building Wine..."
 cd "$WINE_BUILDER_DIR"
 ./build.sh
@@ -38,6 +32,12 @@ cd "$PROJECT_ROOT"
 if [ ! -d "$WINE_DIR" ]; then
   echo "❌ Wine build output not found at $WINE_DIR"
   exit 1
+fi
+
+# 先讓 Nix 與封裝流程判斷是否需更新，避免舊簽章標記略過新的建置設定。
+if [ -f "$SIGNED_FLAG" ]; then
+  echo "✅ Wine is already signed ($SIGNED_FLAG exists)."
+  exit 0
 fi
 
 echo "✂️  Stripping Wine binaries..."

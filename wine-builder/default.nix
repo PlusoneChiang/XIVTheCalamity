@@ -163,6 +163,9 @@ pkgs.stdenv.mkDerivation rec {
 
   installPhase = ''
     make install-lib DESTDIR=${placeholder "out"} -j$NIX_BUILD_CORES
+    # MoltenVK 由 Wine 動態載入，明確封裝 Nix 選用架構的版本。
+    cp ${pkgs.lib.getLib pkgs.darwin.moltenvk}/lib/libMoltenVK.dylib \
+      $out${placeholder "out"}/lib/
     cp ${pkgs.lib.getBin pkgs.gst_all_1.gstreamer}/bin/gst-inspect-1.0 \
       $out${placeholder "out"}/bin/
   '';

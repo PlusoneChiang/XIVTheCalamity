@@ -75,13 +75,14 @@ chmod -R u+w "$TEMP_WINE"
 find "$TEMP_WINE" -name ".DS_Store" -delete 2>/dev/null || true
 find "$TEMP_WINE" -name "._*" -delete 2>/dev/null || true
 
+# ARM64／WineD3D 實驗暫停套用外部 overrides。
 # Step 1.5: Apply overrides
-if [ -d "$OVERRIDES_DIR" ]; then
-  echo "🧩 Applying override DLLs from $OVERRIDES_DIR ..."
-  rsync -a "$OVERRIDES_DIR/" "$TEMP_WINE/lib/"
-else
-  echo "⚠️  Override directory not found: $OVERRIDES_DIR (skip)"
-fi
+# if [ -d "$OVERRIDES_DIR" ]; then
+#   echo "🧩 Applying override DLLs from $OVERRIDES_DIR ..."
+#   rsync -a "$OVERRIDES_DIR/" "$TEMP_WINE/lib/"
+# else
+#   echo "⚠️  Override directory not found: $OVERRIDES_DIR (skip)"
+# fi
 
 # Step 1.6: Re-sign Wine binaries after overrides
 echo "🔐 Re-signing Wine binaries..."

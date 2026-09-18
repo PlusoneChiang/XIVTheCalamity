@@ -16,7 +16,7 @@ public class ProtonGeDownloadService(
     private readonly PlatformPathService _platformPaths = PlatformPathService.Instance;
     private readonly HttpClient _httpClient = new();
 
-    public const string PinnedVersion = "GE-Proton11-1";
+    public const string PinnedVersion = "GE-Proton11-7";
     private const string PinnedReleaseApiUrl = $"https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/tags/{PinnedVersion}";
     private const string RequestUserAgent = "XIVTheCalamity/1.0";
 

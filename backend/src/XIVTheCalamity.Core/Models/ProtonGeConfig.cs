@@ -11,14 +11,6 @@ public class ProtonGeConfig
     public bool DxvkHudEnabled { get; set; } = false;
 
     /// <summary>
-    /// Enable DXVK GPLAsync mode.
-    /// When enabled, downloads the GPLAsync build and installs it to the Wine prefix,
-    /// replacing the DXVK bundled in GE-Proton.
-    /// When disabled, the GPLAsync DLLs are removed and GE-Proton's bundled DXVK is used.
-    /// </summary>
-    public bool DxvkAsyncEnabled { get; set; } = false;
-    
-    /// <summary>
     /// Maximum framerate limit. 0 = unlimited (default).
     /// Mapped to DXVK_FRAME_RATE environment variable.
     /// </summary>

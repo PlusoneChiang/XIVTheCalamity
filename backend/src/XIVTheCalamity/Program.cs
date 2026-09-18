@@ -420,7 +420,6 @@ public class Program
                 XIVTheCalamity.Platform.Linux.Proton.ProtonGeEnvironmentService>();
             builder.Services.AddSingleton<XIVTheCalamity.Platform.Linux.Proton.ProtonGeDownloadService>();
             builder.Services.AddSingleton<XIVTheCalamity.Platform.Linux.Umu.UmuDownloadService>();
-            builder.Services.AddSingleton<XIVTheCalamity.Platform.Linux.Wine.DxvkDownloadService>();
             builder.Services.AddSingleton<WinePrefixService>();
             builder.Services.AddSingleton<WineConfigService>();
         }

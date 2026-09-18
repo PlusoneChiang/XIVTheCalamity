@@ -40,11 +40,12 @@ rm -rf $targetDir
 mkdir -p $targetDir
 cp -R "$subDir/"* $targetDir
 chmod -R u+w $targetDir
-rsync -a "$overridesDir/lib" $targetDir
+# ARM64／WineD3D 實驗暫停套用外部 overrides。
+# rsync -a "$overridesDir/lib" $targetDir
 
 libDir="$targetDir/lib"
 mkdir -p "$libDir"
-processedLibs=("libMoltenVK.dylib")
+processedLibs=()
 
 # Strip existing code signatures before modifying binaries to avoid warnings
 # install_name_tool will otherwise print that changes invalidate the signature.
