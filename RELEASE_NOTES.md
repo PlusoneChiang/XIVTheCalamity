@@ -1,5 +1,16 @@
 # Release Notes
 
+## v2.2.3
+#### 🇹🇼 zh-TW
+- macOS Wine Runtime 更新至 `v2026.09.16`（Wine 11.17）。
+- Linux 更新至 `GE-Proton11-7`，移除 GPLAsync 選項，統一使用 Proton 隨附的 DXVK。
+- 修正 Linux 備援啟動、幀率限制與效能監控顯示。
+
+#### 🇺🇸 English
+- Updated the macOS Wine Runtime to `v2026.09.16` (Wine 11.17).
+- Updated Linux to `GE-Proton11-7` and removed the GPLAsync option to use Proton's bundled DXVK.
+- Fixed Linux fallback launching, frame rate limiting, and performance monitoring display.
+
 ## v2.2.2
 #### 🇹🇼 zh-TW
 - macOS 新增 Rosetta 2 檢查與安裝提示。
