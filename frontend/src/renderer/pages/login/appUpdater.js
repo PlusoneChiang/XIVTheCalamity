@@ -82,6 +82,14 @@ export async function initAppUpdater() {
     });
 
     window.xivtc.updater.onError((data) => {
+      if (data.operation === 'install') {
+        const error = document.querySelector('.app-update-install-error');
+        if (error) {
+          error.textContent = data.message;
+          error.hidden = false;
+        }
+        return;
+      }
       updateState = 'error';
       console.error('[APP-UPDATE] Update error:', data.message);
       hideTitleBarProgress();
@@ -176,6 +184,7 @@ function showRestartDialog(version) {
     <div class="app-update-dialog">
       <div class="app-update-dialog-icon">✅</div>
       <p class="app-update-dialog-title" data-i18n="app_update.ready_msg" data-i18n-options='${JSON.stringify({ version })}'>${i18n.t('app_update.ready_msg', { version })}</p>
+      <p class="app-update-install-error" role="alert" hidden></p>
       <div class="app-update-dialog-buttons">
         <button class="app-update-btn app-update-btn-primary app-update-btn-green" id="appUpdateInstallBtn">
           <span data-i18n="app_update.restart">${i18n.t('app_update.restart')}</span>
@@ -189,7 +198,14 @@ function showRestartDialog(version) {
   document.body.appendChild(overlay);
 
   document.getElementById('appUpdateInstallBtn').addEventListener('click', async () => {
-    await window.xivtc.updater.install();
+    const button = document.getElementById('appUpdateInstallBtn');
+    button.disabled = true;
+    overlay.querySelector('.app-update-install-error').hidden = true;
+    try {
+      await window.xivtc.updater.install();
+    } finally {
+      button.disabled = false;
+    }
   });
 
   document.getElementById('appUpdateLaterBtn').addEventListener('click', () => {

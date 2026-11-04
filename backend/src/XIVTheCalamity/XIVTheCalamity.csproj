@@ -40,6 +40,7 @@
   <ItemGroup>
     <!-- 將前端打包產物設為內部資源，並自實體發佈目錄中移除（避免生成外部鬆散檔案） -->
     <EmbeddedResource Include="wwwroot\**" />
+    <EmbeddedResource Include="Services/update-linux.sh" LogicalName="XIVTheCalamity.update-linux.sh" />
     <Content Remove="wwwroot\**" />
   </ItemGroup>
 

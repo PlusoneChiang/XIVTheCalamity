@@ -20,6 +20,7 @@ public class AppUpdaterService
     private readonly IHttpClientFactory _httpClientFactory;
     private string? _downloadedFilePath;
     private readonly object _lock = new();
+    private int _linuxUpdatePreparing;
 
     public AppUpdaterService(
         ConfigService configService,
@@ -320,39 +321,17 @@ rm -- ""$0""
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
-                var appImagePath = Environment.GetEnvironmentVariable("APPIMAGE");
-                if (!string.IsNullOrEmpty(appImagePath))
+                if (Interlocked.CompareExchange(ref _linuxUpdatePreparing, 1, 0) != 0)
+                    throw new InvalidOperationException("Linux 更新程序已啟動。");
+                try
                 {
-                    Log.Information("[AppUpdater] Running as AppImage. Original path: {AppImagePath}", appImagePath);
-                    try
-                    {
-                        var scriptPath = Path.Combine(Path.GetTempPath(), "update-linux.sh");
-                        var scriptContent = $@"#!/bin/sh
-sleep 1
-if mv -f ""{path}"" ""{appImagePath}""; then
-    chmod +x ""{appImagePath}""
-    ""{appImagePath}"" &
-else
-    chmod +x ""{path}""
-    ""{path}"" &
-fi
-rm -- ""$0""
-";
-                        File.WriteAllText(scriptPath, scriptContent);
-                        Process.Start("chmod", $"+x \"{scriptPath}\"")?.WaitForExit();
-                        Process.Start("/bin/sh", $"\"{scriptPath}\"");
-                        Environment.Exit(0);
-                        return;
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Error(ex, "[AppUpdater] Failed to perform AppImage update via script, falling back to direct run");
-                    }
+                    PrepareLinuxUpdate(path);
                 }
-
-                // Linux 系統沒有 HomeAlias 功能，其環境變數從未被修改，故可以直接啟動新版並繼承當前正常的系統環境
-                Process.Start("chmod", $"+x \"{path}\"")?.WaitForExit();
-                Process.Start(path);
+                catch
+                {
+                    Interlocked.Exchange(ref _linuxUpdatePreparing, 0);
+                    throw;
+                }
             }
 
             // 關閉目前的主程式
@@ -361,6 +340,58 @@ rm -- ""$0""
         catch (Exception ex)
         {
             Log.Error(ex, "[AppUpdater] Failed to launch installer/update");
+            throw;
+        }
+    }
+
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    private static void PrepareLinuxUpdate(string downloadedPath)
+    {
+        var target = Environment.GetEnvironmentVariable("APPIMAGE");
+        if (string.IsNullOrWhiteSpace(target) || !Path.IsPathFullyQualified(target) || !File.Exists(target))
+            throw new InvalidOperationException("無法確認原始 AppImage 路徑，已取消更新；目前程式不會關閉。");
+
+        target = File.ResolveLinkTarget(target, returnFinalTarget: true)?.FullName ?? target;
+        var updateDirectory = Path.Combine(Path.GetDirectoryName(target)!, ".xivtc-update-" + Guid.NewGuid().ToString("N"));
+        var logPath = Path.Combine(PlatformPathService.Instance.LogsDirectory, "app-update-linux.log");
+        Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
+        // 關閉主程式前確認日誌可寫，避免外部指令稿失敗卻沒有紀錄。
+        using (var log = new FileStream(logPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite)) { }
+
+        Directory.CreateDirectory(updateDirectory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        try
+        {
+            var stagedPath = Path.Combine(updateDirectory, "new.AppImage");
+            using (var source = File.OpenRead(downloadedPath))
+            using (var staged = new FileStream(stagedPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                if (source.Length == 0)
+                    throw new InvalidDataException("下載的 AppImage 是空檔案，已取消更新。");
+                source.CopyTo(staged);
+                staged.Flush(flushToDisk: true);
+            }
+            var permissions = File.GetUnixFileMode(target) & (UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
+                | UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute
+                | UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute);
+            File.SetUnixFileMode(stagedPath, permissions | UnixFileMode.UserExecute);
+
+            var scriptPath = Path.Combine(updateDirectory, "update.sh");
+            using (var script = typeof(AppUpdaterService).Assembly.GetManifestResourceStream("XIVTheCalamity.update-linux.sh")
+                ?? throw new InvalidOperationException("找不到 Linux 更新指令稿。"))
+            using (var output = File.Create(scriptPath))
+                script.CopyTo(output);
+
+            var start = new ProcessStartInfo("/bin/sh") { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(target)! };
+            foreach (var argument in new[] { scriptPath, Environment.ProcessId.ToString(), stagedPath, target, logPath, downloadedPath })
+                start.ArgumentList.Add(argument);
+            Log.Information("[AppUpdater] Prepared Linux update: {Source} -> {Target}; PID: {Pid}; log: {Log}",
+                downloadedPath, target, Environment.ProcessId, logPath);
+            using var updater = Process.Start(start) ?? throw new InvalidOperationException("無法啟動 Linux 更新程序。");
+        }
+        catch
+        {
+            try { Directory.Delete(updateDirectory, recursive: true); }
+            catch (Exception cleanupError) { Log.Warning(cleanupError, "[AppUpdater] Failed to remove staging directory: {Path}", updateDirectory); }
             throw;
         }
     }

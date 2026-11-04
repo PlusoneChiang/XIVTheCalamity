@@ -2,6 +2,7 @@ using Serilog;
 using System;
 using System.IO;
 using System.Net.Http;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
@@ -58,6 +59,10 @@ public class Program
         try
         {
             Log.Information("Starting XIVTheCalamity with Photino.NET (NativeAOT)");
+            if (OperatingSystem.IsLinux())
+                Log.Information("[AppUpdater] Startup version: {Version}; executable: {Executable}; AppImage: {AppImage}",
+                    typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion,
+                    Environment.ProcessPath, Environment.GetEnvironmentVariable("APPIMAGE"));
 
             // 2. 載入配置並決定是否啟用 Home Alias (僅 macOS 支援)
             PrepareEnvironment();

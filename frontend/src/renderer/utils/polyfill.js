@@ -218,7 +218,10 @@ if (!window.xivtc) {
       install: async () => {
         const res = await apiCall('/api/update/install', 'POST');
         if (!res.success) {
-          errorListeners.forEach(cb => cb({ message: res.error || 'Failed to install update' }));
+          errorListeners.forEach(cb => cb({
+            operation: 'install',
+            message: res.data?.error?.details || res.data?.error?.message || res.error || 'Failed to install update'
+          }));
         }
       },
       onChecking: (cb) => { checkingListeners.push(cb); return () => { checkingListeners = checkingListeners.filter(x => x !== cb); }; },
