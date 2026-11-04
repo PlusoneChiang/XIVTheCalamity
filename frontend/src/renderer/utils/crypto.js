@@ -10,6 +10,9 @@
  * @returns {Promise<CryptoKey>}
  */
 async function deriveKey(password, salt) {
+  if (typeof password !== 'string' || password.length === 0) {
+    throw new Error('缺少有效的加密金鑰。');
+  }
   const encoder = new TextEncoder();
   const passwordBuffer = encoder.encode(password);
   
@@ -47,7 +50,7 @@ async function deriveKey(password, salt) {
  * @param {string} password - Master password
  * @returns {Promise<string>} Base64 encoded encrypted data
  */
-export async function encryptText(text, password = 'default-key') {
+export async function encryptText(text, password) {
   try {
     const encoder = new TextEncoder();
     const data = encoder.encode(text);
@@ -86,7 +89,7 @@ export async function encryptText(text, password = 'default-key') {
  * @param {string} password - Master password
  * @returns {Promise<string>} Decrypted plain text
  */
-export async function decryptText(encryptedBase64, password = 'default-key') {
+export async function decryptText(encryptedBase64, password) {
   try {
     // Decode base64
     const combined = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0));

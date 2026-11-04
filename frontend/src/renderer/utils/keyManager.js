@@ -8,7 +8,7 @@ const CONFIG_FILE = 'config.json';
 
 /**
  * Generate a random encryption key
- * @returns {string} - 32-character hexadecimal key
+ * @returns {string} - 64-character hexadecimal key
  */
 function generateEncryptionKey() {
   const array = new Uint8Array(32);
@@ -25,8 +25,14 @@ export async function getEncryptionKey() {
   try {
     // Try to load existing config
     const result = await window.xivtc.storage.load(CONFIG_FILE);
-    
-    if (result.success && result.data && result.data.encryptionKey) {
+    if (result?.success !== true) {
+      throw new Error('無法讀取加密金鑰，已停止帳密加解密。');
+    }
+
+    if (result.data != null) {
+      if (typeof result.data.encryptionKey !== 'string' || result.data.encryptionKey.length === 0) {
+        throw new Error('加密金鑰設定無效，已停止帳密加解密；原設定不會被覆寫。');
+      }
       console.log('[KeyManager] Loaded existing encryption key');
       return result.data.encryptionKey;
     }
@@ -42,13 +48,15 @@ export async function getEncryptionKey() {
       version: '1.0'
     };
     
-    await window.xivtc.storage.save(CONFIG_FILE, config);
+    const saveResult = await window.xivtc.storage.save(CONFIG_FILE, config);
+    if (saveResult?.success !== true) {
+      throw new Error('無法儲存新的加密金鑰，已停止帳密加密。');
+    }
     console.log('[KeyManager] Encryption key generated and saved');
     
     return newKey;
   } catch (error) {
     console.error('[KeyManager] Failed to get encryption key:', error);
-    // Fallback to hardcoded key (should not happen in production)
-    return 'xiv-calamity-fallback-key';
+    throw error;
   }
 }
