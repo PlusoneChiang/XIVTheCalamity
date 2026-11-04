@@ -34,7 +34,6 @@ public record AppUpdateCheckResult(
     bool UpdateAvailable,
     string Version,
     string ReleaseNotes,
-    string DownloadUrl,
     long Size
 );
 

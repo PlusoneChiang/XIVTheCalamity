@@ -3,7 +3,10 @@
  * RFC 6238 implementation using otplib
  */
 
-import { authenticator } from '@otplib/preset-browser';
+import { createGuardrails, generate } from 'otplib';
+
+// 相容既有 16 字元 Base32 金鑰（10 bytes），不改變外部服務核發的金鑰。
+const guardrails = createGuardrails({ MIN_SECRET_BYTES: 10 });
 
 /**
  * Generate TOTP code
@@ -14,8 +17,12 @@ import { authenticator } from '@otplib/preset-browser';
  */
 export async function generateTOTP(secret, timeStep = 30, digits = 6) {
   try {
-    authenticator.options = { step: timeStep, digits: digits };
-    return authenticator.generate(secret);
+    return await generate({
+      secret: secret.toUpperCase().replace(/\s+/g, '').replace(/=+$/, ''),
+      period: timeStep,
+      digits,
+      guardrails
+    });
   } catch (error) {
     console.error('[TOTP] Generation failed:', error);
     throw error;

@@ -15,6 +15,9 @@ namespace XIVTheCalamity.Services;
 
 public class AppUpdaterService
 {
+    private const string ReleasesUrl = "https://api.github.com/repos/PlusoneChiang/XIVTheCalamity/releases";
+    private const string DownloadBaseUrl = "https://github.com/PlusoneChiang/XIVTheCalamity/releases/download/";
+    private string? _availableDownloadUrl;
     private readonly ConfigService _configService;
     private readonly EventBroadcastHub _eventHub;
     private readonly IHttpClientFactory _httpClientFactory;
@@ -34,6 +37,7 @@ public class AppUpdaterService
 
     public async Task<AppUpdateCheckResult> CheckForUpdatesAsync()
     {
+        lock (_lock) { _availableDownloadUrl = null; }
         try
         {
             var config = await _configService.LoadConfigAsync();
@@ -44,7 +48,7 @@ public class AppUpdaterService
             var client = _httpClientFactory.CreateClient();
             client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (XIVTheCalamity/1.0)");
             
-            var response = await client.GetAsync("https://api.github.com/repos/PlusoneChiang/XIVTheCalamity/releases");
+            var response = await client.GetAsync(ReleasesUrl);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -53,7 +57,7 @@ public class AppUpdaterService
             if (releases == null || releases.Length == 0)
             {
                 Log.Information("[AppUpdater] No releases found on GitHub");
-                return new AppUpdateCheckResult(false, "", "", "", 0);
+                return new AppUpdateCheckResult(false, "", "", 0);
             }
 
             GitHubRelease? selectedRelease = null;
@@ -79,7 +83,7 @@ public class AppUpdaterService
             if (selectedRelease == null)
             {
                 Log.Information("[AppUpdater] No matching release found");
-                return new AppUpdateCheckResult(false, "", "", "", 0);
+                return new AppUpdateCheckResult(false, "", "", 0);
             }
 
             // 取得目前的 Informational Version
@@ -105,11 +109,14 @@ public class AppUpdaterService
                 var asset = FindTargetAsset(selectedRelease);
                 if (asset != null)
                 {
+                    // 下載位置只由固定儲存庫及後端取得的 Release 資料決定。
+                    var downloadUrl = DownloadBaseUrl + Uri.EscapeDataString(selectedRelease.Tag_name)
+                        + "/" + Uri.EscapeDataString(asset.Name);
+                    lock (_lock) { _availableDownloadUrl = downloadUrl; }
                     return new AppUpdateCheckResult(
                         UpdateAvailable: true,
                         Version: selectedRelease.Tag_name,
                         ReleaseNotes: selectedRelease.Body,
-                        DownloadUrl: asset.Browser_download_url,
                         Size: asset.Size
                     );
                 }
@@ -128,7 +135,7 @@ public class AppUpdaterService
             Log.Error(ex, "[AppUpdater] Failed to check for updates");
         }
 
-        return new AppUpdateCheckResult(false, "", "", "", 0);
+        return new AppUpdateCheckResult(false, "", "", 0);
     }
 
     private GitHubAsset? FindTargetAsset(GitHubRelease release)
@@ -153,11 +160,13 @@ public class AppUpdaterService
         return null;
     }
 
-    public async Task DownloadUpdateAsync(string downloadUrl)
+    public async Task DownloadUpdateAsync()
     {
-        if (string.IsNullOrEmpty(downloadUrl))
+        string downloadUrl;
+        lock (_lock)
         {
-            throw new ArgumentException("Download URL cannot be empty");
+            downloadUrl = _availableDownloadUrl
+                ?? throw new InvalidOperationException("請先檢查更新，確認有可下載的版本。");
         }
 
         try

@@ -205,12 +205,11 @@ if (!window.xivtc) {
         }
       },
       download: async () => {
-        if (!currentUpdateInfo || !currentUpdateInfo.downloadUrl) {
+        if (!currentUpdateInfo || !currentUpdateInfo.updateAvailable) {
           errorListeners.forEach(cb => cb({ message: 'No update available to download' }));
           return;
         }
-        const url = encodeURIComponent(currentUpdateInfo.downloadUrl);
-        const res = await apiCall(`/api/update/download?downloadUrl=${url}`, 'POST');
+        const res = await apiCall('/api/update/download', 'POST');
         if (!res.success) {
           errorListeners.forEach(cb => cb({ message: res.error || 'Failed to start download' }));
         }

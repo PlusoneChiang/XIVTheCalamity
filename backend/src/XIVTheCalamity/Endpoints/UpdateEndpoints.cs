@@ -137,23 +137,17 @@ public static class UpdateEndpoints
 
         // POST /api/update/download
         group.MapPost("/download", (
-            string downloadUrl,
             AppUpdaterService appUpdaterService,
             ILogger<Program> logger) =>
         {
             try
             {
-                if (string.IsNullOrEmpty(downloadUrl))
-                {
-                    return Results.BadRequest(ApiErrorResponse.Create("VALIDATION_FAILED", "Download URL is required"));
-                }
-
                 // 在背景執行下載
                 _ = Task.Run(async () =>
                 {
                     try
                     {
-                        await appUpdaterService.DownloadUpdateAsync(downloadUrl);
+                        await appUpdaterService.DownloadUpdateAsync();
                     }
                     catch (Exception ex)
                     {
