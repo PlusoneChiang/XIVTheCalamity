@@ -82,16 +82,16 @@ if (!window.xivtc) {
       }
     },
     storage: {
-      save: async (filename, data) => {
-        const res = await apiCall('/api/storage/save', 'POST', { filename, data });
+      save: async (type, data) => {
+        const res = await apiCall('/api/storage/save', 'POST', { type, data });
         return res.data || { success: false, error: res.error || 'Failed' };
       },
-      load: async (filename) => {
-        const res = await apiCall('/api/storage/load', 'POST', { filename });
+      load: async (type) => {
+        const res = await apiCall('/api/storage/load', 'POST', { type });
         return res.data || { success: false, data: null, error: res.error || 'Failed' };
       },
-      delete: async (filename) => {
-        const res = await apiCall('/api/storage/delete', 'POST', { filename });
+      delete: async (type) => {
+        const res = await apiCall('/api/storage/delete', 'POST', { type });
         return res.data || { success: false, error: res.error || 'Failed' };
       }
     },
@@ -104,6 +104,7 @@ if (!window.xivtc) {
     },
     openExternal: async (url) => {
       const res = await apiCall('/api/shell/open-external', 'POST', { url });
+      if (res.status === 400 && res.data?.message) window.alert(res.data.message);
       if (res.success && res.data) return res.data;
       return { success: false, message: res.error || res.statusText || 'Failed to open external link' };
     },

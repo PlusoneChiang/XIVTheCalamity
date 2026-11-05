@@ -8,7 +8,6 @@ public sealed class NewsService(IHttpClientFactory httpClientFactory)
 {
     private const string SourceUrl = "https://user-cdn.ffxiv.com.tw/news/251115/launcher_left.html";
     private const string MoreUrl = "https://www.ffxiv.com.tw/web/news/news_list.aspx";
-    private static readonly string[] LinkHosts = ["www.ffxiv.com.tw", "event.ffxiv.com.tw"];
     private const string ImageHost = "file.ffxiv.com.tw";
     private static readonly Regex BannerRegex = new(
         """<div\s+[^>]*class\s*=\s*["'][^"']*swiper-slide[^"']*["'][^>]*>\s*<a\s+[^>]*href\s*=\s*["'](?<url>[^"']+)["'][^>]*>\s*<img\s+[^>]*src\s*=\s*["'](?<image>[^"']+)["']""",
@@ -55,7 +54,7 @@ public sealed class NewsService(IHttpClientFactory httpClientFactory)
     }
 
     private static bool IsAllowedImage(string value) => IsHttpsHost(value, ImageHost);
-    private static bool IsAllowedLink(string value) => LinkHosts.Any(host => IsHttpsHost(value, host));
+    private static bool IsAllowedLink(string value) => ExternalLinkPolicy.IsAllowed(value);
 
     private static bool IsHttpsHost(string value, string host) => Uri.TryCreate(value, UriKind.Absolute, out var uri)
         && uri.Scheme == Uri.UriSchemeHttps

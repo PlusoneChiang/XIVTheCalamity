@@ -153,7 +153,7 @@ XIVTheCalamity/
 ### 系統需求
 
 #### macOS 使用者
-- **作業系統**：macOS 12.0+ (Monterey 或更新)
+- **作業系統**：macOS 15.6+（Sequoia 或更新）
 - **架構**：Apple Silicon (arm64)
 - **儲存空間**：約 100 GB（遊戲 + Wine + 登入器）
 

@@ -175,8 +175,8 @@ public record ProfilesResponse(string Active, ProfileItem[] Profiles);
 public record ProfileSwitchRequest(string Name, bool CopyDefault = false);
 
 // Electron bridge records
-public record StorageSaveRequest(string Filename, System.Text.Json.JsonElement Data);
-public record StorageLoadRequest(string Filename);
+public record StorageSaveRequest(string Type, System.Text.Json.JsonElement Data);
+public record StorageLoadRequest(string Type);
 public record StorageResponse(bool Success, System.Text.Json.JsonElement? Data = null, string? Error = null);
 public record VersionInfoResponse(string Version, string AppName, string Description);
 public record OpenExternalRequest(string Url);

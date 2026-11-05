@@ -11,6 +11,14 @@ namespace XIVTheCalamity.Platform.MacOS.Wine;
 /// </summary>
 public class WineConfigService
 {
+    private static readonly IReadOnlyDictionary<string, string> WineTools =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["winecfg"] = @"C:\windows\system32\winecfg.exe",
+            ["regedit"] = @"C:\windows\system32\regedit.exe",
+            ["wineconsole"] = @"C:\windows\system32\wineconsole.exe"
+        };
+
     private readonly WinePathService _paths;
     private readonly ILogger<WineConfigService>? _logger;
 
@@ -25,14 +33,22 @@ public class WineConfigService
         _logger = logger;
     }
 
+    public static bool IsSupportedTool(string toolName) => WineTools.ContainsKey(toolName);
+
     /// <summary>
-    /// Launch Wine tool (winecfg, regedit, cmd, etc.)
+    /// Launch a supported Wine tool.
     /// </summary>
-    /// <param name="toolName">Tool name (e.g., "winecfg", "regedit", "cmd")</param>
+    /// <param name="toolName">Tool name (e.g., "winecfg", "regedit", "wineconsole")</param>
     /// <param name="wineConfig">Optional Wine configuration for environment variables</param>
     /// <returns>Process ID if successful, null if failed</returns>
     public async Task<int?> LaunchToolAsync(string toolName, WineConfig? wineConfig = null, CancellationToken cancellationToken = default)
     {
+        if (!WineTools.TryGetValue(toolName, out var toolPath))
+        {
+            _logger?.LogWarning("Unsupported Wine tool requested: {ToolName}", toolName);
+            return null;
+        }
+
         _logger?.LogInformation("Launching Wine tool: {ToolName}", toolName);
 
         try
@@ -55,12 +71,12 @@ public class WineConfigService
             var startInfo = new ProcessStartInfo
             {
                 FileName = _paths.WineExecutable,
-                Arguments = toolName,
                 UseShellExecute = false,
                 CreateNoWindow = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true
             };
+            startInfo.ArgumentList.Add(toolPath);
 
             foreach (var (key, value) in env)
             {

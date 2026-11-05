@@ -6,7 +6,7 @@
 import { encryptText, decryptText } from './crypto.js';
 import { getEncryptionKey } from './keyManager.js';
 
-const CREDENTIALS_FILE = 'credentials.json';
+const CREDENTIALS_TYPE = 'credentials';
 
 // Legacy Key Derivation (using the old, buggy salt mapping for backward compatibility during migration)
 async function legacyDeriveKey(password, salt) {
@@ -63,14 +63,14 @@ let migrationPromise = null;
  */
 async function migrateCredentials() {
   try {
-    const passwordsFile = 'passwords.json';
-    const otpSecretsFile = 'otp_secrets.json';
+    const passwordsType = 'legacyPasswords';
+    const otpSecretsType = 'legacyOtpSecrets';
     
     // Check if legacy passwords.json exists
-    const passwordsResult = await window.xivtc.storage.load(passwordsFile);
+    const passwordsResult = await window.xivtc.storage.load(passwordsType);
     if (!passwordsResult.success || !passwordsResult.data) {
       // No legacy passwords.json found, check if legacy otp_secrets.json exists alone
-      const otpCheck = await window.xivtc.storage.load(otpSecretsFile);
+      const otpCheck = await window.xivtc.storage.load(otpSecretsType);
       if (!otpCheck.success || !otpCheck.data) {
         return; // No legacy files exist, skip migration
       }
@@ -81,15 +81,15 @@ async function migrateCredentials() {
     const legacyPasswords = passwordsResult.data || {};
     
     let legacyOtpSecrets = {};
-    const otpResult = await window.xivtc.storage.load(otpSecretsFile);
+    const otpResult = await window.xivtc.storage.load(otpSecretsType);
     if (otpResult.success && otpResult.data) {
       legacyOtpSecrets = otpResult.data;
     }
     
     // Create backup copies of the legacy files first
-    await window.xivtc.storage.save('passwords.json.bak', legacyPasswords);
+    await window.xivtc.storage.save('legacyPasswordsBackup', legacyPasswords);
     if (Object.keys(legacyOtpSecrets).length > 0) {
-      await window.xivtc.storage.save('otp_secrets.json.bak', legacyOtpSecrets);
+      await window.xivtc.storage.save('legacyOtpSecretsBackup', legacyOtpSecrets);
     }
     
     const masterPassword = await getEncryptionKey();
@@ -169,8 +169,8 @@ async function migrateCredentials() {
     }
     
     // Load and merge with any existing credentials.json
-    const credentialsFile = CREDENTIALS_FILE;
-    const existingResult = await window.xivtc.storage.load(credentialsFile);
+    const credentialsType = CREDENTIALS_TYPE;
+    const existingResult = await window.xivtc.storage.load(credentialsType);
     let finalStore = {};
     if (existingResult.success && existingResult.data) {
       finalStore = existingResult.data;
@@ -178,11 +178,11 @@ async function migrateCredentials() {
     
     finalStore = { ...migratedStore, ...finalStore };
     
-    const saveResult = await window.xivtc.storage.save(credentialsFile, finalStore);
+    const saveResult = await window.xivtc.storage.save(credentialsType, finalStore);
     if (saveResult.success) {
       console.log('[CredentialsStore] Migration successful. Cleaning up legacy files...');
-      await window.xivtc.storage.delete(passwordsFile);
-      await window.xivtc.storage.delete(otpSecretsFile);
+      await window.xivtc.storage.delete(passwordsType);
+      await window.xivtc.storage.delete(otpSecretsType);
       console.log('[CredentialsStore] Cleanup complete.');
     } else {
       console.error('[CredentialsStore] Migration failed to save new store.');
@@ -213,7 +213,7 @@ async function loadStore() {
   
   let store = {};
   try {
-    const result = await window.xivtc.storage.load(CREDENTIALS_FILE);
+    const result = await window.xivtc.storage.load(CREDENTIALS_TYPE);
     if (result.success && result.data) {
       store = result.data;
     }
@@ -228,7 +228,7 @@ async function loadStore() {
  */
 async function saveStore(store) {
   try {
-    const result = await window.xivtc.storage.save(CREDENTIALS_FILE, store);
+    const result = await window.xivtc.storage.save(CREDENTIALS_TYPE, store);
     return result.success;
   } catch (error) {
     console.error('[CredentialsStore] Save store failed:', error);

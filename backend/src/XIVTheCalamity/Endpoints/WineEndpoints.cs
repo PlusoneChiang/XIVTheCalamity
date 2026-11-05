@@ -19,6 +19,11 @@ public static class WineEndpoints
             ILogger<Program> logger,
             CancellationToken cancellationToken) =>
         {
+            if (!WineConfigService.IsSupportedTool(tool))
+            {
+                return Results.BadRequest(ApiErrorResponse.Create("VALIDATION_FAILED", "Unsupported Wine tool"));
+            }
+
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 logger.LogWarning("Wine tool '{Tool}' requested on Windows platform", tool);
@@ -51,14 +56,14 @@ public static class WineEndpoints
                 }
                 else
                 {
-                    return Results.Json(ApiErrorResponse.Create("LAUNCH_FAILED", $"Failed to launch {tool}"), 
+                    return Results.Json(ApiErrorResponse.Create("LAUNCH_FAILED", $"Failed to launch {tool}"),
                         AppJsonContext.Default.ApiErrorResponse, statusCode: 500);
                 }
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Failed to launch {Tool}", tool);
-                return Results.Json(ApiErrorResponse.Create("INTERNAL_ERROR", $"Failed to launch {tool}", ex.Message), 
+                return Results.Json(ApiErrorResponse.Create("INTERNAL_ERROR", $"Failed to launch {tool}", ex.Message),
                     AppJsonContext.Default.ApiErrorResponse, statusCode: 500);
             }
         });

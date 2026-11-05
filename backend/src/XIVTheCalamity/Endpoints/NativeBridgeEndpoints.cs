@@ -23,9 +23,10 @@ public static class NativeBridgeEndpoints
         {
             try
             {
-                var credentialsDir = Path.Combine(Program.GetAppSupportPath(), "XIVTheCalamity", "credentials");
-                Directory.CreateDirectory(credentialsDir);
-                var filePath = Path.Combine(credentialsDir, req.Filename);
+                var filePath = GetStoragePath(req.Type);
+                if (filePath == null)
+                    return Results.BadRequest(new StorageResponse(false, Error: "不支援的儲存資料類型。"));
+                Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
 
                 var json = JsonSerializer.Serialize(req.Data, AppJsonContext.Default.JsonElement);
                 await File.WriteAllTextAsync(filePath, json);
@@ -42,7 +43,9 @@ public static class NativeBridgeEndpoints
         {
             try
             {
-                var filePath = Path.Combine(Program.GetAppSupportPath(), "XIVTheCalamity", "credentials", req.Filename);
+                var filePath = GetStoragePath(req.Type);
+                if (filePath == null)
+                    return Results.BadRequest(new StorageResponse(false, Error: "不支援的儲存資料類型。"));
                 if (!File.Exists(filePath))
                 {
                     return Results.Ok(new StorageResponse(true, Data: null));
@@ -62,7 +65,9 @@ public static class NativeBridgeEndpoints
         {
             try
             {
-                var filePath = Path.Combine(Program.GetAppSupportPath(), "XIVTheCalamity", "credentials", req.Filename);
+                var filePath = GetStoragePath(req.Type);
+                if (filePath == null)
+                    return Results.BadRequest(new StorageResponse(false, Error: "不支援的儲存資料類型。"));
                 if (File.Exists(filePath))
                 {
                     File.Delete(filePath);
@@ -129,19 +134,23 @@ public static class NativeBridgeEndpoints
         // 4. Shell operations
         app.MapPost("/api/shell/open-external", (OpenExternalRequest req) =>
         {
+            if (!ExternalLinkPolicy.IsAllowed(req.Url))
+                return Results.BadRequest(new GenericActionResponse(false, "僅允許開啟 ffxiv.com.tw 網域及其子網域的 HTTPS 網頁。"));
             try
             {
+                var url = new Uri(req.Url).AbsoluteUri;
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
-                    Process.Start(new ProcessStartInfo(req.Url) { UseShellExecute = true });
+                    Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
                 }
-                else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                else
                 {
-                    Process.Start("open", req.Url);
-                }
-                else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                {
-                    Process.Start("xdg-open", req.Url);
+                    var startInfo = new ProcessStartInfo(OperatingSystem.IsMacOS() ? "open" : "xdg-open")
+                    {
+                        UseShellExecute = false
+                    };
+                    startInfo.ArgumentList.Add(url);
+                    Process.Start(startInfo);
                 }
                 return Results.Ok(new GenericActionResponse(true));
             }
@@ -274,6 +283,22 @@ public static class NativeBridgeEndpoints
                 hub.Unsubscribe(id);
             }
         });
+    }
+
+    private static string? GetStoragePath(string? type)
+    {
+        var filename = type switch
+        {
+            "credentials" => "credentials.json",
+            "encryptionKey" => "config.json",
+            "legacyPasswords" => "passwords.json",
+            "legacyOtpSecrets" => "otp_secrets.json",
+            "legacyPasswordsBackup" => "passwords.json.bak",
+            "legacyOtpSecretsBackup" => "otp_secrets.json.bak",
+            _ => null
+        };
+        return filename == null ? null
+            : Path.Combine(Program.GetAppSupportPath(), "XIVTheCalamity", "credentials", filename);
     }
 
 }

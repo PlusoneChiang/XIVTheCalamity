@@ -4,7 +4,7 @@
  * Stores key in a config file that users can backup/restore
  */
 
-const CONFIG_FILE = 'config.json';
+const STORAGE_TYPE = 'encryptionKey';
 
 /**
  * Generate a random encryption key
@@ -24,7 +24,7 @@ function generateEncryptionKey() {
 export async function getEncryptionKey() {
   try {
     // Try to load existing config
-    const result = await window.xivtc.storage.load(CONFIG_FILE);
+    const result = await window.xivtc.storage.load(STORAGE_TYPE);
     if (result?.success !== true) {
       throw new Error('無法讀取加密金鑰，已停止帳密加解密。');
     }
@@ -48,7 +48,7 @@ export async function getEncryptionKey() {
       version: '1.0'
     };
     
-    const saveResult = await window.xivtc.storage.save(CONFIG_FILE, config);
+    const saveResult = await window.xivtc.storage.save(STORAGE_TYPE, config);
     if (saveResult?.success !== true) {
       throw new Error('無法儲存新的加密金鑰，已停止帳密加密。');
     }

@@ -2,7 +2,6 @@ import { apiFetch } from '../../utils/polyfill.js';
 import i18n from '../../i18n/index.js';
 
 const OFFICIAL_NEWS_URL = 'https://user-cdn.ffxiv.com.tw/news/251115/launcher_left.html';
-const LOCAL_LINK_HOSTS = new Set(['www.ffxiv.com.tw', 'event.ffxiv.com.tw']);
 const LOCAL_IMAGE_HOSTS = new Set(['file.ffxiv.com.tw']);
 const CATEGORIES = ['最新', '活動', '更新', '維護', '其他'];
 
@@ -20,7 +19,7 @@ function isLocalUrl(value, hosts) {
 }
 
 function isLocalLink(value) {
-  return isLocalUrl(value, LOCAL_LINK_HOSTS);
+  return isExternalUrl(value);
 }
 
 function isLocalImage(value) {
@@ -30,7 +29,8 @@ function isLocalImage(value) {
 function isExternalUrl(value) {
   try {
     const url = new URL(value);
-    return (url.protocol === 'https:' || url.protocol === 'http:') && url.username === '' && url.password === '';
+    return url.protocol === 'https:' && url.username === '' && url.password === ''
+      && (url.hostname === 'ffxiv.com.tw' || url.hostname.endsWith('.ffxiv.com.tw'));
   } catch {
     return false;
   }

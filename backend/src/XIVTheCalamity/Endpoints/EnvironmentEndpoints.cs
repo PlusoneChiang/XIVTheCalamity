@@ -82,21 +82,24 @@ public static class EnvironmentEndpoints
                 return Results.BadRequest(ApiErrorResponse.Create("SERVICE_UNAVAILABLE", "Environment service not available"));
             }
             
-            logger.LogInformation("[ENV-TOOL] Launching diagnostic tool: {Tool}", tool);
-            
             try
             {
-                var toolExe = tool.ToLowerInvariant() switch
+                var toolPath = tool switch
                 {
-                    "winecfg" => "winecfg.exe",
-                    "regedit" => "regedit.exe",
-                    "cmd" => "cmd.exe",
-                    "notepad" => "notepad.exe",
-                    "explorer" => "explorer.exe",
-                    _ => $"{tool}.exe"
+                    "winecfg" => @"C:\windows\system32\winecfg.exe",
+                    "regedit" => @"C:\windows\system32\regedit.exe",
+                    "cmd" => @"C:\windows\system32\cmd.exe",
+                    "notepad" => @"C:\windows\system32\notepad.exe",
+                    "explorer" => @"C:\windows\system32\explorer.exe",
+                    _ => null
                 };
-                
-                var result = await environmentService.ExecuteAsync(toolExe, Array.Empty<string>(), cancellationToken);
+                if (toolPath == null)
+                {
+                    return Results.BadRequest(ApiErrorResponse.Create("VALIDATION_FAILED", "Unsupported diagnostic tool"));
+                }
+
+                logger.LogInformation("[ENV-TOOL] Launching diagnostic tool: {Tool}", tool);
+                var result = await environmentService.ExecuteAsync(toolPath, Array.Empty<string>(), cancellationToken);
                 
                 return Results.Json(new ToolLaunchResult(true, result.ExitCode, result.StandardOutput, result.StandardError),
                     AppJsonContext.Default.ToolLaunchResult);
