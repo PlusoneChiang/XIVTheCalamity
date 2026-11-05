@@ -1,4 +1,5 @@
 using XIVTheCalamity.DTOs;
+using XIVTheCalamity.Services;
 using XIVTheCalamity.Core.Models;
 using XIVTheCalamity.Core.Services;
 using XIVTheCalamity.Platform;
@@ -34,7 +35,9 @@ public static class ConfigEndpoints
 
         // PUT /api/config
         group.MapPut("/", async (
+            HttpContext context,
             [Microsoft.AspNetCore.Mvc.FromQuery(Name = "profile")] string? profile,
+            [Microsoft.AspNetCore.Mvc.FromQuery] bool? deferRestart,
             AppConfig config,
             ConfigService configService,
             XIVTheCalamity.Services.EventBroadcastHub eventHub,
@@ -48,6 +51,8 @@ public static class ConfigEndpoints
                 var pathService = PlatformPathService.Instance;
                 if (string.IsNullOrEmpty(profile) || profile == pathService.ActiveProfile)
                 {
+                    // 建立新設定檔時先完成帳號綁定，最後切換設定檔才重新啟動。
+                    if (deferRestart != true && RestartIfAnnouncementModeChanged(context, config) is { } restartError) return restartError;
                     XIVTheCalamity.MainWindowContainer.UpdateDevMode(config.Launcher.DevelopmentMode);
                     try
                     {
@@ -174,6 +179,7 @@ public static class ConfigEndpoints
         });
 
         group.MapPost("/reset", async (
+            HttpContext context,
             ConfigService configService,
             XIVTheCalamity.Services.EventBroadcastHub eventHub,
             ILogger<Program> logger) =>
@@ -182,6 +188,7 @@ public static class ConfigEndpoints
             {
                 logger.LogInformation("Resetting application config to default");
                 var config = await configService.ResetToDefaultAsync();
+                if (RestartIfAnnouncementModeChanged(context, config) is { } restartError) return restartError;
                 XIVTheCalamity.MainWindowContainer.UpdateDevMode(config.Launcher.DevelopmentMode);
                 try
                 {
@@ -340,6 +347,7 @@ public static class ConfigEndpoints
 
         // POST /api/config/profiles/switch (Switch active profile persistently)
         group.MapPost("/profiles/switch", async (
+            HttpContext context,
             ProfileSwitchRequest request,
             ConfigService configService,
             ILogger<Program> logger) =>
@@ -353,6 +361,7 @@ public static class ConfigEndpoints
 
                 pathService.SwitchProfile(targetName);
                 var config = await configService.LoadConfigAsync();
+                if (RestartIfAnnouncementModeChanged(context, config) is { } restartError) return restartError;
 
                 return Results.Ok(ApiResponse<AppConfig>.Ok(config));
             }
@@ -414,4 +423,17 @@ public static class ConfigEndpoints
             CopyDirectoryRecursive(folder, dest);
         }
     }
+    private static IResult? RestartIfAnnouncementModeChanged(HttpContext context, AppConfig config)
+    {
+        var mode = config.Launcher.AnnouncementMode == "official" ? "official" : "local";
+        if (mode == Program.AnnouncementMode) return null;
+        try { LauncherRestart.Schedule(context); return null; }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "設定已儲存，但無法重新啟動啟動器");
+            return Results.Json(ApiErrorResponse.Create("RESTART_FAILED", "設定已儲存，但無法自動重新啟動；請手動重新啟動啟動器。", ex.Message),
+                AppJsonContext.Default.ApiErrorResponse, statusCode: 500);
+        }
+    }
+
 }

@@ -14,6 +14,7 @@ import { startDalamudUpdate, cancelDalamudUpdate, handleDalamudConfigChanged, is
 import { initAppUpdater, showRosettaDialog } from './appUpdater.js';
 import { handleApiResponse, getErrorMessage as getApiErrorMessage } from '../../utils/apiError.js';
 import { applyTheme } from '../../utils/theme.js';
+import { initNews } from './news.js';
 
 // Constants
 const SITE_KEY = "6Ld6VmorAAAAANQdQeqkaOeScR42qHC7Hyalq00r";
@@ -45,55 +46,6 @@ let remainExpireTime = null;
 let sessionObtainedAt = null;
 
 /**
- * Setup news iframe link click interception to open external links in default browser
- */
-function setupIframeInterception() {
-  const newsFrame = document.getElementById('newsFrame');
-  if (!newsFrame) return;
-
-  const attachListener = () => {
-    try {
-      const iframeDoc = newsFrame.contentDocument || newsFrame.contentWindow.document;
-      if (iframeDoc) {
-        // Prevent duplicate listeners
-        if (iframeDoc.dataset && iframeDoc.dataset.clickIntercepted) return;
-        if (iframeDoc.dataset) {
-          iframeDoc.dataset.clickIntercepted = "true";
-        } else {
-          if (iframeDoc.documentElement && iframeDoc.documentElement.getAttribute('data-click-intercepted')) return;
-          iframeDoc.documentElement.setAttribute('data-click-intercepted', 'true');
-        }
-
-        console.log('[Login] Attaching click listener to news iframe');
-        iframeDoc.addEventListener('click', (e) => {
-          const anchor = e.target.closest('a');
-          if (anchor && anchor.href) {
-            e.preventDefault();
-            console.log('[Login] Intercepted link click in news iframe:', anchor.href);
-            window.xivtc.openExternal(anchor.href);
-          }
-        });
-      }
-    } catch (e) {
-      console.warn('[Login] newsFrame contentDocument is not accessible:', e.message);
-    }
-  };
-
-  newsFrame.addEventListener('load', attachListener);
-  attachListener();
-  
-  // Poll to handle dynamic navigation within the iframe
-  let attempts = 0;
-  const interval = setInterval(() => {
-    attempts++;
-    attachListener();
-    if (attempts >= 20) {
-      clearInterval(interval);
-    }
-  }, 1000);
-}
-
-/**
  * Initialize the login page
  */
 async function init() {
@@ -106,9 +58,6 @@ async function init() {
     return;
   }
 
-  // Intercept clicks in the news iframe
-  setupIframeInterception();
-  
   // Set platform-specific class on body
   const platform = window.xivtc.getPlatform();
   const platformClass = platform === 'darwin' ? 'platform-darwin' : (platform === 'win32' ? 'platform-windows' : 'platform-linux');
@@ -145,6 +94,7 @@ async function init() {
   }
   
   // Load version
+  initNews();
   loadVersion();
   
   // Initialize account management

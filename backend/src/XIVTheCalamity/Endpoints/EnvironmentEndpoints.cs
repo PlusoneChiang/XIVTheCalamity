@@ -12,7 +12,6 @@ namespace XIVTheCalamity.Endpoints;
 public static class EnvironmentEndpoints
 {
     private static readonly SemaphoreSlim RosettaInstallLock = new(1, 1);
-    private static int _restartScheduled;
 
     public static void MapEnvironmentEndpoints(this WebApplication app)
     {
@@ -175,50 +174,13 @@ public static class EnvironmentEndpoints
             if (!context.Request.HasJsonContentType() ||
                 RosettaAvailabilityCheck.Check(default) != RosettaAvailability.Available)
                 return RosettaError("NOT_READY", 400);
-            if (Interlocked.CompareExchange(ref _restartScheduled, 1, 0) != 0)
-                return RosettaError("RESTART_IN_PROGRESS", 409);
             try
             {
-                var window = MainWindowContainer.MainWindow
-                    ?? throw new InvalidOperationException("找不到啟動器視窗。");
-                var restart = new ProcessStartInfo("/bin/sh") { UseShellExecute = false };
-                restart.ArgumentList.Add("-c");
-                // 參數獨立傳入 shell，並等目前程序退出後再開啟，避免埠號衝突。
-                restart.ArgumentList.Add("while /bin/kill -0 \"$1\" 2>/dev/null; do /bin/sleep 1; done; shift; exec \"$@\"");
-                restart.ArgumentList.Add("xivtc-restart");
-                restart.ArgumentList.Add(Environment.ProcessId.ToString());
-                var bundlePath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", ".."));
-                if (bundlePath.EndsWith(".app", StringComparison.OrdinalIgnoreCase) && Directory.Exists(bundlePath))
-                {
-                    restart.ArgumentList.Add("/usr/bin/env");
-                    restart.ArgumentList.Add("-i");
-                    restart.ArgumentList.Add("/usr/bin/open");
-                    restart.ArgumentList.Add("-n");
-                    restart.ArgumentList.Add(bundlePath);
-                }
-                else
-                {
-                    var executable = Environment.ProcessPath
-                        ?? throw new InvalidOperationException("找不到啟動器執行檔。");
-                    restart.ArgumentList.Add(executable);
-                    var arguments = Environment.GetCommandLineArgs();
-                    if (Path.GetFileNameWithoutExtension(executable).Equals("dotnet", StringComparison.OrdinalIgnoreCase))
-                        restart.ArgumentList.Add(arguments[0]);
-                    foreach (var argument in arguments.Skip(1))
-                        restart.ArgumentList.Add(argument);
-                }
-                using var process = Process.Start(restart)
-                    ?? throw new InvalidOperationException("無法啟動重新啟動程序。");
-                context.Response.OnCompleted(() =>
-                {
-                    window.Invoke(() => window.Close());
-                    return Task.CompletedTask;
-                });
+                LauncherRestart.Schedule(context);
                 return Results.Json(ApiResponse<string>.Ok("restarting"), AppJsonContext.Default.ApiResponseString);
             }
             catch (Exception ex)
             {
-                Interlocked.Exchange(ref _restartScheduled, 0);
                 logger.LogError(ex, "[ROSETTA] 無法重新啟動 Launcher");
                 return RosettaError("RESTART_FAILED", 500);
             }

@@ -275,6 +275,8 @@ public class ConfigService
     /// </summary>
     private void ValidateConfig(AppConfig config)
     {
+        if (config.Launcher.AnnouncementMode is not ("local" or "official"))
+            throw new ArgumentException("公告模式必須是 local 或 official。");
         // Validate gamePath if not empty
         if (!string.IsNullOrEmpty(config.Game.GamePath) && !Directory.Exists(config.Game.GamePath))
         {

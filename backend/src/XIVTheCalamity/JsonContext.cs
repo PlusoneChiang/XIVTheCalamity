@@ -56,6 +56,11 @@ namespace XIVTheCalamity;
 [JsonSerializable(typeof(MessageDialogRequest))]
 [JsonSerializable(typeof(MessageDialogResponse))]
 [JsonSerializable(typeof(BroadcastEventRequest))]
+[JsonSerializable(typeof(NewsBanner))]
+[JsonSerializable(typeof(NewsBanner[]))]
+[JsonSerializable(typeof(NewsItem))]
+[JsonSerializable(typeof(NewsItem[]))]
+[JsonSerializable(typeof(NewsResponse))]
 [JsonSerializable(typeof(EventStreamItem))]
 
 // API Response Wrappers
@@ -70,6 +75,7 @@ namespace XIVTheCalamity;
 [JsonSerializable(typeof(ApiResponse<StorageResponse>))]
 [JsonSerializable(typeof(ApiResponse<VersionInfoResponse>))]
 [JsonSerializable(typeof(ApiResponse<MessageDialogResponse>))]
+[JsonSerializable(typeof(ApiResponse<NewsResponse>))]
 [JsonSerializable(typeof(ApiResponse<GenericActionResponse>))]
 [JsonSerializable(typeof(ApiResponse<SelectDirectoryResponse>))]
 [JsonSerializable(typeof(ApiResponse<ValidateDirectoryResponse>))]

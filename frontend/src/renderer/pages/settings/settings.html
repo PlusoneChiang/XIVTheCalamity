@@ -40,6 +40,15 @@
                   <span data-i18n="settings.general.enable_pre_release">接收測試通道更新</span>
                 </label>
               </div>
+              <div style="margin-top: 16px;">
+                <label for="announcementMode" data-i18n="settings.general.announcement_mode">公告模式</label>
+                <select id="announcementMode">
+                  <option value="local" data-i18n="settings.general.announcement_mode_local">本機版面（建議）</option>
+                  <option value="official" data-i18n="settings.general.announcement_mode_official">官方公告頁</option>
+                </select>
+                <p class="help-text" data-i18n="settings.general.announcement_mode_local_help">本機版面只顯示公告資料，不執行公告頁的外部 JavaScript。</p>
+                <p class="help-text" data-i18n="settings.general.announcement_mode_official_help">官方公告頁會載入其外部內容與 JavaScript；選擇此模式代表你接受較高風險。模式變更後會自動重新啟動啟動器。</p>
+              </div>
             </div>
             <div class="checkbox-group">
               <label>

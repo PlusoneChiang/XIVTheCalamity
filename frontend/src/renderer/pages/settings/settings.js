@@ -5,7 +5,7 @@
 import '../../utils/polyfill.js';
 import i18n from '../../i18n/index.js';
 import { applyTheme } from '../../utils/theme.js';
-import { getLastUsedAccount, deleteOTPSecret, getAccountsWithProfiles, bindProfile, unbindProfile } from '../../utils/credentialsStore.js';
+import { getLastUsedAccount, deleteOTPSecret, getAccountsWithProfiles, getBoundProfile, bindProfile, unbindProfile } from '../../utils/credentialsStore.js';
 
 let currentConfig = null;
 let currentPlatform = 'win32';
@@ -225,6 +225,7 @@ function populateForm(config, applyVisuals = false) {
     }
     document.getElementById('debugLogging').checked = config.launcher.developmentMode || false;
     document.getElementById('enablePreRelease').checked = config.launcher.enablePreRelease || false;
+    document.getElementById('announcementMode').value = config.launcher.announcementMode === 'official' ? 'official' : 'local';
     updateDebugOnlyVisibility();
     
     const savedTheme = config.launcher.theme || 'dark';
@@ -292,6 +293,7 @@ function collectFormData() {
     launcher: {
       developmentMode: document.getElementById('debugLogging').checked,
       enablePreRelease: document.getElementById('enablePreRelease').checked,
+      announcementMode: document.getElementById('announcementMode').value === 'official' ? 'official' : 'local',
       language: document.getElementById('language').value,
       theme: document.querySelector('input[name="theme"]:checked')?.value || 'dark',
       // Preserve showDalamudTab from current config (set via Konami code)
@@ -383,7 +385,7 @@ async function persistConfig(closeWindow) {
     });
     
     if (!response.ok) {
-      throw new Error(response.data?.message || response.statusText || 'Save failed');
+      throw new Error(response.data?.error?.message || response.data?.message || response.statusText || 'Save failed');
     }
     
     console.log('[Settings] Config saved successfully for profile:', selectedProfile);
@@ -424,7 +426,7 @@ async function persistConfig(closeWindow) {
   } catch (error) {
     console.error('[Settings] Failed to save configuration:', error);
     hideLoadingOverlay();
-    showError(i18n.t('settings.save_failed'));
+    showError(error.message || i18n.t('settings.save_failed'));
   }
 }
 
@@ -1194,6 +1196,32 @@ function showConfirmModal(title, message) {
   });
 }
 
+async function switchProfileWithBinding(targetProfile, activeEmail, accounts) {
+  const canBind = !!activeEmail && accounts.some(account => account.email === activeEmail);
+  let previousProfile = null;
+  if (canBind) {
+    previousProfile = await getBoundProfile(activeEmail);
+    if (!await bindProfile(activeEmail, targetProfile)) {
+      throw new Error('無法儲存帳號與設定檔的關聯。');
+    }
+  }
+
+  const response = await window.xivtc.backend.call('/api/config/profiles/switch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: targetProfile })
+  });
+  if (response.ok) return response;
+
+  const error = response.data?.error;
+  if (canBind && error?.code !== 'RESTART_FAILED') {
+    if (!await bindProfile(activeEmail, previousProfile)) {
+      throw new Error('切換設定檔失敗，且無法還原帳號綁定；請重新確認帳號使用的設定檔。');
+    }
+  }
+  throw new Error(error?.message || response.data?.message || response.statusText || '切換設定檔失敗');
+}
+
 /**
  * Initialize Profile Section
  */
@@ -1397,20 +1425,11 @@ async function initProfileSection() {
             
             // Directly switch to target profile (discard unsaved changes)
             // 直接切換設定檔，放棄當前未儲存的變更
-            const switchResponse = await window.xivtc.backend.call('/api/config/profiles/switch', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ name: targetProfile })
-            });
+            const switchResponse = await switchProfileWithBinding(targetProfile, activeEmail, accounts);
             
             if (switchResponse.ok) {
               const oldGamePath = currentConfig?.game?.gamePath || '';
               const oldDalamudEnabled = currentConfig?.dalamud?.enabled || false;
-
-              // Bind current active account to this profile
-              if (activeEmail) {
-                await bindProfile(activeEmail, targetProfile);
-              }
 
               // 3. Load target profile settings into UI
               await loadConfig(targetProfile, true); // true to apply theme immediately
@@ -1432,7 +1451,7 @@ async function initProfileSection() {
             }
           } catch (err) {
             console.error('[Settings] Failed to switch profile:', err);
-            showError(i18n.t('settings.save_failed'));
+            showError(err.message || i18n.t('settings.save_failed'));
           } finally {
             hideLoadingOverlay();
           }
@@ -1465,14 +1484,7 @@ async function initProfileSection() {
                 await unbindProfile(p);
                 if (currentSelectedProfile === p) {
                   // Deleted the active profile → switch to default, notify, refresh list (do NOT close)
-                  const switchRes = await window.xivtc.backend.call('/api/config/profiles/switch', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: 'default' })
-                  });
-                  if (switchRes.ok && activeEmail) {
-                    await bindProfile(activeEmail, 'default');
-                  }
+                  await switchProfileWithBinding('default', activeEmail, accounts);
                   await loadConfig('default', true);
                   await window.xivtc.events.send('config-changed', {
                     gamePathChanged: true,
@@ -1486,6 +1498,7 @@ async function initProfileSection() {
               }
             } catch (err) {
               console.error('[Settings] Failed to delete profile:', err);
+              showError(err.message || i18n.t('settings.save_failed'));
             } finally {
               hideLoadingOverlay();
             }
@@ -1546,11 +1559,14 @@ async function initProfileSection() {
         
         // 1. Save current profile changes
         const currentForm = collectFormData();
-        await window.xivtc.backend.call(`/api/config?profile=${currentSelectedProfile}`, {
+        const saveResponse = await window.xivtc.backend.call(`/api/config?profile=${currentSelectedProfile}&deferRestart=true`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: currentForm
         });
+        if (!saveResponse.ok) {
+          throw new Error(saveResponse.data?.error?.message || saveResponse.data?.message || saveResponse.statusText || 'Save failed');
+        }
         
         // 2. Create new profile immediately
         const addResponse = await window.xivtc.backend.call('/api/config/profiles', {
@@ -1577,15 +1593,7 @@ async function initProfileSection() {
           }
           
           // 4. Switch persistently to the new profile
-          const switchRes = await window.xivtc.backend.call('/api/config/profiles/switch', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: sanitized })
-          });
-          
-          if (switchRes.ok && activeEmail) {
-            await bindProfile(activeEmail, sanitized);
-          }
+          await switchProfileWithBinding(sanitized, activeEmail, accounts);
           
           const oldGamePath = currentConfig?.game?.gamePath || '';
           const oldDalamudEnabled = currentConfig?.dalamud?.enabled || false;
@@ -1609,6 +1617,7 @@ async function initProfileSection() {
         }
       } catch (err) {
         console.error('[Settings] Failed to add profile:', err);
+        showError(err.message || i18n.t('settings.save_failed'));
       } finally {
         hideLoadingOverlay();
       }

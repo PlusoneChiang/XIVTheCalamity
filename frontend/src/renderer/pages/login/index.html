@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="../../styles/themes.css">
     <link rel="stylesheet" href="../../styles.css">
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="news.css">
 </head>
 <body>
     <!-- Draggable Title Bar -->
@@ -34,13 +35,10 @@
     
     <div class="container">
         <!-- News Section (Left 60%) -->
-        <div class="news-section">
-            <iframe 
-                id="newsFrame" 
-                src="https://user-cdn.ffxiv.com.tw/news/251115/launcher_left.html"
-                frameborder="0"
-                allowtransparency="true">
-            </iframe>
+        <div class="news-section" id="newsSection">
+            <div class="local-news" id="localNews" aria-live="polite">
+                <p class="local-news-status">載入官方公告中…</p>
+            </div>
         </div>
         
         <!-- Login Section (Right 40%) -->

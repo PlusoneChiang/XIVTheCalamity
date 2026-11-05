@@ -7,6 +7,19 @@
 
 /* Dark (default) */
 :root {
+  /* 本機公告卡片使用對應主題的高對比配色。 */
+  --news-bg: #242426;
+  --news-text: #eee9e0;
+  --news-muted: #b5afa5;
+  --news-accent: #dfbf85;
+  --news-surface: #323235;
+  --news-selected: #46413a;
+  --news-hover: #303032;
+  --news-border: #464448;
+  --news-badge-bg: #3b3325;
+  --news-badge-border: #716044;
+  --news-scheme: dark;
+
   --color-text:          rgba(255, 255, 255, 0.95);
   --color-text-muted:    rgba(255, 255, 255, 0.65);
   --color-text-faint:    rgba(255, 255, 255, 0.40);
@@ -21,6 +34,19 @@
 
 /* Light */
 html[data-theme="light"] {
+  /* 本機公告卡片使用對應主題的高對比配色。 */
+  --news-bg: #f7f5f0;
+  --news-text: #393630;
+  --news-muted: #6b6357;
+  --news-accent: #785924;
+  --news-surface: #ebe7df;
+  --news-selected: #fffdf9;
+  --news-hover: #eeebe4;
+  --news-border: #dfd9ce;
+  --news-badge-bg: #f3ead7;
+  --news-badge-border: #c6ad7c;
+  --news-scheme: light;
+
   --color-text:          #1a1a2e;
   --color-text-muted:    rgba(26, 26, 46, 0.65);
   --color-text-faint:    rgba(26, 26, 46, 0.40);
@@ -35,6 +61,19 @@ html[data-theme="light"] {
 
 /* Valentine */
 html[data-theme="valentine"] {
+  /* 本機公告卡片使用對應主題的高對比配色。 */
+  --news-bg: #fff2f5;
+  --news-text: #58333f;
+  --news-muted: #865765;
+  --news-accent: #a14460;
+  --news-surface: #f3dbe3;
+  --news-selected: #fffafd;
+  --news-hover: #f9e4eb;
+  --news-border: #e3bdca;
+  --news-badge-bg: #f5dae3;
+  --news-badge-border: #c38a9c;
+  --news-scheme: light;
+
   --color-text:          rgba(255, 255, 255, 0.95);
   --color-text-muted:    rgba(255, 255, 255, 0.70);
   --color-text-faint:    rgba(255, 255, 255, 0.45);
