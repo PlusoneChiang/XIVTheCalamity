@@ -1,5 +1,14 @@
 # Release Notes
 
+## v2.3.1
+#### 🇹🇼 zh-TW
+- 限制檔案存取與工具執行權限，外部網頁僅允許開啟官方 HTTPS 網域。
+- macOS 最低系統需求提高至 15.6。
+
+#### 🇺🇸 English
+- Restricted file access and tool execution permissions, and limited external links to official HTTPS domains.
+- Raised the minimum macOS requirement to 15.6.
+
 ## v2.3.0
 #### 🇹🇼 zh-TW
 - 新增本機公告模式，取代官方公告版面，降低外部JS注入風險。
