@@ -122,24 +122,8 @@ public static class GameEndpoints
                         }
                     }
 
-                    try
-                    {
-                        logger.LogInformation("[GAME] Waiting for EntryPoint fake launch game exit...");
-                        if (entryResult.InjectorProcess != null)
-                        {
-                            await entryResult.InjectorProcess.WaitForExitAsync(cancellationToken);
-                            var exitCode = entryResult.InjectorProcess.ExitCode;
-                            logger.LogInformation("[GAME] Game exited with code: {ExitCode}", exitCode);
-                            return Results.Ok(ApiResponse<GameLaunchResponse>.Ok(
-                                new GameLaunchResponse(reportedPid, exitCode)));
-                        }
-                        else
-                        {
-                            return Results.Ok(ApiResponse<GameLaunchResponse>.Ok(
-                                new GameLaunchResponse(reportedPid, 0)));
-                        }
-                    }
-                    finally { }
+                    return Results.Ok(ApiResponse<GameLaunchResponse>.Ok(
+                        new GameLaunchResponse(reportedPid)));
                 }
                 
                 var result = await gameLaunchService.FakeLaunchAsync(
@@ -149,7 +133,7 @@ public static class GameEndpoints
                     config.Dalamud.Enabled ? config.Dalamud.PluginRepoUrl : null,
                     cancellationToken);
                 
-                if (result.Success && result.Process != null)
+                if (result.Success)
                 {
                     logger.LogInformation("[GAME] Fake launch successful, PID: {Pid}", result.ProcessId);
                     
@@ -166,22 +150,8 @@ public static class GameEndpoints
                             CancellationToken.None);
                     }
 
-                    try
-                    {
-                        logger.LogInformation("[GAME] Waiting for game exit...");
-                        await result.Process.WaitForExitAsync(cancellationToken);
-                        var exitCode = result.Process.ExitCode;
-                        logger.LogInformation("[GAME] Game exited with code: {ExitCode}", exitCode);
-                        return Results.Ok(ApiResponse<GameLaunchResponse>.Ok(
-                            new GameLaunchResponse(result.ProcessId ?? 0, exitCode)));
-                    }
-                    finally { }
-                }
-                else if (result.Success)
-                {
-                    logger.LogWarning("[GAME] Fake launch started but process reference lost");
                     return Results.Ok(ApiResponse<GameLaunchResponse>.Ok(
-                        new GameLaunchResponse(result.ProcessId ?? 0, -1)));
+                        new GameLaunchResponse(result.ProcessId ?? 0)));
                 }
                 else
                 {

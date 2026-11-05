@@ -817,6 +817,7 @@ async function handleTestLaunch() {
   const overlay = document.getElementById('gameRunningOverlay');
   const exitCodeDialog = document.getElementById('exitCodeDialog');
   const exitCodeMessage = document.getElementById('exitCodeMessage');
+  let launched = false;
   
   try {
     console.log('[Settings] Test launch requested');
@@ -830,43 +831,36 @@ async function handleTestLaunch() {
       method: 'POST'
     });
     
-    // Hide overlay
-    overlay.style.display = 'none';
-    
     if (response.ok && response.data) {
-      // Handle new API response format
-      const result = response.data.success ? response.data.data : response.data;
+      launched = true;
+      const exitResponse = await window.xivtc.backend.call('/api/game/wait-exit', {
+        method: 'GET'
+      });
+      if (!exitResponse.ok || !exitResponse.data) {
+        throw new Error(exitResponse.data?.error?.message || 'Failed to wait for game exit');
+      }
+      const result = exitResponse.data.success ? exitResponse.data.data : exitResponse.data;
       const exitCode = result.exitCode;
       console.log('[Settings] Game exited with code:', exitCode);
       
       // Check if exit code is abnormal (not 0 or 1)
-      if (exitCode !== 0 && exitCode !== 1) {
+      if (exitCode !== 0 && exitCode !== 1 && exitCode !== null) {
         // Show exit code dialog
         exitCodeMessage.textContent = i18n.t('settings.general.abnormal_exit', { code: exitCode }) 
           || `遊戲異常結束，Exit Code: ${exitCode}`;
         exitCodeDialog.style.display = 'flex';
-      } else {
-        // Normal exit
-        button.textContent = i18n.t('settings.general.test_success') || '測試完成';
-        setTimeout(() => {
-          button.disabled = false;
-          button.textContent = originalText;
-        }, 2000);
       }
       
-      button.disabled = false;
-      button.textContent = originalText;
     } else {
       const errorMsg = response.data?.error?.message || response.data?.error || 'Unknown error';
       console.error('[Settings] Test launch failed:', errorMsg);
       alert(i18n.t('settings.general.test_failed') + ': ' + errorMsg);
-      button.disabled = false;
-      button.textContent = originalText;
     }
   } catch (error) {
-    console.error('[Settings] Test launch exception:', error);
+    console.error(launched ? '[Settings] Wait for exit error:' : '[Settings] Test launch exception:', error);
+    if (!launched) alert(i18n.t('settings.general.test_failed') + ': ' + error.message);
+  } finally {
     overlay.style.display = 'none';
-    alert(i18n.t('settings.general.test_failed') + ': ' + error.message);
     button.disabled = false;
     button.textContent = originalText;
   }
