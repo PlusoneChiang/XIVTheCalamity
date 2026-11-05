@@ -1,0 +1,6 @@
+<Project>
+  <ItemGroup>
+    <!-- 發布參數也會套用至程式庫，因此統一所有專案的 AOT 編譯器版本。 -->
+    <KnownILCompilerPack Update="Microsoft.DotNet.ILCompiler" ILCompilerPackVersion="10.0.14" />
+  </ItemGroup>
+</Project>

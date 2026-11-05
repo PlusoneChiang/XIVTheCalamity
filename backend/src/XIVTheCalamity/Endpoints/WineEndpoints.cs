@@ -36,6 +36,8 @@ public static class WineEndpoints
             {
                 var config = await configService.LoadConfigAsync();
                 var wineConfig = config.Wine;
+                if (wineConfig == null)
+                    return Results.BadRequest(ApiErrorResponse.Create("CONFIG_INVALID", "尚未設定 Wine，無法啟動工具。"));
                 
                 logger.LogInformation("Launching Wine tool with config: WINEDEBUG={WineDebug}, Msync={Msync}",
                     wineConfig.WineDebug, wineConfig.Msync);

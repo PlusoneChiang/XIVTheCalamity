@@ -5,6 +5,7 @@ using XIVTheCalamity.Dalamud.Models;
 using XIVTheCalamity.DTOs;
 using XIVTheCalamity.Platform.MacOS.Wine;
 using XIVTheCalamity.Platform.MacOS.Discord;
+using XIVTheCalamity.Game.Models;
 
 namespace XIVTheCalamity;
 
@@ -27,6 +28,7 @@ namespace XIVTheCalamity;
 [JsonSerializable(typeof(XIVTheCalamity.Core.Models.GitHubAsset))]
 [JsonSerializable(typeof(XIVTheCalamity.Core.Models.AppUpdateCheckResult))]
 [JsonSerializable(typeof(XIVTheCalamity.Core.Models.AppUpdateProgress))]
+[JsonSerializable(typeof(GameVersionInfo))]
 
 // Wine Services (needed for DI parameter resolution on Windows)
 [JsonSerializable(typeof(WineConfigService))]
@@ -72,8 +74,8 @@ namespace XIVTheCalamity;
 [JsonSerializable(typeof(ApiResponse<WineCompatConfig>))]
 [JsonSerializable(typeof(ApiResponse<LoginData>))]
 [JsonSerializable(typeof(ApiResponse<string>))]
-[JsonSerializable(typeof(ApiResponse<object>))]
 [JsonSerializable(typeof(ApiResponse<AppUpdateCheckResult>))]
+[JsonSerializable(typeof(ApiResponse<GameVersionInfo>))]
 [JsonSerializable(typeof(ApiResponse<StorageResponse>))]
 [JsonSerializable(typeof(ApiResponse<VersionInfoResponse>))]
 [JsonSerializable(typeof(ApiResponse<MessageDialogResponse>))]
@@ -81,6 +83,8 @@ namespace XIVTheCalamity;
 [JsonSerializable(typeof(ApiResponse<GenericActionResponse>))]
 [JsonSerializable(typeof(ApiResponse<SelectDirectoryResponse>))]
 [JsonSerializable(typeof(ApiResponse<ValidateDirectoryResponse>))]
+[JsonSerializable(typeof(ApiResponse<ConfigPathResponse>))]
+[JsonSerializable(typeof(ApiResponse<DalamudPathsResponse>))]
 [JsonSerializable(typeof(GenericActionResponse))]
 [JsonSerializable(typeof(SelectDirectoryResponse))]
 [JsonSerializable(typeof(ValidateDirectoryResponse))]
@@ -147,6 +151,7 @@ public record ConfigPathResponse(string Path);
 public record VersionResponse(string? BootVersion, string? GameVersion);
 public record UpdateCheckResponse(bool HasUpdates, string? BootVersion, string? GameVersion, int PatchCount);
 public record DalamudStatusResponse(DalamudStatus Status, string? Version);
+public record DalamudPathsResponse(string BasePath, string HooksPath, string RuntimePath, string AssetsPath, string ConfigPath, string PluginsPath, string InjectorPath);
 
 // SSE specific types
 public record SseMessage(string Message);

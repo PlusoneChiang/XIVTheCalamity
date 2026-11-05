@@ -74,17 +74,15 @@ public static class DalamudEndpoints
         {
             try
             {
-                var paths = new
-                {
-                    basePath = pathService.BasePath,
-                    hooksPath = pathService.HooksPath,
-                    runtimePath = pathService.RuntimePath,
-                    assetsPath = pathService.AssetsPath,
-                    configPath = pathService.ConfigPath,
-                    pluginsPath = pathService.PluginsPath,
-                    injectorPath = pathService.InjectorPath
-                };
-                return Results.Ok(ApiResponse<object>.Ok(paths));
+                var paths = new DalamudPathsResponse(
+                    pathService.BasePath,
+                    pathService.HooksPath,
+                    pathService.RuntimePath,
+                    pathService.AssetsPath,
+                    pathService.ConfigPath,
+                    pathService.PluginsPath,
+                    pathService.InjectorPath);
+                return Results.Ok(ApiResponse<DalamudPathsResponse>.Ok(paths));
             }
             catch (Exception ex)
             {

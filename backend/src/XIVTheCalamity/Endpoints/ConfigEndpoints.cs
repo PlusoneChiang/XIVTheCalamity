@@ -139,6 +139,7 @@ public static class ConfigEndpoints
                 // Wine configuration
                 if (partialConfig.Wine != null)
                 {
+                    currentConfig.Wine ??= new WineConfig();
                     currentConfig.Wine.MetalFxSpatialEnabled = partialConfig.Wine.MetalFxSpatialEnabled;
                     currentConfig.Wine.MetalFxSpatialFactor = partialConfig.Wine.MetalFxSpatialFactor;
                     currentConfig.Wine.Metal3PerformanceOverlay = partialConfig.Wine.Metal3PerformanceOverlay;
@@ -427,7 +428,7 @@ public static class ConfigEndpoints
                 }
 
                 logger.LogInformation("Deleted profile: {Name}", name);
-                return Results.Ok(ApiResponse<object>.Ok(new { success = true }));
+                return Results.Ok(ApiResponse<GenericActionResponse>.Ok(new GenericActionResponse(true)));
             }
             catch (Exception ex)
             {

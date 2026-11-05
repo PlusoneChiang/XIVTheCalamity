@@ -154,7 +154,7 @@ public class Program
                         Log.Warning(ex, "[VirtualHost] Failed to handle local intercept for scheme {Scheme}: {Request}", scheme, request);
                     }
 
-                    contentType = null;
+                    contentType = "text/plain";
                     return scheme == "https" ? null : System.IO.Stream.Null;
                 })
                 .Center()
@@ -385,11 +385,11 @@ public class Program
         // 套用 Serilog
         builder.Host.UseSerilog();
 
-        // 設置 JSON Source Generator 解決器 (開發環境相容反射)
+        // 設置 JSON Source Generator 解決器，供 NativeAOT 發布使用。
         builder.Services.ConfigureHttpJsonOptions(options =>
         {
-            options.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonContext.Default);
-            options.SerializerOptions.TypeInfoResolverChain.Add(new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver());
+            options.SerializerOptions.TypeInfoResolverChain.Clear();
+            options.SerializerOptions.TypeInfoResolverChain.Add(AppJsonContext.Default);
         });
 
         // 註冊 Config 服務與 Discord RPC

@@ -7,6 +7,7 @@ using XIVTheCalamity.Helpers;
 using XIVTheCalamity.Core.Models.Progress;
 using XIVTheCalamity.Core.Services;
 using XIVTheCalamity.Game.Services;
+using XIVTheCalamity.Game.Models;
 using XIVTheCalamity.Services;
 using XIVTheCalamity.Core.Models;
 
@@ -32,7 +33,7 @@ public static class UpdateEndpoints
                 }
 
                 var versions = versionService.GetLocalVersions(gamePath);
-                return Results.Ok(ApiResponse<object>.Ok(versions));
+                return Results.Ok(ApiResponse<GameVersionInfo>.Ok(versions));
             }
             catch (Exception ex)
             {

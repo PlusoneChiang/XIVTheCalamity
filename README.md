@@ -23,7 +23,7 @@
 - **[XIVLauncher](https://github.com/goatcorp/FFXIVQuickLauncher)**
 - **[XIVLauncher.Core](https://github.com/goatcorp/XIVLauncher.Core)**
 
-本專案採用 **Photino.NET** 作為跨平台桌面 UI 框架，搭配 **.NET 9 (NativeAOT)** 後端，並將前端靜態資源直接內建打包為內嵌資源（Resource），實現了高安全性、極低資源佔用與高速啟動的跨平台架構設計。
+本專案採用 **Photino.NET** 作為跨平台桌面 UI 框架，搭配 **.NET 10 (NativeAOT)** 後端，並將前端靜態資源直接內建打包為內嵌資源（Resource），實現了高安全性、極低資源佔用與高速啟動的跨平台架構設計。
 
 ### 🎯 設計目標
 
@@ -94,8 +94,8 @@
 └─────────────────┬───────────────────┘
                   │ In-Process / REST API
 ┌─────────────────┴───────────────────┐
-│     ASP.NET Core 9 (NativeAOT)      │
-│    ├─ Runtime: .NET 9 NativeAOT     │
+│     ASP.NET Core 10 (NativeAOT)      │
+│    ├─ Runtime: .NET 10 NativeAOT     │
 │    ├─ API: RESTful                  │
 │    └─ Logging: Serilog              │
 └─────────────────┬───────────────────┘
@@ -121,7 +121,7 @@
 | 組件 | 技術 | 用途 |
 |------|------|------|
 | **UI 視窗** | Photino.NET + HTML/CSS/JS | 輕量化跨平台桌面 UI 視窗 |
-| **後端核心** | ASP.NET Core 9 NativeAOT | 遊戲邏輯、下載更新、平台與帳號管理 |
+| **後端核心** | ASP.NET Core 10 NativeAOT | 遊戲邏輯、下載更新、平台與帳號管理 |
 | **Wine (macOS)** | Wine Crossover (Fork) | macOS Wine 運行環境 |
 | **Wine (Linux)** | GE-Proton 11 | Linux Wine 運行環境（自動下載 AppImage 包裝）|
 
@@ -133,7 +133,7 @@ XIVTheCalamity/
 │   ├── src/               # UI 頁面與組件
 │   └── scripts/           # 前端資源編譯與嵌入腳本
 │
-├── backend/               # .NET 9 NativeAOT 後端
+├── backend/               # .NET 10 NativeAOT 後端
 │   └── src/
 │       ├── XIVTheCalamity.Api.NativeAOT/ # NativeAOT REST API 主機
 │       ├── XIVTheCalamity.Core/           # 核心模型與配置邏輯
@@ -188,7 +188,7 @@ XIVTheCalamity/
 
 ### 開發需求
 - Node.js 20+
-- .NET 9 SDK
+- .NET 10 SDK
 
 ### 快速建置 (無簽署開發版)
 

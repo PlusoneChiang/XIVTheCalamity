@@ -108,28 +108,20 @@ public class WineConfigService
                     // 讀取並寫入 stdout
                     var stdoutTask = Task.Run(async () =>
                     {
-                        while (!process.StandardOutput.EndOfStream)
+                        while (await process.StandardOutput.ReadLineAsync() is { } line)
                         {
-                            var line = await process.StandardOutput.ReadLineAsync();
-                            if (line != null)
-                            {
-                                await logFile.WriteLineAsync($"[OUT] {line}");
-                                await logFile.FlushAsync();
-                            }
+                            await logFile.WriteLineAsync($"[OUT] {line}");
+                            await logFile.FlushAsync();
                         }
                     });
 
                     // 讀取並寫入 stderr
                     var stderrTask = Task.Run(async () =>
                     {
-                        while (!process.StandardError.EndOfStream)
+                        while (await process.StandardError.ReadLineAsync() is { } line)
                         {
-                            var line = await process.StandardError.ReadLineAsync();
-                            if (line != null)
-                            {
-                                await logFile.WriteLineAsync($"[ERR] {line}");
-                                await logFile.FlushAsync();
-                            }
+                            await logFile.WriteLineAsync($"[ERR] {line}");
+                            await logFile.FlushAsync();
                         }
                     });
 

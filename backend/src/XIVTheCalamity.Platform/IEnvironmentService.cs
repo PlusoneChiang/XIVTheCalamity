@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using XIVTheCalamity.Core.Models.Progress;
 
 namespace XIVTheCalamity.Platform;
@@ -14,7 +13,7 @@ public interface IEnvironmentService
     /// Includes downloading emulator (if needed) and creating prefix
     /// </summary>
     IAsyncEnumerable<EnvironmentProgressEvent> InitializeAsync(
-        [EnumeratorCancellation] CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Ensure environment is initialized (Prefix created)

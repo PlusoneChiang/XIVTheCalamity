@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Version>2.2.3</Version>
@@ -10,6 +10,7 @@
     
     <!-- NativeAOT 配置 -->
     <PublishAot>true</PublishAot>
+    <RuntimeFrameworkVersion Condition="'$(SelfContained)' == 'true'">10.0.14</RuntimeFrameworkVersion>
     <InvariantGlobalization>false</InvariantGlobalization>
     <StripSymbols>true</StripSymbols>
     
@@ -29,6 +30,7 @@
 
   <ItemGroup>
     <!-- 日誌套件 -->
+    <PackageReference Include="Serilog" Version="4.3.1" />
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <!-- Photino.NET 核心套件 -->

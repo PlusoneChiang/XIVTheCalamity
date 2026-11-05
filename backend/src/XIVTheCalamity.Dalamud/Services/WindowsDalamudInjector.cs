@@ -293,27 +293,19 @@ public class WindowsDalamudInjector : IDalamudInjector
 
         var stdoutTask = Task.Run(async () =>
         {
-            while (!process.StandardOutput.EndOfStream)
+            while (await process.StandardOutput.ReadLineAsync() is { } line)
             {
-                var line = await process.StandardOutput.ReadLineAsync();
-                if (line != null)
-                {
-                    stdout.AppendLine(line);
-                    _logger.LogDebug("[DALAMUD-INJECT] stdout: {Line}", line);
-                }
+                stdout.AppendLine(line);
+                _logger.LogDebug("[DALAMUD-INJECT] stdout: {Line}", line);
             }
         }, ct);
 
         var stderrTask = Task.Run(async () =>
         {
-            while (!process.StandardError.EndOfStream)
+            while (await process.StandardError.ReadLineAsync() is { } line)
             {
-                var line = await process.StandardError.ReadLineAsync();
-                if (line != null)
-                {
-                    stderr.AppendLine(line);
-                    _logger.LogWarning("[DALAMUD-INJECT] stderr: {Line}", line);
-                }
+                stderr.AppendLine(line);
+                _logger.LogWarning("[DALAMUD-INJECT] stderr: {Line}", line);
             }
         }, ct);
 

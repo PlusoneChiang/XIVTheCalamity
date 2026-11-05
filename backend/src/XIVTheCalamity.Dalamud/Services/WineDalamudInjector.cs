@@ -178,10 +178,10 @@ public class WineDalamudInjector : IDalamudInjector
             var conflictingVars = new[] { "LD_PRELOAD", "SDL_VIDEODRIVER", "QT_QPA_PLATFORM", "APPDIR", "APPIMAGE", "ARGV0", "GSETTINGS_SCHEMA_DIR", "OWD" };
             foreach (var v in conflictingVars) psi.Environment.Remove(v);
 
-            if (psi.Environment.TryGetValue("PATH", out var envPath))
+            if (psi.Environment.TryGetValue("PATH", out var envPath) && envPath != null)
                 psi.Environment["PATH"] = string.Join(":", envPath.Split(':').Where(p => !p.Contains(".mount_") && !p.Contains("/tmp/.mount")));
 
-            if (psi.Environment.TryGetValue("XDG_DATA_DIRS", out var envXdg))
+            if (psi.Environment.TryGetValue("XDG_DATA_DIRS", out var envXdg) && envXdg != null)
                 psi.Environment["XDG_DATA_DIRS"] = string.Join(":", envXdg.Split(':').Where(d => !d.Contains(".mount_") && !d.Contains("/tmp/.mount")));
 
             foreach (var (key, value) in injectorEnv)
@@ -198,10 +198,9 @@ public class WineDalamudInjector : IDalamudInjector
             {
                 try
                 {
-                    while (!process.StandardOutput.EndOfStream)
+                    while (await process.StandardOutput.ReadLineAsync() is { } line)
                     {
-                        var line = await process.StandardOutput.ReadLineAsync();
-                        if (line != null) _logger.LogInformation("[DALAMUD-INJECT] stdout: {Line}", line);
+                        _logger.LogInformation("[DALAMUD-INJECT] stdout: {Line}", line);
                     }
                 }
                 catch { }
@@ -210,10 +209,9 @@ public class WineDalamudInjector : IDalamudInjector
             {
                 try
                 {
-                    while (!process.StandardError.EndOfStream)
+                    while (await process.StandardError.ReadLineAsync() is { } line)
                     {
-                        var line = await process.StandardError.ReadLineAsync();
-                        if (line != null) _logger.LogWarning("[DALAMUD-INJECT] stderr: {Line}", line);
+                        _logger.LogWarning("[DALAMUD-INJECT] stderr: {Line}", line);
                     }
                 }
                 catch { }
@@ -538,16 +536,14 @@ public class WineDalamudInjector : IDalamudInjector
         var conflictingVars = new[] { "LD_PRELOAD", "SDL_VIDEODRIVER", "QT_QPA_PLATFORM", "APPDIR", "APPIMAGE", "ARGV0", "GSETTINGS_SCHEMA_DIR", "OWD" };
         foreach (var varName in conflictingVars) psi.Environment.Remove(varName);
         
-        if (psi.Environment.ContainsKey("PATH"))
+        if (psi.Environment.TryGetValue("PATH", out var path) && path != null)
         {
-            var path = psi.Environment["PATH"];
             var paths = path.Split(':').Where(p => !p.Contains(".mount_") && !p.Contains("/tmp/.mount")).ToArray();
             psi.Environment["PATH"] = string.Join(":", paths);
         }
         
-        if (psi.Environment.ContainsKey("XDG_DATA_DIRS"))
+        if (psi.Environment.TryGetValue("XDG_DATA_DIRS", out var xdgData) && xdgData != null)
         {
-            var xdgData = psi.Environment["XDG_DATA_DIRS"];
             var dirs = xdgData.Split(':').Where(d => !d.Contains(".mount_") && !d.Contains("/tmp/.mount")).ToArray();
             psi.Environment["XDG_DATA_DIRS"] = string.Join(":", dirs);
         }
@@ -569,27 +565,19 @@ public class WineDalamudInjector : IDalamudInjector
         
         var stdoutTask = Task.Run(async () =>
         {
-            while (!process.StandardOutput.EndOfStream)
+            while (await process.StandardOutput.ReadLineAsync() is { } line)
             {
-                var line = await process.StandardOutput.ReadLineAsync();
-                if (line != null)
-                {
-                    stdout.AppendLine(line);
-                    _logger.LogDebug("[DALAMUD-INJECT] stdout: {Line}", line);
-                }
+                stdout.AppendLine(line);
+                _logger.LogDebug("[DALAMUD-INJECT] stdout: {Line}", line);
             }
         }, ct);
         
         var stderrTask = Task.Run(async () =>
         {
-            while (!process.StandardError.EndOfStream)
+            while (await process.StandardError.ReadLineAsync() is { } line)
             {
-                var line = await process.StandardError.ReadLineAsync();
-                if (line != null)
-                {
-                    stderr.AppendLine(line);
-                    _logger.LogWarning("[DALAMUD-INJECT] stderr: {Line}", line);
-                }
+                stderr.AppendLine(line);
+                _logger.LogWarning("[DALAMUD-INJECT] stderr: {Line}", line);
             }
         }, ct);
         

@@ -1,8 +1,14 @@
-const { build } = require('vite');
-const { viteSingleFile } = require('vite-plugin-singlefile');
 const path = require('path');
 
 async function main() {
+  const { build } = await import('vite');
+  const { viteSingleFile } = await import('vite-plugin-singlefile');
+  const onwarn = (warning, warn) => {
+    // shortcut: 上游註解被 Rollup 誤認為 PURE 標記，待 @scure/base 修正後移除此過濾。
+    if (warning.code === 'INVALID_ANNOTATION' && warning.id?.includes('/node_modules/@scure/base/')) return;
+    warn(warning);
+  };
+
   console.log('Building login page...');
   await build({
     configFile: false,
@@ -12,6 +18,7 @@ async function main() {
       emptyOutDir: true,
       assetsInlineLimit: 100000000,
       rollupOptions: {
+        onwarn,
         input: {
           login: path.resolve(__dirname, '../src/renderer/pages/login/index.html'),
         },
@@ -31,6 +38,7 @@ async function main() {
       emptyOutDir: false,
       assetsInlineLimit: 100000000,
       rollupOptions: {
+        onwarn,
         input: {
           settings: path.resolve(__dirname, '../src/renderer/pages/settings/settings.html'),
         },

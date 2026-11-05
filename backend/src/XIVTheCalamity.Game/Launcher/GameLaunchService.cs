@@ -659,29 +659,21 @@ public class GameLaunchService
             
             var stdoutTask = Task.Run(async () =>
             {
-                while (!process.StandardOutput.EndOfStream)
+                while (await process.StandardOutput.ReadLineAsync() is { } line)
                 {
-                    var line = await process.StandardOutput.ReadLineAsync();
-                    if (line != null)
-                    {
-                        await logFile.WriteLineAsync($"[OUT] {line}");
-                        await logFile.FlushAsync();
-                        _logger.LogDebug("[GAME-OUT] {Line}", line);
-                    }
+                    await logFile.WriteLineAsync($"[OUT] {line}");
+                    await logFile.FlushAsync();
+                    _logger.LogDebug("[GAME-OUT] {Line}", line);
                 }
             });
             
             var stderrTask = Task.Run(async () =>
             {
-                while (!process.StandardError.EndOfStream)
+                while (await process.StandardError.ReadLineAsync() is { } line)
                 {
-                    var line = await process.StandardError.ReadLineAsync();
-                    if (line != null)
-                    {
-                        await logFile.WriteLineAsync($"[ERR] {line}");
-                        await logFile.FlushAsync();
-                        _logger.LogWarning("[GAME-ERR] {Line}", line);
-                    }
+                    await logFile.WriteLineAsync($"[ERR] {line}");
+                    await logFile.FlushAsync();
+                    _logger.LogWarning("[GAME-ERR] {Line}", line);
                 }
             });
             

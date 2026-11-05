@@ -19,10 +19,7 @@ public class ConfigService
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
-        TypeInfoResolver = System.Text.Json.Serialization.Metadata.JsonTypeInfoResolver.Combine(
-            CoreJsonContext.Default,
-            new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver()
-        ),
+        TypeInfoResolver = CoreJsonContext.Default,
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
@@ -58,7 +55,7 @@ public class ConfigService
             if (File.Exists(globalPath))
             {
                 var json = await File.ReadAllTextAsync(globalPath);
-                var global = JsonSerializer.Deserialize<GlobalConfig>(json, _jsonOptions)
+                var global = JsonSerializer.Deserialize(json, CoreJsonContext.Default.GlobalConfig)
                     ?? throw new JsonException("全域設定內容無效。");
                 ValidateGlobalConfig(global, validateGamePath: false);
                 using var document = JsonDocument.Parse(json);
@@ -105,7 +102,7 @@ public class ConfigService
         try
         {
             var json = await File.ReadAllTextAsync(configPath);
-            var config = JsonSerializer.Deserialize<AppConfig>(json, _jsonOptions);
+            var config = JsonSerializer.Deserialize(json, CoreJsonContext.Default.AppConfig);
             
             if (config is null)
             {
@@ -374,7 +371,7 @@ public class ConfigService
     {
         var path = GetGlobalConfigFilePath();
         var temporaryPath = path + ".tmp";
-        var json = JsonSerializer.Serialize(global, _jsonOptions);
+        var json = JsonSerializer.Serialize(global, CoreJsonContext.Default.GlobalConfig);
         try
         {
             File.WriteAllText(temporaryPath, json);
