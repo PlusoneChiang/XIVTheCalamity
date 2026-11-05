@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Nodes;
 using XIVTheCalamity.Core.Json;
 using XIVTheCalamity.Core.Models;
 
@@ -12,6 +13,7 @@ namespace XIVTheCalamity.Core.Services;
 public class ConfigService
 {
     private static readonly object _lock = new();
+    private static readonly SemaphoreSlim _globalConfigLock = new(1, 1);
     private string ConfigPath => GetConfigFilePath();
     private readonly IEnumerable<IPlatformConfigProvider> _platformProviders;
 
@@ -47,20 +49,51 @@ public class ConfigService
     /// </summary>
     public string GetConfigPath() => ConfigPath;
 
+    public async Task<GlobalConfig> LoadGlobalConfigAsync()
+    {
+        await _globalConfigLock.WaitAsync();
+        try
+        {
+            var globalPath = GetGlobalConfigFilePath();
+            if (File.Exists(globalPath))
+            {
+                var json = await File.ReadAllTextAsync(globalPath);
+                var global = JsonSerializer.Deserialize<GlobalConfig>(json, _jsonOptions)
+                    ?? throw new JsonException("全域設定內容無效。");
+                ValidateGlobalConfig(global, validateGamePath: false);
+                return global;
+            }
+
+            var migratedGlobal = await MigrateGlobalConfigAsync();
+            SaveGlobalConfigSync(migratedGlobal);
+            return migratedGlobal;
+        }
+        finally
+        {
+            _globalConfigLock.Release();
+        }
+    }
+
+    public async Task SaveGlobalConfigAsync(GlobalConfig global)
+    {
+        ValidateGlobalConfig(global, validateGamePath: true);
+        await _globalConfigLock.WaitAsync();
+        try { SaveGlobalConfigSync(global); }
+        finally { _globalConfigLock.Release(); }
+    }
+
     /// <summary>
     /// Load configuration
     /// </summary>
     public async Task<AppConfig> LoadConfigAsync(string? profileName = null)
     {
         var configPath = GetConfigFilePath(profileName);
-        lock (_lock)
+        bool configMissing;
+        lock (_lock) configMissing = !File.Exists(configPath);
+        if (configMissing)
         {
-            if (!File.Exists(configPath))
-            {
-                Console.WriteLine($"[Config] Config file not found, creating default config at {configPath}");
-                var defaultConfig = CreateDefaultConfig();
-                return defaultConfig;
-            }
+            Console.WriteLine($"[Config] Config file not found, creating default config at {configPath}");
+            return await ApplyGlobalConfigAsync(CreateDefaultConfig());
         }
 
         try
@@ -71,7 +104,7 @@ public class ConfigService
             if (config is null)
             {
                 Console.WriteLine("[Config] Failed to deserialize config, using default");
-                return CreateDefaultConfig();
+                return await ApplyGlobalConfigAsync(CreateDefaultConfig());
             }
             
             // Apply platform strategy default values (e.g. initial creation of sub-config objects)
@@ -110,33 +143,8 @@ public class ConfigService
             // Force-overwrite managed fields that users must not change
             config.Dalamud.PluginRepoUrl = DalamudConfig.ManagedPluginRepoUrl;
 
-            // Inherit GamePath from default profile if loading a non-default profile
-            var targetProfile = string.IsNullOrEmpty(profileName) 
-                ? PlatformPathService.Instance.ActiveProfile 
-                : profileName;
-
-            if (targetProfile != "default")
-            {
-                try
-                {
-                    var defaultConfig = await LoadConfigAsync("default");
-                    if (config.Game != null && defaultConfig.Game != null)
-                    {
-                        config.Game.GamePath = defaultConfig.Game.GamePath;
-                    }
-                    if (config.Launcher != null && defaultConfig.Launcher != null)
-                    {
-                        config.Launcher.ShowDalamudTab = defaultConfig.Launcher.ShowDalamudTab;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[Config] Failed to inherit game path or showDalamudTab from default profile: {ex.Message}");
-                }
-            }
-
             Console.WriteLine("[Config] Config loaded successfully");
-            return config;
+            return await ApplyGlobalConfigAsync(config);
         }
         catch (JsonException ex)
         {
@@ -150,12 +158,12 @@ public class ConfigService
                 Console.WriteLine($"[Config] Backed up corrupted config to {backupPath}");
             }
             
-            return CreateDefaultConfig();
+            return await ApplyGlobalConfigAsync(CreateDefaultConfig());
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[Config] Failed to load config: {ex.Message}");
-            return CreateDefaultConfig();
+            return await ApplyGlobalConfigAsync(CreateDefaultConfig());
         }
     }
 
@@ -164,6 +172,7 @@ public class ConfigService
     /// </summary>
     public async Task SaveConfigAsync(AppConfig config, string? profileName = null)
     {
+        await ApplyGlobalConfigAsync(config);
         // Sync split config properties back to the main Wine wrapper object before save and validation
         if (config.WineGraphics != null || config.WinePerformance != null || config.WineCompat != null)
         {
@@ -193,31 +202,6 @@ public class ConfigService
         // Force-overwrite managed fields before validation and save
         config.Dalamud.PluginRepoUrl = DalamudConfig.ManagedPluginRepoUrl;
 
-        // Force-overwrite GamePath from default profile config if saving a non-default profile
-        var targetProfile = string.IsNullOrEmpty(profileName) 
-            ? PlatformPathService.Instance.ActiveProfile 
-            : profileName;
-
-        if (targetProfile != "default")
-        {
-            try
-            {
-                var defaultConfig = await LoadConfigAsync("default");
-                if (config.Game != null && defaultConfig.Game != null)
-                {
-                    config.Game.GamePath = defaultConfig.Game.GamePath;
-                }
-                if (config.Launcher != null && defaultConfig.Launcher != null)
-                {
-                    config.Launcher.ShowDalamudTab = defaultConfig.Launcher.ShowDalamudTab;
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[Config] Failed to force default game path or showDalamudTab on save: {ex.Message}");
-            }
-        }
-
         ValidateConfig(config);
         
         lock (_lock)
@@ -234,8 +218,12 @@ public class ConfigService
         var configPath = GetConfigFilePath(profileName);
         try
         {
-            var json = JsonSerializer.Serialize(config, _jsonOptions);
-            File.WriteAllText(configPath, json);
+            var node = JsonSerializer.SerializeToNode(config, CoreJsonContext.Default.AppConfig)!.AsObject();
+            node["game"]?.AsObject().Remove("gamePath");
+            node["launcher"]?.AsObject().Remove("announcementMode");
+            node["launcher"]?.AsObject().Remove("developmentMode");
+            node["launcher"]?.AsObject().Remove("showDalamudTab");
+            File.WriteAllText(configPath, node.ToJsonString(_jsonOptions));
             Console.WriteLine("[Config] Config saved successfully");
         }
         catch (Exception ex)
@@ -253,7 +241,7 @@ public class ConfigService
         Console.WriteLine("[Config] Resetting config to default");
         var defaultConfig = CreateDefaultConfig();
         await SaveConfigAsync(defaultConfig);
-        return defaultConfig;
+        return await ApplyGlobalConfigAsync(defaultConfig);
     }
 
     /// <summary>
@@ -275,13 +263,6 @@ public class ConfigService
     /// </summary>
     private void ValidateConfig(AppConfig config)
     {
-        if (config.Launcher.AnnouncementMode is not ("local" or "official"))
-            throw new ArgumentException("公告模式必須是 local 或 official。");
-        // Validate gamePath if not empty
-        if (!string.IsNullOrEmpty(config.Game.GamePath) && !Directory.Exists(config.Game.GamePath))
-        {
-            throw new ArgumentException($"Game path does not exist: {config.Game.GamePath}");
-        }
 
         // Validate region
         if (config.Game.Region != "TraditionalChinese")
@@ -318,5 +299,81 @@ public class ConfigService
             return platformPaths.GetConfigPath("config.json");
         }
         return platformPaths.GetConfigPathForProfile(profileName, "config.json");
+    }
+
+    private static string GetGlobalConfigFilePath() => Path.Combine(PlatformPathService.Instance.AppDataDirectory, "global.json");
+
+    private async Task<AppConfig> ApplyGlobalConfigAsync(AppConfig config)
+    {
+        var global = await LoadGlobalConfigAsync();
+        config.Game.GamePath = global.GamePath;
+        config.Launcher.AnnouncementMode = global.AnnouncementMode;
+        config.Launcher.DevelopmentMode = global.DevelopmentMode;
+        config.Launcher.ShowDalamudTab = global.ShowDalamudTab;
+        return config;
+    }
+
+    private async Task<GlobalConfig> MigrateGlobalConfigAsync()
+    {
+        var paths = PlatformPathService.Instance;
+        var defaultLegacy = await ReadLegacyGlobalValuesAsync(paths.GetConfigPathForProfile("default"));
+        var activeLegacy = await ReadLegacyGlobalValuesAsync(paths.GetConfigPath());
+        return new GlobalConfig
+        {
+            GamePath = defaultLegacy.GamePath,
+            ShowDalamudTab = defaultLegacy.ShowDalamudTab,
+            AnnouncementMode = activeLegacy.AnnouncementMode,
+            DevelopmentMode = activeLegacy.DevelopmentMode
+        };
+    }
+
+    private static async Task<GlobalConfig> ReadLegacyGlobalValuesAsync(string path)
+    {
+        if (!File.Exists(path)) return new GlobalConfig();
+        try
+        {
+            await using var stream = File.OpenRead(path);
+            using var document = await JsonDocument.ParseAsync(stream);
+            var root = document.RootElement;
+            var launcher = root.TryGetProperty("launcher", out var launcherElement) ? launcherElement : default;
+            var game = root.TryGetProperty("game", out var gameElement) ? gameElement : default;
+            return new GlobalConfig
+            {
+                GamePath = game.ValueKind == JsonValueKind.Object && game.TryGetProperty("gamePath", out var gamePath) ? gamePath.GetString() ?? "" : "",
+                ShowDalamudTab = launcher.ValueKind == JsonValueKind.Object && launcher.TryGetProperty("showDalamudTab", out var showTab) && showTab.ValueKind == JsonValueKind.True,
+                AnnouncementMode = launcher.ValueKind == JsonValueKind.Object && launcher.TryGetProperty("announcementMode", out var mode) && mode.GetString() == "official" ? "official" : "local",
+                DevelopmentMode = launcher.ValueKind == JsonValueKind.Object && launcher.TryGetProperty("developmentMode", out var development) && development.ValueKind == JsonValueKind.True
+            };
+        }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException)
+        {
+            File.Copy(path, path + ".backup", true);
+            return new GlobalConfig();
+        }
+    }
+
+    private static void ValidateGlobalConfig(GlobalConfig global, bool validateGamePath)
+    {
+        if (global.AnnouncementMode is not ("local" or "official"))
+            throw new ArgumentException("公告模式必須是 local 或 official。");
+        if (validateGamePath && !string.IsNullOrEmpty(global.GamePath) && !Directory.Exists(global.GamePath))
+            throw new ArgumentException($"Game path does not exist: {global.GamePath}");
+    }
+
+    private static void SaveGlobalConfigSync(GlobalConfig global)
+    {
+        var path = GetGlobalConfigFilePath();
+        var temporaryPath = path + ".tmp";
+        var json = JsonSerializer.Serialize(global, _jsonOptions);
+        try
+        {
+            File.WriteAllText(temporaryPath, json);
+            File.Move(temporaryPath, path, true);
+        }
+        catch
+        {
+            if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
+            throw;
+        }
     }
 }

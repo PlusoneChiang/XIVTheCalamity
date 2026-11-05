@@ -5,9 +5,10 @@
 import '../../utils/polyfill.js';
 import i18n from '../../i18n/index.js';
 import { applyTheme } from '../../utils/theme.js';
-import { getLastUsedAccount, deleteOTPSecret, getAccountsWithProfiles, getBoundProfile, bindProfile, unbindProfile } from '../../utils/credentialsStore.js';
+import { getLastUsedAccount, deleteOTPSecret, getAccountsWithProfiles, bindProfile, unbindProfile } from '../../utils/credentialsStore.js';
 
 let currentConfig = null;
+let currentGlobalConfig = null;
 let currentPlatform = 'win32';
 let localProfiles = ['default'];
 let currentSelectedProfile = 'default';
@@ -66,11 +67,13 @@ async function init() {
   
   // Load configuration and apply theme/locale visuals on startup active profile load
   await loadConfig(null, true);
+  await loadGlobalConfig();
   
   // Update Dalamud tab visibility based on configuration
   updateDalamudTabVisibility();
   
   // Initialize each tab
+  initGlobalTab();
   initGeneralTab();
   initWineTab();
   initProtonGeTab();
@@ -160,8 +163,6 @@ async function loadConfig(profile = null, applyVisuals = false) {
         profileDescriptions[profile] = configData.launcher?.description || '';
       }
       console.log('[Settings] Configuration loaded for profile:', profile || 'active', currentConfig);
-      // Update game path editable state after profile switch
-      updateGamePathReadonly();
     }
   } catch (error) {
     console.error('[Settings] Failed to load configuration:', error);
@@ -173,7 +174,7 @@ async function loadConfig(profile = null, applyVisuals = false) {
  * Show/hide elements marked with class "debug-only" based on Debug mode state
  */
 function updateDebugOnlyVisibility() {
-  const isDebug = document.getElementById('debugLogging')?.checked || false;
+  const isDebug = currentGlobalConfig?.developmentMode || false;
   document.querySelectorAll('.debug-only').forEach(el => {
     el.style.display = isDebug ? '' : 'none';
   });
@@ -186,7 +187,7 @@ function updateDalamudTabVisibility() {
   const dalamudTabButton = document.querySelector('[data-tab="dalamud"]');
   const dalamudTabContent = document.getElementById('tab-dalamud');
   
-  if (!currentConfig?.launcher?.showDalamudTab) {
+  if (!currentGlobalConfig?.showDalamudTab) {
     // Hide Dalamud tab
     if (dalamudTabButton) {
       dalamudTabButton.classList.add('hidden');
@@ -223,10 +224,7 @@ function populateForm(config, applyVisuals = false) {
     if (applyVisuals) {
       i18n.setLocale(config.launcher.language || 'zh-TW');
     }
-    document.getElementById('debugLogging').checked = config.launcher.developmentMode || false;
     document.getElementById('enablePreRelease').checked = config.launcher.enablePreRelease || false;
-    document.getElementById('announcementMode').value = config.launcher.announcementMode === 'official' ? 'official' : 'local';
-    updateDebugOnlyVisibility();
     
     const savedTheme = config.launcher.theme || 'dark';
     const themeRadio = document.querySelector(`input[name="theme"][value="${savedTheme}"]`);
@@ -235,10 +233,6 @@ function populateForm(config, applyVisuals = false) {
       applyTheme(savedTheme);
     }
 
-  }
-  
-  if (config.game) {
-    document.getElementById('gamePath').value = config.game.gamePath || '';
   }
   
   // Wine settings
@@ -291,18 +285,12 @@ function populateForm(config, applyVisuals = false) {
 function collectFormData() {
   const formData = {
     launcher: {
-      developmentMode: document.getElementById('debugLogging').checked,
       enablePreRelease: document.getElementById('enablePreRelease').checked,
-      announcementMode: document.getElementById('announcementMode').value === 'official' ? 'official' : 'local',
       language: document.getElementById('language').value,
       theme: document.querySelector('input[name="theme"]:checked')?.value || 'dark',
-      // Preserve showDalamudTab from current config (set via Konami code)
-      showDalamudTab: currentConfig?.launcher?.showDalamudTab || false,
       description: profileDescriptions[currentSelectedProfile] || ''
     },
-    game: {
-      gamePath: document.getElementById('gamePath').value
-    },
+    game: currentConfig?.game || {},
     wine: {
       metalFxSpatialEnabled: document.getElementById('metalFxEnabled').checked,
       metalFxSpatialFactor: parseFloat(document.getElementById('metalFxFactor').value),
@@ -346,19 +334,45 @@ function collectFormData() {
   return formData;
 }
 
+async function loadGlobalConfig() {
+  try {
+    const response = await window.xivtc.backend.call('/api/config/global', { method: 'GET' });
+    if (!response.ok || !response.data) throw new Error(response.data?.error?.message || response.statusText || 'Load failed');
+    currentGlobalConfig = response.data.success ? response.data.data : response.data;
+    document.getElementById('announcementMode').value = currentGlobalConfig.announcementMode === 'official' ? 'official' : 'local';
+    document.getElementById('debugLogging').checked = currentGlobalConfig.developmentMode === true;
+    document.getElementById('gamePath').value = currentGlobalConfig.gamePath || '';
+    updateDebugOnlyVisibility();
+  } catch (error) {
+    console.error('[Settings] Failed to load global settings:', error);
+    showError(i18n.t('settings.load_failed'));
+  }
+}
+
+function collectGlobalConfig() {
+  return {
+    announcementMode: document.getElementById('announcementMode').value === 'official' ? 'official' : 'local',
+    developmentMode: document.getElementById('debugLogging').checked,
+    gamePath: document.getElementById('gamePath').value,
+    showDalamudTab: currentGlobalConfig?.showDalamudTab === true
+  };
+}
+
 /**
  * Persist configuration. If closeWindow is true, closes the window on success;
  * otherwise shows a success notification.
  */
 async function persistConfig(closeWindow) {
   try {
+    if (!currentGlobalConfig) throw new Error(i18n.t('settings.load_failed'));
     showLoadingOverlay(i18n.t('settings.applying'));
     
     const selectedProfile = currentSelectedProfile;
     const formData = collectFormData();
+    const globalData = collectGlobalConfig();
     
-    const oldGamePath = currentConfig?.game?.gamePath || '';
-    const newGamePath = formData.game?.gamePath || '';
+    const oldGamePath = currentGlobalConfig?.gamePath || '';
+    const newGamePath = globalData.gamePath || '';
     const oldLocale = currentConfig?.launcher?.language || 'zh-TW';
     const newLocale = formData.launcher.language;
     if (oldLocale !== newLocale) {
@@ -367,9 +381,6 @@ async function persistConfig(closeWindow) {
     
     applyTheme(formData.launcher.theme || 'dark');
     
-    // Calculate differences before mutating currentConfig
-    // Only treat gamePathChanged as true when both paths are non-empty AND actually differ
-    // (avoids false positives from form initialization on first load)
     const gamePathChanged = !!(oldGamePath && newGamePath && oldGamePath !== newGamePath);
     const oldDalamudEnabled = currentConfig?.dalamud?.enabled || false;
     const newDalamudEnabled = formData.dalamud?.enabled || false;
@@ -387,9 +398,6 @@ async function persistConfig(closeWindow) {
     if (!response.ok) {
       throw new Error(response.data?.error?.message || response.data?.message || response.statusText || 'Save failed');
     }
-    
-    console.log('[Settings] Config saved successfully for profile:', selectedProfile);
-    currentConfig = formData;
     
     // Apply Wine settings to registry (macOS only)
     if (currentPlatform === 'darwin') {
@@ -409,6 +417,21 @@ async function persistConfig(closeWindow) {
       console.log('[Settings] Wine settings applied successfully');
       await refreshDiscordRpcStatus();
     }
+
+    // 全域設定最後儲存；公告模式變更可能會讓啟動器重新啟動。
+    const globalResponse = await window.xivtc.backend.call('/api/config/global', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: globalData
+    });
+    if (!globalResponse.ok) {
+      throw new Error(globalResponse.data?.error?.message || globalResponse.data?.message || globalResponse.statusText || 'Save failed');
+    }
+    currentConfig = formData;
+    currentGlobalConfig = globalData;
+    updateDebugOnlyVisibility();
+    updateDalamudTabVisibility();
+    console.log('[Settings] Config and global settings saved successfully for profile:', selectedProfile);
     
     // Notify login page of config changes (language/theme/dalamud/gamepath)
     await window.xivtc.events.send('config-changed', {
@@ -447,15 +470,9 @@ async function applyConfig() {
 }
 
 /**
- * Initialize General Tab
+ * Initialize global settings
  */
-function initGeneralTab() {
-  // Language change
-  document.getElementById('language').addEventListener('change', (e) => {
-    i18n.setLocale(e.target.value);
-    i18n.updateElements();
-  });
-
+function initGlobalTab() {
   document.getElementById('debugLogging').addEventListener('change', updateDebugOnlyVisibility);
   
   // Open LOG path
@@ -469,8 +486,9 @@ function initGeneralTab() {
       console.error('[Settings] Failed to open log folder:', error);
     }
   });
-  
-  // Browse game path
+
+  document.getElementById('testLaunchButton').addEventListener('click', handleTestLaunch);
+
   document.getElementById('browseGamePathButton').addEventListener('click', async () => {
     try {
       const result = await window.xivtc.selectDirectory();
@@ -497,6 +515,16 @@ function initGeneralTab() {
     } catch (error) {
       console.error('[Settings] Failed to browse game path:', error);
     }
+  });
+}
+
+/**
+ * Initialize General Tab
+ */
+function initGeneralTab() {
+  document.getElementById('language').addEventListener('change', (e) => {
+    i18n.setLocale(e.target.value);
+    i18n.updateElements();
   });
   
   // Clear OTP key
@@ -535,39 +563,6 @@ function initGeneralTab() {
 
   // Initialize profile section
   initProfileSection();
-
-  // Apply game path readonly state based on current profile
-  updateGamePathReadonly();
-}
-
-/**
- * Lock/unlock game path input based on whether the active profile is 'default'.
- * Only the default profile may change the game installation path.
- */
-function updateGamePathReadonly() {
-  const isDefault = currentSelectedProfile === 'default';
-  const input = document.getElementById('gamePath');
-  const browseBtn = document.getElementById('browseGamePathButton');
-  if (!input || !browseBtn) return;
-
-  if (isDefault) {
-    input.removeAttribute('readonly');
-    input.removeAttribute('disabled');
-    input.style.opacity = '';
-    browseBtn.disabled = false;
-    browseBtn.style.opacity = '';
-    browseBtn.title = '';
-  } else {
-    input.setAttribute('readonly', 'true');
-    input.style.opacity = '0.5';
-    browseBtn.disabled = true;
-    browseBtn.style.opacity = '0.4';
-    const hint = i18n.getLocale() === 'en-US'
-      ? 'Game path can only be changed in the default profile'
-      : '遊戲路徑只能在預設設定檔中修改';
-    browseBtn.title = hint;
-    input.title = hint;
-  }
 }
 
 /**
@@ -811,11 +806,6 @@ function initDalamudTab() {
   // Load Dalamud version
   loadDalamudVersion();
   
-  // Setup test launch button
-  const testLaunchButton = document.getElementById('testLaunchButton');
-  if (testLaunchButton) {
-    testLaunchButton.addEventListener('click', handleTestLaunch);
-  }
 }
 
 /**
@@ -1117,44 +1107,40 @@ function hideKonamiCodeDialog() {
 }
 
 /**
- * Set Dalamud tab enabled state via Konami code and save immediately
+ * Set the hidden advanced tab state via Konami code and save immediately
  */
 async function setDalamudTabEnabled(enabled) {
   try {
+    if (!currentGlobalConfig) throw new Error(i18n.t('settings.load_failed'));
     const action = enabled ? 'enable' : 'disable';
-    console.log(`[Settings] Setting Dalamud tab ${action} via Konami code`);
+    console.log(`[Settings] Saving hidden tab setting via Konami code: ${action}`);
     
-    // 1. Call API to update configuration - immediately save the setting
-    const response = await window.xivtc.backend.call('/api/config', {
-      method: 'PATCH',
-      body: JSON.stringify({
-        launcher: {
-          showDalamudTab: enabled
-        }
-      })
+    const response = await window.xivtc.backend.call('/api/config/global', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: {
+        ...currentGlobalConfig,
+        showDalamudTab: enabled
+      }
     });
     
     if (response.ok && response.data) {
       // 2. Hide dialog
       hideKonamiCodeDialog();
       
-      // 3. Reload configuration to ensure UI consistency
-      await loadConfig();
+      currentGlobalConfig = { ...currentGlobalConfig, showDalamudTab: enabled };
       updateDalamudTabVisibility();
       
       // 4. Show feedback message
-      const message = enabled 
-        ? (i18n.t('settings.konami.success') || '✓ Dalamud 功能已啟用')
-        : '✓ Dalamud 功能已關閉';
-      showSuccess(message);
-      console.log(`[Settings] Dalamud tab ${action} successfully`);
+      showSuccess(i18n.t('settings.konami.success') || '✓ 設定已儲存');
+      console.log(`[Settings] Hidden tab setting ${action} successfully`);
     } else {
-      throw new Error(`Failed to ${action} Dalamud tab`);
+      throw new Error(`Failed to save hidden tab setting`);
     }
   } catch (error) {
-    console.error(`[Settings] Failed to set Dalamud tab:`, error);
+    console.error(`[Settings] Failed to save hidden tab setting:`, error);
     hideKonamiCodeDialog();
-    showError(i18n.t('settings.konami.error') || '✗ 操作失敗，請重試');
+    showError(i18n.t('settings.konami.error') || '✗ 無法儲存設定');
   }
 }
 
@@ -1196,32 +1182,6 @@ function showConfirmModal(title, message) {
   });
 }
 
-async function switchProfileWithBinding(targetProfile, activeEmail, accounts) {
-  const canBind = !!activeEmail && accounts.some(account => account.email === activeEmail);
-  let previousProfile = null;
-  if (canBind) {
-    previousProfile = await getBoundProfile(activeEmail);
-    if (!await bindProfile(activeEmail, targetProfile)) {
-      throw new Error('無法儲存帳號與設定檔的關聯。');
-    }
-  }
-
-  const response = await window.xivtc.backend.call('/api/config/profiles/switch', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: targetProfile })
-  });
-  if (response.ok) return response;
-
-  const error = response.data?.error;
-  if (canBind && error?.code !== 'RESTART_FAILED') {
-    if (!await bindProfile(activeEmail, previousProfile)) {
-      throw new Error('切換設定檔失敗，且無法還原帳號綁定；請重新確認帳號使用的設定檔。');
-    }
-  }
-  throw new Error(error?.message || response.data?.message || response.statusText || '切換設定檔失敗');
-}
-
 /**
  * Initialize Profile Section
  */
@@ -1252,9 +1212,6 @@ async function initProfileSection() {
       localProfiles = profilesList.map(p => p.name);
       currentSelectedProfile = active;
       startupActiveProfile = active;
-      
-      // Update game path editable state after active profile is retrieved
-      updateGamePathReadonly();
       
       // Prepopulate profile descriptions map
       profileDescriptions = {};
@@ -1425,25 +1382,26 @@ async function initProfileSection() {
             
             // Directly switch to target profile (discard unsaved changes)
             // 直接切換設定檔，放棄當前未儲存的變更
-            const switchResponse = await switchProfileWithBinding(targetProfile, activeEmail, accounts);
+            const switchResponse = await window.xivtc.backend.call('/api/config/profiles/switch', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: targetProfile })
+            });
             
             if (switchResponse.ok) {
-              const oldGamePath = currentConfig?.game?.gamePath || '';
               const oldDalamudEnabled = currentConfig?.dalamud?.enabled || false;
+
+              if (activeEmail) await bindProfile(activeEmail, targetProfile);
 
               // 3. Load target profile settings into UI
               await loadConfig(targetProfile, true); // true to apply theme immediately
               
-              const newGamePath = currentConfig?.game?.gamePath || '';
               const newDalamudEnabled = currentConfig?.dalamud?.enabled || false;
-              const gamePathChanged = oldGamePath !== newGamePath;
               const dalamudEnabledChanged = oldDalamudEnabled !== newDalamudEnabled;
 
-              console.log('[Settings] Notifying login page of profile switch. gamePathChanged:', gamePathChanged, 'dalamudEnabledChanged:', dalamudEnabledChanged);
+              console.log('[Settings] Notifying login page of profile switch. dalamudEnabledChanged:', dalamudEnabledChanged);
               await window.xivtc.events.send('config-changed', {
-                gamePathChanged,
-                dalamudEnabledChanged: dalamudEnabledChanged ? newDalamudEnabled : undefined,
-                newGamePath
+                dalamudEnabledChanged: dalamudEnabledChanged ? newDalamudEnabled : undefined
               });
 
               // Refresh list to update active badges/actions (do NOT close settings window)
@@ -1472,8 +1430,8 @@ async function initProfileSection() {
             ? `Delete Profile`
             : `刪除設定檔`;
           const confirmMsg = i18n.getLocale() === 'en-US'
-            ? `Are you sure you want to delete profile "${p}"?\nThis will erase its settings and plugins.`
-            : `確定要刪除設定檔「${p}」嗎？\n這將會清除其專屬設定與插件。`;
+            ? `Are you sure you want to delete profile "${p}"?\nThis will erase its dedicated settings.`
+            : `確定要刪除設定檔「${p}」嗎？\n這將會清除其專屬設定。`;
           const confirmed = await showConfirmModal(delTitle, confirmMsg);
           if (confirmed) {
             try {
@@ -1484,12 +1442,14 @@ async function initProfileSection() {
                 await unbindProfile(p);
                 if (currentSelectedProfile === p) {
                   // Deleted the active profile → switch to default, notify, refresh list (do NOT close)
-                  await switchProfileWithBinding('default', activeEmail, accounts);
-                  await loadConfig('default', true);
-                  await window.xivtc.events.send('config-changed', {
-                    gamePathChanged: true,
-                    newGamePath: currentConfig?.game?.gamePath || ''
+                  const switchResponse = await window.xivtc.backend.call('/api/config/profiles/switch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: 'default' })
                   });
+                  if (switchResponse.ok && activeEmail) await bindProfile(activeEmail, 'default');
+                  await loadConfig('default', true);
+                  await window.xivtc.events.send('config-changed', {});
                   await initProfileSection();
                 } else {
                   // Deleted a non-active profile → just reload list
@@ -1559,7 +1519,7 @@ async function initProfileSection() {
         
         // 1. Save current profile changes
         const currentForm = collectFormData();
-        const saveResponse = await window.xivtc.backend.call(`/api/config?profile=${currentSelectedProfile}&deferRestart=true`, {
+        const saveResponse = await window.xivtc.backend.call(`/api/config?profile=${currentSelectedProfile}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: currentForm
@@ -1593,24 +1553,25 @@ async function initProfileSection() {
           }
           
           // 4. Switch persistently to the new profile
-          await switchProfileWithBinding(sanitized, activeEmail, accounts);
-          
-          const oldGamePath = currentConfig?.game?.gamePath || '';
+          const switchResponse = await window.xivtc.backend.call('/api/config/profiles/switch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: sanitized })
+          });
+          if (!switchResponse.ok) throw new Error(switchResponse.data?.error?.message || switchResponse.statusText || '切換設定檔失敗');
+          if (activeEmail) await bindProfile(activeEmail, sanitized);
+
           const oldDalamudEnabled = currentConfig?.dalamud?.enabled || false;
 
           // 5. Load the new configuration and update UI
           await loadConfig(sanitized, true);
           
-          const newGamePath = currentConfig?.game?.gamePath || '';
           const newDalamudEnabled = currentConfig?.dalamud?.enabled || false;
-          const gamePathChanged = oldGamePath !== newGamePath;
           const dalamudEnabledChanged = oldDalamudEnabled !== newDalamudEnabled;
 
-          console.log('[Settings] Notifying login page of profile creation switch. gamePathChanged:', gamePathChanged, 'dalamudEnabledChanged:', dalamudEnabledChanged);
+          console.log('[Settings] Notifying login page of profile creation switch. dalamudEnabledChanged:', dalamudEnabledChanged);
           await window.xivtc.events.send('config-changed', {
-            gamePathChanged,
-            dalamudEnabledChanged: dalamudEnabledChanged ? newDalamudEnabled : undefined,
-            newGamePath
+            dalamudEnabledChanged: dalamudEnabledChanged ? newDalamudEnabled : undefined
           });
           
           await initProfileSection();

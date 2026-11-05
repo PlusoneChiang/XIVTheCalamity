@@ -1355,7 +1355,7 @@ async function saveGamePath(gamePath) {
     console.log('[GameSetup] Saving game path:', gamePath);
     
     // Get current config
-    const response = await window.xivtc.backend.call('/api/config');
+    const response = await window.xivtc.backend.call('/api/config/global');
     
     let config;
     try {
@@ -1365,16 +1365,11 @@ async function saveGamePath(gamePath) {
       throw new Error(`Failed to load config: ${getApiErrorMessage(error, i18n)}`);
     }
     
-    // Ensure game object exists
-    if (!config.game) {
-      config.game = {};
-    }
-    
-    // Update game path
-    config.game.gamePath = gamePath;
+    // 遊戲路徑由所有設定檔共用。
+    config.gamePath = gamePath;
     
     // Save config
-    const saveResponse = await window.xivtc.backend.call('/api/config', {
+    const saveResponse = await window.xivtc.backend.call('/api/config/global', {
       method: 'PUT',
       body: JSON.stringify(config)
     });

@@ -13,6 +13,50 @@ public static class ConfigEndpoints
     {
         var group = app.MapGroup("/api/config");
 
+        group.MapGet("/global", async (ConfigService configService, ILogger<Program> logger) =>
+        {
+            try
+            {
+                return Results.Json(ApiResponse<GlobalConfig>.Ok(await configService.LoadGlobalConfigAsync()),
+                    AppJsonContext.Default.ApiResponseGlobalConfig);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to load global configuration");
+                return Results.Json(ApiErrorResponse.Create("GLOBAL_CONFIG_UNAVAILABLE", "無法載入全域設定。", ex.Message),
+                    AppJsonContext.Default.ApiErrorResponse, statusCode: 500);
+            }
+        });
+
+        group.MapPut("/global", async (
+            HttpContext context,
+            GlobalConfig global,
+            ConfigService configService,
+            XIVTheCalamity.Services.EventBroadcastHub eventHub,
+            ILogger<Program> logger) =>
+        {
+            try
+            {
+                await configService.SaveGlobalConfigAsync(global);
+                XIVTheCalamity.MainWindowContainer.UpdateDevMode(global.DevelopmentMode);
+                var config = await configService.LoadConfigAsync();
+                eventHub.Broadcast("config-updated", System.Text.Json.JsonSerializer.SerializeToElement(config, AppJsonContext.Default.AppConfig));
+                if (global.AnnouncementMode != Program.AnnouncementMode && RestartLauncher(context) is { } restartError)
+                    return restartError;
+                return Results.Json(ApiResponse<GlobalConfig>.Ok(global), AppJsonContext.Default.ApiResponseGlobalConfig);
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(ApiErrorResponse.Create("CONFIG_INVALID", "Invalid configuration", ex.Message));
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to save global configuration");
+                return Results.Json(ApiErrorResponse.Create("GLOBAL_CONFIG_SAVE_FAILED", "無法儲存全域設定。", ex.Message),
+                    AppJsonContext.Default.ApiErrorResponse, statusCode: 500);
+            }
+        });
+
         // GET /api/config
         group.MapGet("/", async (
             [Microsoft.AspNetCore.Mvc.FromQuery(Name = "profile")] string? profile,
@@ -35,9 +79,7 @@ public static class ConfigEndpoints
 
         // PUT /api/config
         group.MapPut("/", async (
-            HttpContext context,
             [Microsoft.AspNetCore.Mvc.FromQuery(Name = "profile")] string? profile,
-            [Microsoft.AspNetCore.Mvc.FromQuery] bool? deferRestart,
             AppConfig config,
             ConfigService configService,
             XIVTheCalamity.Services.EventBroadcastHub eventHub,
@@ -51,8 +93,6 @@ public static class ConfigEndpoints
                 var pathService = PlatformPathService.Instance;
                 if (string.IsNullOrEmpty(profile) || profile == pathService.ActiveProfile)
                 {
-                    // 建立新設定檔時先完成帳號綁定，最後切換設定檔才重新啟動。
-                    if (deferRestart != true && RestartIfAnnouncementModeChanged(context, config) is { } restartError) return restartError;
                     XIVTheCalamity.MainWindowContainer.UpdateDevMode(config.Launcher.DevelopmentMode);
                     try
                     {
@@ -93,9 +133,6 @@ public static class ConfigEndpoints
                 var currentConfig = await configService.LoadConfigAsync();
                 
                 // Merge changes
-                if (!string.IsNullOrEmpty(partialConfig.Game.GamePath))
-                    currentConfig.Game.GamePath = partialConfig.Game.GamePath;
-                
                 if (partialConfig.Game.Region != "TraditionalChinese")
                     currentConfig.Game.Region = partialConfig.Game.Region;
                 
@@ -135,8 +172,6 @@ public static class ConfigEndpoints
                     currentConfig.Launcher.EncryptedArguments = partialConfig.Launcher.EncryptedArguments;
                     currentConfig.Launcher.ExitWithGame = partialConfig.Launcher.ExitWithGame;
                     currentConfig.Launcher.NonZeroExitError = partialConfig.Launcher.NonZeroExitError;
-                    currentConfig.Launcher.DevelopmentMode = partialConfig.Launcher.DevelopmentMode;
-                    currentConfig.Launcher.ShowDalamudTab = partialConfig.Launcher.ShowDalamudTab;
                     currentConfig.Launcher.EnablePreRelease = partialConfig.Launcher.EnablePreRelease;
                     currentConfig.Launcher.Language = partialConfig.Launcher.Language;
                 }
@@ -179,7 +214,6 @@ public static class ConfigEndpoints
         });
 
         group.MapPost("/reset", async (
-            HttpContext context,
             ConfigService configService,
             XIVTheCalamity.Services.EventBroadcastHub eventHub,
             ILogger<Program> logger) =>
@@ -188,7 +222,6 @@ public static class ConfigEndpoints
             {
                 logger.LogInformation("Resetting application config to default");
                 var config = await configService.ResetToDefaultAsync();
-                if (RestartIfAnnouncementModeChanged(context, config) is { } restartError) return restartError;
                 XIVTheCalamity.MainWindowContainer.UpdateDevMode(config.Launcher.DevelopmentMode);
                 try
                 {
@@ -347,7 +380,6 @@ public static class ConfigEndpoints
 
         // POST /api/config/profiles/switch (Switch active profile persistently)
         group.MapPost("/profiles/switch", async (
-            HttpContext context,
             ProfileSwitchRequest request,
             ConfigService configService,
             ILogger<Program> logger) =>
@@ -361,8 +393,6 @@ public static class ConfigEndpoints
 
                 pathService.SwitchProfile(targetName);
                 var config = await configService.LoadConfigAsync();
-                if (RestartIfAnnouncementModeChanged(context, config) is { } restartError) return restartError;
-
                 return Results.Ok(ApiResponse<AppConfig>.Ok(config));
             }
             catch (Exception ex)
@@ -423,10 +453,8 @@ public static class ConfigEndpoints
             CopyDirectoryRecursive(folder, dest);
         }
     }
-    private static IResult? RestartIfAnnouncementModeChanged(HttpContext context, AppConfig config)
+    private static IResult? RestartLauncher(HttpContext context)
     {
-        var mode = config.Launcher.AnnouncementMode == "official" ? "official" : "local";
-        if (mode == Program.AnnouncementMode) return null;
         try { LauncherRestart.Schedule(context); return null; }
         catch (Exception ex)
         {

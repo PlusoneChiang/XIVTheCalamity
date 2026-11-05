@@ -97,6 +97,7 @@ const translations = {
     'settings.apply_wine_failed': 'Wine 設定套用失敗',
     
     // Settings tabs
+    'settings.tab.global': '全域',
     'settings.tab.general': '一般',
     'settings.tab.profiles': '設定檔',
     'settings.tab.wine': 'Wine',
@@ -110,7 +111,8 @@ const translations = {
     'settings.general.current_profile': '當前設定檔',
     'settings.general.add_profile': '新增',
     'settings.general.delete_profile': '刪除',
-    'settings.general.profile_help': '切換設定檔會變更程式設定、遊戲個人設定與 Dalamud 插件。Wine 主程式與容器不受影響。',
+    'settings.general.profile_help': '切換設定檔會變更個別偏好與遊戲個人設定；全域設定不受影響。',
+    'settings.global.basic': '全域設定',
     'settings.profile.add_title': '新增設定檔',
     'settings.profile.name_label': '設定檔名稱 (僅限英數字)',
     'settings.profile.desc_label': '設定檔說明',
@@ -132,7 +134,7 @@ const translations = {
     'settings.general.announcement_mode_local': '本機版面（建議）',
     'settings.general.announcement_mode_official': '官方公告頁',
     'settings.general.announcement_mode_local_help': '本機版面只顯示公告資料，不執行公告頁的外部 JavaScript。',
-    'settings.general.announcement_mode_official_help': '官方公告頁會載入其外部內容與 JavaScript；選擇此模式代表你接受較高風險。使用中的設定檔變更模式並儲存或套用後，啟動器會自動重新啟動。',
+    'settings.general.announcement_mode_official_help': '官方公告頁會載入其外部內容與 JavaScript；選擇此模式代表你接受較高風險。變更公告模式並儲存或套用後，啟動器會自動重新啟動。',
     'settings.general.open_log': '開啟記錄資料夾',
     'settings.general.game': '遊戲設定',
     'settings.general.game_path': '遊戲路徑',
@@ -163,9 +165,9 @@ const translations = {
     'settings.general.theme_valentine': '戀人節 💕',
     
     // Konami Code
-    'settings.konami.prompt': '是否啟用 Dalamud 設定頁面？',
-    'settings.konami.success': '✓ Dalamud 功能已啟用',
-    'settings.konami.error': '✗ 啟用失敗，請重試',
+    'settings.konami.prompt': '是否套用此設定？',
+    'settings.konami.success': '✓ 設定已儲存',
+    'settings.konami.error': '✗ 無法儲存設定',
     
     // Wine settings
     'settings.wine.graphics': '圖形設定',
@@ -229,7 +231,7 @@ const translations = {
     'settings.protonge.max_framerate_help': '限制最高 FPS (30-240)',
     'settings.protonge.performance': '效能設定',
     'settings.protonge.gamemode': '啟用 GameMode',
-    'settings.protonge.gamemode_help': 'Feral GameMode 效能優化（需要安裝 gamemode 套件）',
+    'settings.protonge.gamemode_help': 'Feral GameMode 效能優化',
     'settings.protonge.advanced': '進階設定',
     'settings.protonge.esync': 'Esync',
     'settings.protonge.esync_help': '事件同步機制，提升多執行緒效能',
@@ -577,6 +579,7 @@ const translations = {
     'settings.apply_wine_failed': 'Failed to apply Wine settings',
     
     // Settings tabs
+    'settings.tab.global': 'Global',
     'settings.tab.general': 'General',
     'settings.tab.profiles': 'Profiles',
     'settings.tab.wine': 'Wine',
@@ -590,7 +593,8 @@ const translations = {
     'settings.general.current_profile': 'Current Profile',
     'settings.general.add_profile': 'Add',
     'settings.general.delete_profile': 'Delete',
-    'settings.general.profile_help': 'Switching profiles will change application settings, game configuration, and Dalamud plugins. Wine core and Wineprefix are not affected.',
+    'settings.general.profile_help': 'Switching profiles changes individual preferences and game configuration. Global settings are unchanged.',
+    'settings.global.basic': 'Global Settings',
     'settings.profile.add_title': 'Add Profile',
     'settings.profile.name_label': 'Profile Name (letters/numbers only)',
     'settings.profile.desc_label': 'Profile Description',
@@ -612,7 +616,7 @@ const translations = {
     'settings.general.announcement_mode_local': 'Local layout (recommended)',
     'settings.general.announcement_mode_official': 'Official announcement page',
     'settings.general.announcement_mode_local_help': 'The local layout displays announcement data without running the announcement page\'s external JavaScript.',
-    'settings.general.announcement_mode_official_help': 'The official announcement page loads its external content and JavaScript. Choosing it means accepting the higher risk. Saving or applying a mode change in the active profile automatically restarts the launcher.',
+    'settings.general.announcement_mode_official_help': 'The official announcement page loads its external content and JavaScript. Choosing it means accepting the higher risk. Saving or applying an announcement mode change automatically restarts the launcher.',
     'settings.general.open_log': 'Open Log Folder',
     'settings.general.game': 'Game Settings',
     'settings.general.game_path': 'Game Path',
@@ -643,9 +647,9 @@ const translations = {
     'settings.general.theme_valentine': "Valentine's Day 💕",
     
     // Konami Code
-    'settings.konami.prompt': 'Enable Dalamud settings page?',
-    'settings.konami.success': '✓ Dalamud feature enabled',
-    'settings.konami.error': '✗ Failed to enable, please try again',
+    'settings.konami.prompt': 'Apply this setting?',
+    'settings.konami.success': '✓ Setting saved',
+    'settings.konami.error': '✗ Unable to save setting',
     
     // Wine settings
     'settings.wine.graphics': 'Graphics',
@@ -709,7 +713,7 @@ const translations = {
     'settings.protonge.max_framerate_help': 'Limit maximum FPS (30-240)',
     'settings.protonge.performance': 'Performance Settings',
     'settings.protonge.gamemode': 'Enable GameMode',
-    'settings.protonge.gamemode_help': 'Feral GameMode optimization (requires gamemode package)',
+    'settings.protonge.gamemode_help': 'Feral GameMode optimization',
     'settings.protonge.advanced': 'Advanced Settings',
     'settings.protonge.esync': 'Esync',
     'settings.protonge.esync_help': 'Event synchronization for better multi-threading',

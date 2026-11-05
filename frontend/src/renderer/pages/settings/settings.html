@@ -12,16 +12,66 @@
   <div class="settings-container">
     <!-- Tab Navigation -->
     <nav class="tab-navigation">
-      <button class="tab-button active" data-tab="profiles" data-i18n="settings.tab.profiles">設定檔</button>
+      <button class="tab-button active" data-tab="global" data-i18n="settings.tab.global">全域</button>
+      <button class="tab-button" data-tab="profiles" data-i18n="settings.tab.profiles">設定檔</button>
       <button class="tab-button" data-tab="general" data-i18n="settings.tab.general">一般</button>
       <button class="tab-button platform-darwin" data-tab="wine" data-i18n="settings.tab.wine">Wine</button>
       <button class="tab-button platform-linux" data-tab="protonge" data-i18n="settings.tab.protonge">GE-Proton</button>
-      <button class="tab-button" data-tab="dalamud" data-i18n="settings.tab.dalamud">Dalamud</button>
+      <button class="tab-button hidden" data-tab="dalamud" data-i18n="settings.tab.dalamud">Dalamud</button>
       <button class="tab-button" data-tab="about" data-i18n="settings.tab.about">關於</button>
     </nav>
 
     <!-- Tab Content Container -->
     <div class="tab-content-container">
+      <!-- Global Tab -->
+      <div id="tab-global" class="tab-content active">
+        <div class="settings-section">
+          <h2 data-i18n="settings.global.basic">全域設定</h2>
+          <div class="form-group">
+            <div>
+              <label for="announcementMode" data-i18n="settings.general.announcement_mode">公告模式</label>
+              <select id="announcementMode">
+                <option value="local" data-i18n="settings.general.announcement_mode_local">本機版面（建議）</option>
+                <option value="official" data-i18n="settings.general.announcement_mode_official">官方公告頁</option>
+              </select>
+              <p class="help-text" data-i18n="settings.general.announcement_mode_local_help">本機版面只顯示公告資料，不執行公告頁的外部 JavaScript。</p>
+              <p class="help-text" data-i18n="settings.general.announcement_mode_official_help">官方公告頁會載入其外部內容與 JavaScript；選擇此模式代表你接受較高風險。變更公告模式並儲存或套用後，啟動器會自動重新啟動。</p>
+            </div>
+            <div class="checkbox-group">
+              <label>
+                <input type="checkbox" id="debugLogging">
+                <span data-i18n="settings.general.debug">Debug 記錄</span>
+              </label>
+              <button id="openLogPathButton" class="btn btn-secondary btn-sm" data-i18n="settings.general.open_log">開啟</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h2 data-i18n="settings.general.game">遊戲設定</h2>
+          <div class="form-group">
+            <div class="full-width">
+              <label for="gamePath" data-i18n="settings.general.game_path">遊戲路徑</label>
+              <div class="input-with-button">
+                <input type="text" id="gamePath" placeholder="/path/to/game">
+                <button id="browseGamePathButton" class="btn btn-secondary" data-i18n="settings.general.browse">瀏覽</button>
+              </div>
+              <p class="help-text" data-i18n="settings.general.game_path_help">指定遊戲安裝目錄</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h2 data-i18n="settings.general.test_section">測試功能</h2>
+          <div class="form-group">
+            <div class="full-width">
+              <button id="testLaunchButton" class="btn btn-secondary" data-i18n="settings.general.test_launch">測試啟動遊戲</button>
+              <p class="help-text" data-i18n="settings.general.test_launch_help">不需登入即可測試遊戲啟動，無法連線至伺服器</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- General Tab -->
       <div id="tab-general" class="tab-content">
         <div class="settings-section">
@@ -40,22 +90,6 @@
                   <span data-i18n="settings.general.enable_pre_release">接收測試通道更新</span>
                 </label>
               </div>
-              <div style="margin-top: 16px;">
-                <label for="announcementMode" data-i18n="settings.general.announcement_mode">公告模式</label>
-                <select id="announcementMode">
-                  <option value="local" data-i18n="settings.general.announcement_mode_local">本機版面（建議）</option>
-                  <option value="official" data-i18n="settings.general.announcement_mode_official">官方公告頁</option>
-                </select>
-                <p class="help-text" data-i18n="settings.general.announcement_mode_local_help">本機版面只顯示公告資料，不執行公告頁的外部 JavaScript。</p>
-                <p class="help-text" data-i18n="settings.general.announcement_mode_official_help">官方公告頁會載入其外部內容與 JavaScript；選擇此模式代表你接受較高風險。模式變更後會自動重新啟動啟動器。</p>
-              </div>
-            </div>
-            <div class="checkbox-group">
-              <label>
-                <input type="checkbox" id="debugLogging">
-                <span data-i18n="settings.general.debug">Debug 記錄</span>
-              </label>
-              <button id="openLogPathButton" class="btn btn-secondary btn-sm" data-i18n="settings.general.open_log">開啟</button>
             </div>
           </div>
         </div>
@@ -86,20 +120,6 @@
         </div>
 
         <div class="settings-section">
-          <h2 data-i18n="settings.general.game">遊戲設定</h2>
-          <div class="form-group">
-            <div class="full-width">
-              <label for="gamePath" data-i18n="settings.general.game_path">遊戲路徑</label>
-              <div class="input-with-button">
-                <input type="text" id="gamePath" placeholder="/path/to/game">
-                <button id="browseGamePathButton" class="btn btn-secondary" data-i18n="settings.general.browse">瀏覽</button>
-              </div>
-              <p class="help-text" data-i18n="settings.general.game_path_help">指定遊戲安裝目錄</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="settings-section">
           <h2 data-i18n="settings.general.security">安全設定</h2>
           <div class="form-group">
             <div class="full-width">
@@ -109,25 +129,16 @@
           </div>
         </div>
 
-        <div class="settings-section">
-          <h2 data-i18n="settings.general.test_section">測試功能</h2>
-          <div class="form-group">
-            <div class="full-width">
-              <button id="testLaunchButton" class="btn btn-secondary" data-i18n="settings.general.test_launch">測試啟動遊戲</button>
-              <p class="help-text" data-i18n="settings.general.test_launch_help">不需登入即可測試遊戲啟動，無法連線至伺服器</p>
-            </div>
-          </div>
-        </div>
       </div>
 
       <!-- Profiles Tab -->
-      <div id="tab-profiles" class="tab-content active">
+      <div id="tab-profiles" class="tab-content">
         <div class="settings-section">
           <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
             <h2 data-i18n="settings.general.profile_management" style="margin: 0; border: none; padding: 0;">設定檔管理</h2>
             <button id="addProfileButton" class="btn btn-primary" style="height: 30px; padding: 0 16px;" data-i18n="settings.general.add_profile">+ 新增設定檔</button>
           </div>
-          <p class="help-text" data-i18n="settings.general.profile_help" style="margin-bottom: 16px;">切換設定檔會變更程式設定、遊戲個人設定與 Dalamud 插件。Wine 主程式與容器不受影響。</p>
+          <p class="help-text" data-i18n="settings.general.profile_help" style="margin-bottom: 16px;">切換設定檔會變更個別偏好與遊戲個人設定；全域設定不受影響。</p>
           
           <div class="profiles-list" id="profilesListContainer">
             <!-- Dynamic profile cards will be inserted here -->
@@ -562,7 +573,7 @@ data-styled.g160[id="sc-1ykasxb-0"]{content:"eDynhg,"}/*!sc*/
   <div id="konamiCodeOverlay" class="modal-overlay hidden" style="display: none;">
     <div class="modal-content">
       <h2>🔓 KONAMI Code Detected!</h2>
-      <p data-i18n="settings.konami.prompt">是否啟用 Dalamud 設定頁面？</p>
+      <p data-i18n="settings.konami.prompt">是否套用此設定？</p>
       <div class="modal-buttons">
         <button id="konamiYesBtn" class="btn btn-primary" data-i18n="button.yes">是</button>
         <button id="konamiNoBtn" class="btn btn-secondary" data-i18n="button.no">否</button>

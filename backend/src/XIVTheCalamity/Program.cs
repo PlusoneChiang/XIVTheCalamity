@@ -97,7 +97,6 @@ public class Program
             // API 呼叫由 polyfill 直接使用 http://localhost:{port}，不透過此 handler
             var virtualHostClient = new HttpClient { BaseAddress = new Uri($"http://localhost:{port}") };
 
-            var isDevMode = IsDevelopmentMode();
             string vhScheme = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "https" : "xivtc";
             
             var window = new PhotinoWindow()
@@ -226,26 +225,6 @@ public class Program
         {
             Log.CloseAndFlush();
         }
-    }
-
-    public static bool IsDevelopmentMode()
-    {
-        try
-        {
-            var appSupport = GetAppSupportPath();
-            var configPath = Path.Combine(appSupport, "XIVTheCalamity", "config.json");
-            if (File.Exists(configPath))
-            {
-                var configJson = File.ReadAllText(configPath);
-                var config = System.Text.Json.JsonSerializer.Deserialize(configJson, AppJsonContext.Default.AppConfig);
-                return config?.Launcher?.DevelopmentMode ?? false;
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "[DevModeCheck] Failed to read config to check DevelopmentMode");
-        }
-        return false;
     }
 
     private static void PrepareEnvironment()

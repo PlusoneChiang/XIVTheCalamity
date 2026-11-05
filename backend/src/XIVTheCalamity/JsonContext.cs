@@ -10,6 +10,7 @@ namespace XIVTheCalamity;
 
 // Core Models
 [JsonSerializable(typeof(AppConfig))]
+[JsonSerializable(typeof(GlobalConfig))]
 [JsonSerializable(typeof(GameConfig))]
 [JsonSerializable(typeof(DalamudConfig))]
 [JsonSerializable(typeof(DiscordRpcConfig))]
@@ -65,6 +66,7 @@ namespace XIVTheCalamity;
 
 // API Response Wrappers
 [JsonSerializable(typeof(ApiResponse<AppConfig>))]
+[JsonSerializable(typeof(ApiResponse<GlobalConfig>))]
 [JsonSerializable(typeof(ApiResponse<WineGraphicsConfig>))]
 [JsonSerializable(typeof(ApiResponse<WinePerformanceConfig>))]
 [JsonSerializable(typeof(ApiResponse<WineCompatConfig>))]

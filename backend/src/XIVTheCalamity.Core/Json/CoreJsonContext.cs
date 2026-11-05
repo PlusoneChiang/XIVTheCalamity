@@ -12,6 +12,7 @@ namespace XIVTheCalamity.Core.Json;
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(AppConfig))]
+[JsonSerializable(typeof(GlobalConfig))]
 [JsonSerializable(typeof(GameConfig))]
 [JsonSerializable(typeof(DalamudConfig))]
 [JsonSerializable(typeof(DiscordRpcConfig))]
