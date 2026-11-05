@@ -1,5 +1,20 @@
 # Release Notes
 
+## v2.3.0
+#### 🇹🇼 zh-TW
+- 新增本機公告模式，取代官方公告版面，降低外部JS注入風險。
+- 新增全域設定，並自動遷移既有設定。
+- 強化更新下載安全性。
+- 優化操作與儲存安全性。
+- 升級至 .NET 10，修復安全性警告與改善相容性。
+
+#### 🇺🇸 English
+- Added a local announcement mode to replace the official announcement page and reduce the risk of external JavaScript injection.
+- Added global settings with automatic migration.
+- Improved update download security.
+- Improved operation and storage security.
+- Upgraded to .NET 10, resolved security warnings, and improved compatibility.
+
 ## v2.2.3
 #### 🇹🇼 zh-TW
 - macOS Wine Runtime 更新至 `v2026.09.16`（Wine 11.17）。
