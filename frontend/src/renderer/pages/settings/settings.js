@@ -224,7 +224,6 @@ function populateForm(config, applyVisuals = false) {
     if (applyVisuals) {
       i18n.setLocale(config.launcher.language || 'zh-TW');
     }
-    document.getElementById('enablePreRelease').checked = config.launcher.enablePreRelease || false;
     
     const savedTheme = config.launcher.theme || 'dark';
     const themeRadio = document.querySelector(`input[name="theme"][value="${savedTheme}"]`);
@@ -285,7 +284,6 @@ function populateForm(config, applyVisuals = false) {
 function collectFormData() {
   const formData = {
     launcher: {
-      enablePreRelease: document.getElementById('enablePreRelease').checked,
       language: document.getElementById('language').value,
       theme: document.querySelector('input[name="theme"]:checked')?.value || 'dark',
       description: profileDescriptions[currentSelectedProfile] || ''
@@ -341,6 +339,7 @@ async function loadGlobalConfig() {
     currentGlobalConfig = response.data.success ? response.data.data : response.data;
     document.getElementById('announcementMode').value = currentGlobalConfig.announcementMode === 'official' ? 'official' : 'local';
     document.getElementById('debugLogging').checked = currentGlobalConfig.developmentMode === true;
+    document.getElementById('enablePreRelease').checked = currentGlobalConfig.enablePreRelease === true;
     document.getElementById('gamePath').value = currentGlobalConfig.gamePath || '';
     updateDebugOnlyVisibility();
   } catch (error) {
@@ -353,6 +352,7 @@ function collectGlobalConfig() {
   return {
     announcementMode: document.getElementById('announcementMode').value === 'official' ? 'official' : 'local',
     developmentMode: document.getElementById('debugLogging').checked,
+    enablePreRelease: document.getElementById('enablePreRelease').checked,
     gamePath: document.getElementById('gamePath').value,
     showDalamudTab: currentGlobalConfig?.showDalamudTab === true
   };

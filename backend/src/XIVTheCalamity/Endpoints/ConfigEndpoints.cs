@@ -172,7 +172,6 @@ public static class ConfigEndpoints
                     currentConfig.Launcher.EncryptedArguments = partialConfig.Launcher.EncryptedArguments;
                     currentConfig.Launcher.ExitWithGame = partialConfig.Launcher.ExitWithGame;
                     currentConfig.Launcher.NonZeroExitError = partialConfig.Launcher.NonZeroExitError;
-                    currentConfig.Launcher.EnablePreRelease = partialConfig.Launcher.EnablePreRelease;
                     currentConfig.Launcher.Language = partialConfig.Launcher.Language;
                 }
                 

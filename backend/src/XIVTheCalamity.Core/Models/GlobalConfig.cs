@@ -6,5 +6,6 @@ public class GlobalConfig
     public string AnnouncementMode { get; set; } = "local";
     public string GamePath { get; set; } = "";
     public bool DevelopmentMode { get; set; }
+    public bool EnablePreRelease { get; set; }
     public bool ShowDalamudTab { get; set; }
 }

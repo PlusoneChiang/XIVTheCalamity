@@ -61,6 +61,12 @@ public class ConfigService
                 var global = JsonSerializer.Deserialize<GlobalConfig>(json, _jsonOptions)
                     ?? throw new JsonException("全域設定內容無效。");
                 ValidateGlobalConfig(global, validateGamePath: false);
+                using var document = JsonDocument.Parse(json);
+                if (!document.RootElement.TryGetProperty("enablePreRelease", out _))
+                {
+                    global.EnablePreRelease = (await ReadLegacyGlobalValuesAsync(PlatformPathService.Instance.GetConfigPath())).EnablePreRelease;
+                    SaveGlobalConfigSync(global);
+                }
                 return global;
             }
 
@@ -223,6 +229,7 @@ public class ConfigService
             node["launcher"]?.AsObject().Remove("announcementMode");
             node["launcher"]?.AsObject().Remove("developmentMode");
             node["launcher"]?.AsObject().Remove("showDalamudTab");
+            node["launcher"]?.AsObject().Remove("enablePreRelease");
             File.WriteAllText(configPath, node.ToJsonString(_jsonOptions));
             Console.WriteLine("[Config] Config saved successfully");
         }
@@ -310,6 +317,7 @@ public class ConfigService
         config.Launcher.AnnouncementMode = global.AnnouncementMode;
         config.Launcher.DevelopmentMode = global.DevelopmentMode;
         config.Launcher.ShowDalamudTab = global.ShowDalamudTab;
+        config.Launcher.EnablePreRelease = global.EnablePreRelease;
         return config;
     }
 
@@ -323,7 +331,8 @@ public class ConfigService
             GamePath = defaultLegacy.GamePath,
             ShowDalamudTab = defaultLegacy.ShowDalamudTab,
             AnnouncementMode = activeLegacy.AnnouncementMode,
-            DevelopmentMode = activeLegacy.DevelopmentMode
+            DevelopmentMode = activeLegacy.DevelopmentMode,
+            EnablePreRelease = activeLegacy.EnablePreRelease
         };
     }
 
@@ -342,7 +351,8 @@ public class ConfigService
                 GamePath = game.ValueKind == JsonValueKind.Object && game.TryGetProperty("gamePath", out var gamePath) ? gamePath.GetString() ?? "" : "",
                 ShowDalamudTab = launcher.ValueKind == JsonValueKind.Object && launcher.TryGetProperty("showDalamudTab", out var showTab) && showTab.ValueKind == JsonValueKind.True,
                 AnnouncementMode = launcher.ValueKind == JsonValueKind.Object && launcher.TryGetProperty("announcementMode", out var mode) && mode.GetString() == "official" ? "official" : "local",
-                DevelopmentMode = launcher.ValueKind == JsonValueKind.Object && launcher.TryGetProperty("developmentMode", out var development) && development.ValueKind == JsonValueKind.True
+                DevelopmentMode = launcher.ValueKind == JsonValueKind.Object && launcher.TryGetProperty("developmentMode", out var development) && development.ValueKind == JsonValueKind.True,
+                EnablePreRelease = launcher.ValueKind == JsonValueKind.Object && launcher.TryGetProperty("enablePreRelease", out var preRelease) && preRelease.ValueKind == JsonValueKind.True
             };
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException)

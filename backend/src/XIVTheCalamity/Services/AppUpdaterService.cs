@@ -40,8 +40,8 @@ public class AppUpdaterService
         lock (_lock) { _availableDownloadUrl = null; }
         try
         {
-            var config = await _configService.LoadConfigAsync();
-            var enablePreRelease = config.Launcher?.EnablePreRelease ?? false;
+            var config = await _configService.LoadGlobalConfigAsync();
+            var enablePreRelease = config.EnablePreRelease;
 
             Log.Information("[AppUpdater] Checking for updates. EnablePreRelease: {EnablePreRelease}", enablePreRelease);
 
