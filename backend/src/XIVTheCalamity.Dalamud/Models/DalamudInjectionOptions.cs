@@ -5,6 +5,9 @@ namespace XIVTheCalamity.Dalamud.Models;
 /// </summary>
 public class DalamudInjectionOptions
 {
+    /// <summary>使用 Pre-release 的 dev 目錄，否則使用正式版目錄。</summary>
+    public bool UseLatestPreRelease { get; set; }
+
     /// <summary>Wait time before injection (milliseconds)</summary>
     public int? InjectionDelayMs { get; set; }
     

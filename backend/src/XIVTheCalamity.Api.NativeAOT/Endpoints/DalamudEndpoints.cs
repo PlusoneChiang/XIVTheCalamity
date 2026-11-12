@@ -1,3 +1,4 @@
+using XIVTheCalamity.Core.Services;
 using XIVTheCalamity.Api.NativeAOT.DTOs;
 using XIVTheCalamity.Api.NativeAOT.Helpers;
 using XIVTheCalamity.Core.Models.Progress;
@@ -15,11 +16,12 @@ public static class DalamudEndpoints
         // GET /api/dalamud/status
         group.MapGet("/status", async (
             DalamudUpdater updater,
+            bool? useLatestPreRelease,
             ILogger<Program> logger) =>
         {
             try
             {
-                var status = await updater.GetStatusAsync();
+                var status = await updater.GetStatusAsync(useLatestPreRelease);
                 return Results.Ok(ApiResponse<DalamudStatus>.Ok(status));
             }
             catch (Exception ex)
@@ -68,12 +70,15 @@ public static class DalamudEndpoints
         });
 
         // GET /api/dalamud/paths
-        group.MapGet("/paths", (
+        group.MapGet("/paths", async (
             DalamudPathService pathService,
+            ConfigService configService,
+            bool? useLatestPreRelease,
             ILogger<Program> logger) =>
         {
             try
             {
+                var usePreRelease = useLatestPreRelease ?? (await configService.LoadConfigAsync()).Dalamud.UseLatestPreRelease;
                 var paths = new
                 {
                     basePath = pathService.BasePath,
@@ -82,7 +87,7 @@ public static class DalamudEndpoints
                     assetsPath = pathService.AssetsPath,
                     configPath = pathService.ConfigPath,
                     pluginsPath = pathService.PluginsPath,
-                    injectorPath = pathService.InjectorPath
+                    injectorPath = pathService.GetInjectorPath(usePreRelease)
                 };
                 return Results.Ok(ApiResponse<object>.Ok(paths));
             }

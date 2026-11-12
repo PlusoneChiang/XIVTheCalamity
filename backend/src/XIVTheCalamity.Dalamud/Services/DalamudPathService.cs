@@ -1,6 +1,7 @@
 using System.Text.Json;
 using XIVTheCalamity.Core.Services;
 using XIVTheCalamity.Dalamud.Json;
+using XIVTheCalamity.Dalamud.Models;
 
 namespace XIVTheCalamity.Dalamud.Services;
 
@@ -41,8 +42,13 @@ public class DalamudPathService
     public string GetHooksVersionPath(string version) => 
         Path.Combine(HooksPath, version);
     
-    /// <summary>Get dev version Hooks directory (always points to latest)</summary>
+    /// <summary>Pre-release 安裝與執行目錄。</summary>
     public string HooksDevPath => Path.Combine(HooksPath, "dev");
+
+    /// <summary>正式版安裝與執行目錄。</summary>
+    public string HooksReleasePath => Path.Combine(HooksPath, "release");
+
+    public string GetHooksPath(bool useLatestPreRelease) => useLatestPreRelease ? HooksDevPath : HooksReleasePath;
     
     /// <summary>Get Assets directory for specific version</summary>
     public string GetAssetsVersionPath(int version) => 
@@ -58,7 +64,7 @@ public class DalamudPathService
     public string RuntimeVersionFile => Path.Combine(RuntimePath, "version");
     
     /// <summary>Dalamud Injector path</summary>
-    public string InjectorPath => Path.Combine(HooksDevPath, "Dalamud.Injector.exe");
+    public string GetInjectorPath(bool useLatestPreRelease) => Path.Combine(GetHooksPath(useLatestPreRelease), "Dalamud.Injector.exe");
     
     /// <summary>Dalamud config file path</summary>
     public string DalamudConfigPath => Path.Combine(ConfigPath, "dalamudConfig.json");
@@ -85,17 +91,19 @@ public class DalamudPathService
     }
     
     /// <summary>Get locally installed Dalamud version</summary>
-    public string? GetLocalVersion()
+    public string? GetLocalVersion(bool useLatestPreRelease = false) => GetLocalVersionInfo(useLatestPreRelease)?.AssemblyVersion;
+
+    /// <summary>取得完整的本機安裝版本資訊，保留舊版紀錄的讀取相容性。</summary>
+    public DalamudVersionInfo? GetLocalVersionInfo(bool useLatestPreRelease = false)
     {
-        var versionFile = Path.Combine(HooksDevPath, "version.json");
+        var versionFile = Path.Combine(GetHooksPath(useLatestPreRelease), "version.json");
         if (!File.Exists(versionFile))
             return null;
             
         try
         {
             var json = File.ReadAllText(versionFile);
-            var versionInfo = JsonSerializer.Deserialize(json, DalamudJsonContext.Default.DalamudVersionInfo);
-            return versionInfo?.AssemblyVersion;
+            return JsonSerializer.Deserialize(json, DalamudJsonContext.Default.DalamudVersionInfo);
         }
         catch
         {

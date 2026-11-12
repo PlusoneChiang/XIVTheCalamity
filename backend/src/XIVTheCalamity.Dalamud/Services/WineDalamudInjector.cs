@@ -35,7 +35,7 @@ public class WineDalamudInjector : IDalamudInjector
     /// <summary>
     /// Hook executed right before injection starts (useful for Linux signature clearing)
     /// </summary>
-    protected virtual void PreInjectHook()
+    protected virtual void PreInjectHook(string workingDirectory)
     {
     }
 
@@ -53,11 +53,13 @@ public class WineDalamudInjector : IDalamudInjector
         try
         {
             _logger.LogInformation("[DALAMUD-INJECT] Starting Dalamud injection (Wine)...");
+            var injectorPath = _pathService.GetInjectorPath(options.UseLatestPreRelease);
+            var workingDirectory = _pathService.GetHooksPath(options.UseLatestPreRelease);
             
             // Check if Dalamud is installed
-            if (!File.Exists(_pathService.InjectorPath))
+            if (!File.Exists(injectorPath))
             {
-                _logger.LogError("[DALAMUD-INJECT] Dalamud.Injector.exe not found at: {Path}", _pathService.InjectorPath);
+                _logger.LogError("[DALAMUD-INJECT] Dalamud.Injector.exe not found at: {Path}", injectorPath);
                 return new DalamudInjectionResult
                 {
                     Success = false,
@@ -73,7 +75,7 @@ public class WineDalamudInjector : IDalamudInjector
             EnsureWineAppDataSymlink(injectorEnv);
 
             // Execute subclass custom hook (e.g. LinuxCachedSignatures clearing)
-            PreInjectHook();
+            PreInjectHook(workingDirectory);
             
             // Wait for game process (using winedbg)
             var gamePid = await WaitForGameProcessAsync(launcher, injectorEnv, cancellationToken);
@@ -99,7 +101,7 @@ public class WineDalamudInjector : IDalamudInjector
             _logger.LogInformation("[DALAMUD-INJECT] Injector arguments: {Args}", injectorArgs);
             
             // Execute injection
-            var result = await ExecuteInjectorAsync(launcher, injectorArgs, injectorEnv, cancellationToken);
+            var result = await ExecuteInjectorAsync(launcher, injectorPath, injectorArgs, injectorEnv, cancellationToken);
             
             return result;
         }
@@ -139,10 +141,11 @@ public class WineDalamudInjector : IDalamudInjector
         try
         {
             _logger.LogInformation("[DALAMUD-INJECT] Starting Dalamud EntryPoint launch (Wine)...");
+            var injectorPath = _pathService.GetInjectorPath(options.UseLatestPreRelease);
 
-            if (!File.Exists(_pathService.InjectorPath))
+            if (!File.Exists(injectorPath))
             {
-                _logger.LogError("[DALAMUD-INJECT] Dalamud.Injector.exe not found at: {Path}", _pathService.InjectorPath);
+                _logger.LogError("[DALAMUD-INJECT] Dalamud.Injector.exe not found at: {Path}", injectorPath);
                 return new DalamudInjectionResult
                 {
                     Success = false,
@@ -158,8 +161,6 @@ public class WineDalamudInjector : IDalamudInjector
             var gameExeWinePath = ConvertToWinePath(gameExePath);
             var injectorArgs = BuildEntryPointArguments(gameExeWinePath, gameArguments, options);
             _logger.LogInformation("[DALAMUD-INJECT] EntryPoint arguments: {Args}", injectorArgs);
-
-            var injectorPath = _pathService.InjectorPath;
 
             if (!injectorEnv.ContainsKey("WINEDEBUG"))
                 injectorEnv["WINEDEBUG"] = "-all";
@@ -449,7 +450,7 @@ public class WineDalamudInjector : IDalamudInjector
         var sb = new StringBuilder();
         sb.Append($"inject {gamePid}");
         
-        var workingDir = ConvertToWinePath(_pathService.HooksDevPath);
+        var workingDir = ConvertToWinePath(_pathService.GetHooksPath(options.UseLatestPreRelease));
         sb.Append($" --dalamud-working-directory=\"{workingDir}\"");
         
         var configFile = ConvertToWinePath(_pathService.DalamudConfigPath);
@@ -480,7 +481,7 @@ public class WineDalamudInjector : IDalamudInjector
         var sb = new StringBuilder();
         sb.Append($"launch -g \"{gameExeWinePath}\" -m entrypoint");
 
-        var workingDir = ConvertToWinePath(_pathService.HooksDevPath);
+        var workingDir = ConvertToWinePath(_pathService.GetHooksPath(options.UseLatestPreRelease));
         sb.Append($" --dalamud-working-directory=\"{workingDir}\"");
 
         var configFile = ConvertToWinePath(_pathService.DalamudConfigPath);
@@ -512,11 +513,11 @@ public class WineDalamudInjector : IDalamudInjector
 
     private async Task<DalamudInjectionResult> ExecuteInjectorAsync(
         WineLauncher launcher,
+        string injectorPath,
         string arguments,
         Dictionary<string, string> environment,
         CancellationToken ct)
     {
-        var injectorPath = _pathService.InjectorPath;
         if (!environment.ContainsKey("WINEDEBUG"))
         {
             environment["WINEDEBUG"] = "-all";

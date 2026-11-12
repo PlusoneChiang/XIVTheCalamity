@@ -44,10 +44,11 @@ public class WindowsDalamudInjector : IDalamudInjector
         try
         {
             _logger.LogInformation("[DALAMUD-INJECT] Starting Dalamud injection (Windows native)...");
+            var injectorPath = _pathService.GetInjectorPath(options.UseLatestPreRelease);
 
-            if (!File.Exists(_pathService.InjectorPath))
+            if (!File.Exists(injectorPath))
             {
-                _logger.LogError("[DALAMUD-INJECT] Dalamud.Injector.exe not found at: {Path}", _pathService.InjectorPath);
+                _logger.LogError("[DALAMUD-INJECT] Dalamud.Injector.exe not found at: {Path}", injectorPath);
                 return new DalamudInjectionResult
                 {
                     Success = false,
@@ -77,7 +78,7 @@ public class WindowsDalamudInjector : IDalamudInjector
 
             var injectorEnv = BuildInjectorEnvironmentWindows(environment, options);
 
-            var result = await ExecuteInjectorWindowsAsync(injectorArgs, injectorEnv, cancellationToken);
+            var result = await ExecuteInjectorWindowsAsync(injectorPath, injectorArgs, injectorEnv, cancellationToken);
             return result;
         }
         catch (OperationCanceledException)
@@ -111,10 +112,11 @@ public class WindowsDalamudInjector : IDalamudInjector
         try
         {
             _logger.LogInformation("[DALAMUD-INJECT] Starting Dalamud EntryPoint launch (Windows native)...");
+            var injectorPath = _pathService.GetInjectorPath(options.UseLatestPreRelease);
 
-            if (!File.Exists(_pathService.InjectorPath))
+            if (!File.Exists(injectorPath))
             {
-                _logger.LogError("[DALAMUD-INJECT] Dalamud.Injector.exe not found at: {Path}", _pathService.InjectorPath);
+                _logger.LogError("[DALAMUD-INJECT] Dalamud.Injector.exe not found at: {Path}", injectorPath);
                 return new DalamudInjectionResult
                 {
                     Success = false,
@@ -126,7 +128,7 @@ public class WindowsDalamudInjector : IDalamudInjector
             _logger.LogInformation("[DALAMUD-INJECT] EntryPoint arguments: {Args}", injectorArgs);
             var injectorEnv = BuildInjectorEnvironmentWindows(environment, options);
 
-            var result = await ExecuteInjectorWindowsAsync(injectorArgs, injectorEnv, cancellationToken);
+            var result = await ExecuteInjectorWindowsAsync(injectorPath, injectorArgs, injectorEnv, cancellationToken);
             if (!result.Success)
                 return result;
 
@@ -195,7 +197,7 @@ public class WindowsDalamudInjector : IDalamudInjector
     {
         var sb = new StringBuilder();
         sb.Append($"inject {gamePid}");
-        sb.Append($" --dalamud-working-directory=\"{_pathService.HooksDevPath}\"");
+        sb.Append($" --dalamud-working-directory=\"{_pathService.GetHooksPath(options.UseLatestPreRelease)}\"");
         sb.Append($" --dalamud-configuration-path=\"{_pathService.DalamudConfigPath}\"");
         sb.Append($" --logpath=\"{_pathService.LogPath}\"");
         sb.Append($" --dalamud-plugin-directory=\"{_pathService.PluginsPath}\"");
@@ -215,7 +217,7 @@ public class WindowsDalamudInjector : IDalamudInjector
     {
         var sb = new StringBuilder();
         sb.Append($"launch -g \"{gameExePath}\" -m entrypoint");
-        sb.Append($" --dalamud-working-directory=\"{_pathService.HooksDevPath}\"");
+        sb.Append($" --dalamud-working-directory=\"{_pathService.GetHooksPath(options.UseLatestPreRelease)}\"");
         sb.Append($" --dalamud-configuration-path=\"{_pathService.DalamudConfigPath}\"");
         sb.Append($" --logpath=\"{_pathService.LogPath}\"");
         sb.Append($" --dalamud-plugin-directory=\"{_pathService.PluginsPath}\"");
@@ -247,12 +249,11 @@ public class WindowsDalamudInjector : IDalamudInjector
     }
 
     private async Task<DalamudInjectionResult> ExecuteInjectorWindowsAsync(
+        string injectorPath,
         string arguments,
         Dictionary<string, string> environment,
         CancellationToken ct)
     {
-        var injectorPath = _pathService.InjectorPath;
-
         _logger.LogInformation("[DALAMUD-INJECT] Executing (Windows native): {Injector} {Args}", 
             injectorPath, arguments);
 

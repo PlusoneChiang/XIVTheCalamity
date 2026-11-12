@@ -16,6 +16,12 @@ public class GitHubRelease
     [JsonPropertyName("prerelease")]
     public bool Prerelease { get; set; }
 
+    [JsonPropertyName("draft")]
+    public bool Draft { get; set; }
+
+    [JsonPropertyName("published_at")]
+    public DateTimeOffset PublishedAt { get; set; }
+
     [JsonPropertyName("assets")]
     public List<GitHubReleaseAsset> Assets { get; set; } = [];
 }

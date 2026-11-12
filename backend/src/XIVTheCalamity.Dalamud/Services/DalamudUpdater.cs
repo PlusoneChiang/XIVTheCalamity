@@ -22,16 +22,13 @@ public class DalamudUpdater
     private readonly DalamudPathService _pathService;
     private readonly ConfigService _configService;
     private readonly HttpClient _httpClient;
-    // private const string VersionUrl = "https://plusonechiang.github.io/XIV-on-Mac-in-TC/dalamud_version.json";
-    // private const string AssetUrl = "https://plusonechiang.github.io/XIV-on-Mac-in-TC/dalamud_asset.json";
-
-    private const string VersionUrl = "https://plusonechiang.github.io/Dalamud/version.json";
     private const string AssetUrl = "https://plusonechiang.github.io/DalamudAssets/asset.json";
-    private const string GitHubReleasesUrl = "https://api.github.com/repos/PlusoneChiang/Dalamud/releases?per_page=20";
+    private const string GitHubReleasesUrl = "https://api.github.com/repos/PlusoneChiang/Dalamud-TC-Patcher/releases?per_page=100";
 
     private const string DotnetRuntimeUrl = "https://dotnetcli.azureedge.net/dotnet/Runtime/{0}/dotnet-runtime-{0}-win-x64.zip";
     private const string DesktopRuntimeUrl = "https://dotnetcli.azureedge.net/dotnet/WindowsDesktop/{0}/windowsdesktop-runtime-{0}-win-x64.zip";
     
+    private readonly SemaphoreSlim _updateLock = new(1, 1);
     private CancellationTokenSource? _cts;
     
     public DalamudUpdater(ILogger<DalamudUpdater> logger, DalamudPathService pathService, ConfigService configService)
@@ -58,13 +55,16 @@ public class DalamudUpdater
     }
     
     /// <summary>Get current status</summary>
-    public async Task<DalamudStatus> GetStatusAsync()
+    public async Task<DalamudStatus> GetStatusAsync(bool? useLatestPreRelease = null)
     {
         MigrateOldDalamudDirectories();
 
+        var usePreRelease = useLatestPreRelease ?? (await _configService.LoadConfigAsync()).Dalamud.UseLatestPreRelease;
+        var localVersionInfo = _pathService.GetLocalVersionInfo(usePreRelease);
         var status = new DalamudStatus
         {
-            LocalVersion = _pathService.GetLocalVersion(),
+            LocalVersion = localVersionInfo?.AssemblyVersion,
+            LocalVersionInfo = localVersionInfo,
             RuntimeVersion = _pathService.GetLocalRuntimeVersion(),
             RuntimeInstalled = _pathService.GetLocalRuntimeVersion() != null,
             AssetsVersion = _pathService.GetLocalAssetsVersion(),
@@ -75,8 +75,7 @@ public class DalamudUpdater
         {
             status.State = DalamudState.Checking;
 
-            var config = await _configService.LoadConfigAsync();
-            var remoteVersion = config.Dalamud.UseLatestPreRelease
+            var remoteVersion = usePreRelease
                 ? await GetLatestPreReleaseVersionInfoAsync()
                 : await GetRemoteVersionAsync();
             
@@ -98,7 +97,7 @@ public class DalamudUpdater
             {
                 status.State = DalamudState.NotInstalled;
             }
-            else if (status.LocalVersion == remoteVersion.AssemblyVersion && status.AssetsVersion == remoteAssetsVersion)
+            else if (IsUpToDate(status, remoteVersion, remoteAssetsVersion))
             {
                 status.State = DalamudState.UpToDate;
             }
@@ -116,70 +115,60 @@ public class DalamudUpdater
         
         return status;
     }
+
+    private static bool IsUpToDate(DalamudStatus status, DalamudVersionInfo version, int assetsVersion) =>
+        status.LocalVersion == version.AssemblyVersion && status.AssetsVersion == assetsVersion &&
+        (!version.RuntimeRequired || (status.RuntimeInstalled && status.RuntimeVersion == version.RuntimeVersion));
     
-    /// <summary>Get remote version information</summary>
-    public async Task<DalamudVersionInfo?> GetRemoteVersionAsync()
+    /// <summary>取得新來源最新正式版的版本資訊。</summary>
+    public Task<DalamudVersionInfo?> GetRemoteVersionAsync() => GetReleaseVersionInfoAsync(false);
+
+    /// <summary>優先取得候選版，沒有候選版時使用正式版。</summary>
+    public Task<DalamudVersionInfo?> GetLatestPreReleaseVersionInfoAsync() => GetReleaseVersionInfoAsync(true);
+
+    private static GitHubRelease? SelectRelease(IEnumerable<GitHubRelease> releases, bool usePreRelease)
+    {
+        var published = releases.Where(r => !r.Draft).OrderByDescending(r => r.PublishedAt).ToList();
+        return (usePreRelease ? published.FirstOrDefault(r => r.Prerelease) : null)
+            ?? published.FirstOrDefault(r => !r.Prerelease);
+    }
+
+    private async Task<DalamudVersionInfo?> GetReleaseVersionInfoAsync(bool usePreRelease)
     {
         try
         {
-            return await _httpClient.GetFromJsonAsync(VersionUrl, DalamudJsonContext.Default.DalamudVersionInfo);
+            var releases = new List<GitHubRelease>();
+            for (var page = 1; ; page++)
+            {
+                var batch = await _httpClient.GetFromJsonAsync($"{GitHubReleasesUrl}&page={page}", DalamudJsonContext.Default.ListGitHubRelease)
+                    ?? throw new InvalidDataException("GitHub Releases 回應為空。");
+                releases.AddRange(batch);
+                if (batch.Count < 100)
+                    break;
+            }
+            var target = SelectRelease(releases, usePreRelease);
+            if (target == null)
+                throw new InvalidDataException("新來源尚未提供所選頻道的 Dalamud 發布版本。");
+
+            var manifest = target.Assets.SingleOrDefault(a => a.Name == "versionInfo.json")
+                ?? throw new InvalidDataException($"Dalamud {target.TagName} 缺少 versionInfo.json。");
+            var releaseInfo = await _httpClient.GetFromJsonAsync(manifest.BrowserDownloadUrl, DalamudJsonContext.Default.DalamudReleaseInfo)
+                ?? throw new InvalidDataException("Dalamud versionInfo.json 為空。");
+            var checksum = target.Assets.SingleOrDefault(a => a.Name == $"dalamud-{releaseInfo.Id}.zip.sha256")
+                ?? throw new InvalidDataException("Dalamud Release 缺少 SHA-256 附件。");
+            var version = releaseInfo.ToVersionInfo(target, await _httpClient.GetStringAsync(checksum.BrowserDownloadUrl));
+
+            _logger.LogInformation("選用 Dalamud {Version}，上游={UpstreamVersion}，TC={TcRevision}，測試={PreReleaseRevision}",
+                version.AssemblyVersion, version.UpstreamVersion, version.TcRevision, version.PreReleaseRevision);
+            return version;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to retrieve remote version information");
+            _logger.LogError(ex, "無法取得 Dalamud 發布版本資訊");
             return null;
         }
     }
 
-    /// <summary>
-    /// Get version info from GitHub Releases.
-    /// Prefers the latest release marked as pre-release; falls back to the latest stable release.
-    /// </summary>
-    public async Task<DalamudVersionInfo?> GetLatestPreReleaseVersionInfoAsync()
-    {
-        try
-        {
-            var releases = await _httpClient.GetFromJsonAsync(GitHubReleasesUrl, DalamudJsonContext.Default.ListGitHubRelease);
-            if (releases == null || releases.Count == 0)
-            {
-                _logger.LogWarning("GitHub Releases API returned no releases");
-                return null;
-            }
-
-            // Prefer pre-release; fall back to latest stable
-            var target = releases.FirstOrDefault(r => r.Prerelease) ?? releases[0];
-
-            _logger.LogInformation("GitHub release selected: {Tag} (prerelease={IsPreRelease})",
-                target.TagName, target.Prerelease);
-
-            var zipAsset = target.Assets.FirstOrDefault(a =>
-                a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) ||
-                a.Name.EndsWith(".7z", StringComparison.OrdinalIgnoreCase));
-
-            if (zipAsset == null)
-            {
-                _logger.LogWarning("GitHub release {Tag} has no zip/7z asset", target.TagName);
-                return null;
-            }
-
-            return new DalamudVersionInfo
-            {
-                AssemblyVersion = target.TagName,
-                DownloadUrl = zipAsset.BrowserDownloadUrl,
-                SupportedGameVer = string.Empty,
-                RuntimeRequired = false,
-                RuntimeVersion = string.Empty,
-                Track = target.Prerelease ? "pre-release" : "stable",
-                DisplayName = target.Name
-            };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to retrieve GitHub release version information");
-            return null;
-        }
-    }
-    
     /// <summary>Get Asset list</summary>
     public async Task<DalamudAssetManifest?> GetAssetManifestAsync()
     {
@@ -197,100 +186,117 @@ public class DalamudUpdater
     /// <summary>Execute complete update and stream progress</summary>
     public async IAsyncEnumerable<DalamudUpdateProgress> UpdateAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var currentProgress = new DalamudUpdateProgress();
-        
-        MigrateOldDalamudDirectories();
-        
-        _pathService.EnsureDirectoriesExist();
-        
-        // 1. Check version
-        currentProgress = ReportProgress(currentProgress, DalamudUpdateStage.CheckingVersion, "Checking version...");
-        yield return currentProgress;
+        using var updateCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        await _updateLock.WaitAsync(cancellationToken);
+        _cts = updateCts;
+        try
+        {
+            var currentProgress = new DalamudUpdateProgress();
 
-        var config = await _configService.LoadConfigAsync();
-        var versionInfo = config.Dalamud.UseLatestPreRelease
-            ? await GetLatestPreReleaseVersionInfoAsync()
-            : await GetRemoteVersionAsync();
-        if (versionInfo == null)
-        {
-            currentProgress = ReportProgress(currentProgress, DalamudUpdateStage.Failed, "Failed to retrieve version");
-            currentProgress.HasError = true;
-            currentProgress.ErrorMessage = "Failed to retrieve remote version information";
+            MigrateOldDalamudDirectories();
+
+            _pathService.EnsureDirectoriesExist();
+
+            // 1. Check version
+            currentProgress = ReportProgress(currentProgress, DalamudUpdateStage.CheckingVersion, "Checking version...");
             yield return currentProgress;
-            yield break;
-        }
-        
-        var localVersion = _pathService.GetLocalVersion();
-        var needsUpdate = localVersion != versionInfo.AssemblyVersion;
-        
-        _logger.LogInformation("Dalamud version check: Local={LocalVersion}, Remote={RemoteVersion}, NeedsUpdate={NeedsUpdate}",
-            localVersion ?? "Not installed", versionInfo.AssemblyVersion, needsUpdate);
-        
-        // 2. Download Dalamud (if needed)
-        if (needsUpdate)
-        {
-            await foreach (var progress in DownloadDalamudAsync(versionInfo, _cts.Token))
+
+            var config = await _configService.LoadConfigAsync();
+            var versionInfo = config.Dalamud.UseLatestPreRelease
+                ? await GetLatestPreReleaseVersionInfoAsync()
+                : await GetRemoteVersionAsync();
+            if (versionInfo == null)
             {
-                yield return progress;
-                currentProgress = progress;
+                currentProgress = ReportProgress(currentProgress, DalamudUpdateStage.Failed, "Failed to retrieve version");
+                currentProgress.HasError = true;
+                currentProgress.ErrorMessage = "Failed to retrieve remote version information";
+                yield return currentProgress;
+                yield break;
             }
-            CleanupOldDalamudVersions(versionInfo.AssemblyVersion);
-        }
-        
-        // 3. Download Runtime (if needed)
-        if (versionInfo.RuntimeRequired)
-        {
-            var localRuntime = _pathService.GetLocalRuntimeVersion();
-            if (localRuntime != versionInfo.RuntimeVersion)
+
+            var localVersion = _pathService.GetLocalVersion(config.Dalamud.UseLatestPreRelease);
+            var needsUpdate = localVersion != versionInfo.AssemblyVersion;
+
+            _logger.LogInformation("Dalamud version check: Local={LocalVersion}, Remote={RemoteVersion}, NeedsUpdate={NeedsUpdate}",
+                localVersion ?? "Not installed", versionInfo.AssemblyVersion, needsUpdate);
+
+            // 2. Download Dalamud (if needed)
+            if (needsUpdate)
             {
-                await foreach (var progress in DownloadRuntimeAsync(versionInfo.RuntimeVersion, _cts.Token))
+                await foreach (var progress in DownloadDalamudAsync(versionInfo, config.Dalamud.UseLatestPreRelease, updateCts.Token))
                 {
                     yield return progress;
                     currentProgress = progress;
                 }
+                CleanupOldDalamudVersions(versionInfo.AssemblyVersion);
             }
-            else
+
+            // 3. Download Runtime (if needed)
+            if (versionInfo.RuntimeRequired)
             {
-                _logger.LogInformation("Runtime 已是最新版本: {Version}", localRuntime);
+                var localRuntime = _pathService.GetLocalRuntimeVersion();
+                if (localRuntime != versionInfo.RuntimeVersion)
+                {
+                    await foreach (var progress in DownloadRuntimeAsync(versionInfo.RuntimeVersion, updateCts.Token))
+                    {
+                        yield return progress;
+                        currentProgress = progress;
+                    }
+                }
+                else
+                {
+                    _logger.LogInformation("Runtime 已是最新版本: {Version}", localRuntime);
+                }
             }
+
+            // 4. 下載 Assets (版本有變時才強制重新下載)
+            var localAssetsVersion = _pathService.GetLocalAssetsVersion();
+            var assetManifest = await GetAssetManifestAsync();
+            var assetsNeedUpdate = assetManifest != null && localAssetsVersion != assetManifest.Version;
+
+            _logger.LogInformation("Assets version check: Local={LocalVersion}, Remote={RemoteVersion}, NeedsUpdate={NeedsUpdate}",
+                localAssetsVersion, assetManifest?.Version, assetsNeedUpdate);
+
+            await foreach (var progress in DownloadAssetsAsync(updateCts.Token, forceUpdate: assetsNeedUpdate, preloadedManifest: assetManifest))
+            {
+                yield return progress;
+                currentProgress = progress;
+            }
+
+            // 5. 刪除舊版 Assets 目錄
+            if (assetsNeedUpdate && assetManifest != null)
+            {
+                CleanupOldAssetsVersions(assetManifest.Version);
+            }
+
+            // 完成
+            currentProgress = ReportProgress(currentProgress, DalamudUpdateStage.Complete, "更新完成");
+            currentProgress.IsComplete = true;
+            yield return currentProgress;
         }
-        
-        // 4. 下載 Assets (版本有變時才強制重新下載)
-        var localAssetsVersion = _pathService.GetLocalAssetsVersion();
-        var assetManifest = await GetAssetManifestAsync();
-        var assetsNeedUpdate = assetManifest != null && localAssetsVersion != assetManifest.Version;
-        
-        _logger.LogInformation("Assets version check: Local={LocalVersion}, Remote={RemoteVersion}, NeedsUpdate={NeedsUpdate}",
-            localAssetsVersion, assetManifest?.Version, assetsNeedUpdate);
-        
-        await foreach (var progress in DownloadAssetsAsync(_cts.Token, forceUpdate: assetsNeedUpdate, preloadedManifest: assetManifest))
+        finally
         {
-            yield return progress;
-            currentProgress = progress;
+            _cts = null;
+            _updateLock.Release();
         }
-        
-        // 5. 刪除舊版 Assets 目錄
-        if (assetsNeedUpdate && assetManifest != null)
-        {
-            CleanupOldAssetsVersions(assetManifest.Version);
-        }
-        
-        // 完成
-        currentProgress = ReportProgress(currentProgress, DalamudUpdateStage.Complete, "更新完成");
-        currentProgress.IsComplete = true;
-        yield return currentProgress;
     }
-    
+
     /// <summary>取消更新</summary>
     public void Cancel()
     {
-        _cts?.Cancel();
+        try
+        {
+            _cts?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // 更新可能剛好在取消請求送達前結束。
+        }
     }
     
     #region Private Methods
     
-    private async IAsyncEnumerable<DalamudUpdateProgress> DownloadDalamudAsync(DalamudVersionInfo versionInfo, [EnumeratorCancellation] CancellationToken ct)
+    private async IAsyncEnumerable<DalamudUpdateProgress> DownloadDalamudAsync(DalamudVersionInfo versionInfo, bool useLatestPreRelease, [EnumeratorCancellation] CancellationToken ct)
     {
         var progress = new DalamudUpdateProgress
         {
@@ -314,6 +320,13 @@ public class DalamudUpdater
                 progress = downloadProgress;
             }
             
+            await using (var archiveStream = File.OpenRead(tempFile))
+            {
+                var hash = Convert.ToHexString(await SHA256.HashDataAsync(archiveStream, ct));
+                if (!hash.Equals(versionInfo.Sha256, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("Dalamud 套件 SHA-256 不符，已停止安裝。");
+            }
+
             // 解壓
             progress = ReportProgress(progress, DalamudUpdateStage.ExtractingDalamud, "解壓 Dalamud...");
             yield return progress;
@@ -323,8 +336,8 @@ public class DalamudUpdater
             var versionJson = JsonSerializer.Serialize(versionInfo, DalamudJsonContext.Default.DalamudVersionInfo);
             await File.WriteAllTextAsync(Path.Combine(targetDir, "version.json"), versionJson, ct);
             
-            // 更新 dev 目錄 (符號連結或複製)
-            await UpdateDevLinkAsync(targetDir, _pathService.HooksDevPath, ct);
+            // 只更新所選頻道，保留另一個頻道的安裝。
+            await ReplaceDirectoryAsync(targetDir, _pathService.GetHooksPath(useLatestPreRelease), ct);
             
             _logger.LogInformation("Dalamud {Version} 安裝完成", versionInfo.AssemblyVersion);
         }
@@ -650,7 +663,7 @@ public class DalamudUpdater
         await File.WriteAllTextAsync(_pathService.AssetsVersionFile, manifest.Version.ToString(), ct);
         
         // 更新 dev 目錄
-        await UpdateDevLinkAsync(assetDir, _pathService.AssetsDevPath, ct);
+        await ReplaceDirectoryAsync(assetDir, _pathService.AssetsDevPath, ct);
         
         _logger.LogInformation("Assets v{Version} 安裝完成", manifest.Version);
     }
@@ -861,16 +874,16 @@ public class DalamudUpdater
         }
     }
     
-    private async Task UpdateDevLinkAsync(string sourcePath, string devPath, CancellationToken ct)
+    private async Task ReplaceDirectoryAsync(string sourcePath, string targetPath, CancellationToken ct)
     {
         await Task.Run(() =>
         {
-            // 刪除舊的 dev 目錄
-            if (Directory.Exists(devPath))
-                Directory.Delete(devPath, true);
+            // 替換所選安裝或資源目錄。
+            if (Directory.Exists(targetPath))
+                Directory.Delete(targetPath, true);
             
-            // 複製檔案到 dev
-            CopyDirectory(sourcePath, devPath);
+            // 複製完整套件。
+            CopyDirectory(sourcePath, targetPath);
         }, ct);
     }
     
@@ -941,7 +954,7 @@ public class DalamudUpdater
             foreach (var dir in Directory.GetDirectories(hooksPath))
             {
                 var dirName = Path.GetFileName(dir);
-                if (dirName == "dev" || dirName == currentVersion)
+                if (dirName == "dev" || dirName == "release" || dirName == currentVersion)
                     continue;
 
                 _logger.LogInformation("刪除舊版 Dalamud 目錄: {Version}", dirName);

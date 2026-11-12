@@ -6,6 +6,7 @@ import '../../utils/polyfill.js';
 import i18n from '../../i18n/index.js';
 import { applyTheme } from '../../utils/theme.js';
 import { getLastUsedAccount, deleteOTPSecret, getAccountsWithProfiles, bindProfile, unbindProfile } from '../../utils/credentialsStore.js';
+import { getDalamudVersionDisplay } from './dalamudVersion.js';
 
 let currentConfig = null;
 let currentGlobalConfig = null;
@@ -13,6 +14,8 @@ let currentPlatform = 'win32';
 let localProfiles = ['default'];
 let currentSelectedProfile = 'default';
 let startupActiveProfile = 'default';
+let dalamudVersionInitialized = false;
+let dalamudVersionRequestId = 0;
 let profileDescriptions = {}; // Map of profileName -> description string
 
 /**
@@ -275,6 +278,8 @@ function populateForm(config, applyVisuals = false) {
     document.getElementById('pluginRepoUrl').value = repoUrls.join('\n');
     document.getElementById('entryPointMode').checked = config.dalamud.useEntryPoint ?? true;
     document.getElementById('useLatestPreRelease').checked = config.dalamud.useLatestPreRelease || false;
+    syncPreReleaseVersionVisibility();
+    if (dalamudVersionInitialized) loadDalamudVersion();
   }
 }
 
@@ -383,8 +388,11 @@ async function persistConfig(closeWindow) {
     
     const gamePathChanged = !!(oldGamePath && newGamePath && oldGamePath !== newGamePath);
     const oldDalamudEnabled = currentConfig?.dalamud?.enabled || false;
+    const oldUseLatestPreRelease = currentConfig?.dalamud?.useLatestPreRelease || false;
     const newDalamudEnabled = formData.dalamud?.enabled || false;
-    const dalamudEnabledChanged = oldDalamudEnabled !== newDalamudEnabled;
+    const newUseLatestPreRelease = formData.dalamud?.useLatestPreRelease || false;
+    const dalamudEnabledChanged = oldDalamudEnabled !== newDalamudEnabled ||
+      (newDalamudEnabled && oldUseLatestPreRelease !== newUseLatestPreRelease);
     
     console.log('[Settings] Saving configuration for profile:', selectedProfile);
     
@@ -804,8 +812,12 @@ function initProtonGeTab() {
  */
 function initDalamudTab() {
   // Load Dalamud version
+  dalamudVersionInitialized = true;
   loadDalamudVersion();
-  
+  document.getElementById('useLatestPreRelease').addEventListener('change', () => {
+    syncPreReleaseVersionVisibility();
+    loadDalamudVersion();
+  });
 }
 
 /**
@@ -870,15 +882,54 @@ async function handleTestLaunch() {
  * Load Dalamud version
  */
 async function loadDalamudVersion() {
+  const requestId = ++dalamudVersionRequestId;
+  for (const id of ['dalamudUpstreamVersion', 'dalamudTcVersion', 'dalamudPreReleaseVersion']) {
+    document.getElementById(id).textContent = '—';
+  }
+  const useLatestPreRelease = document.getElementById('useLatestPreRelease').checked;
   try {
-    const response = await window.xivtc.backend.call('/api/dalamud/status');
-    if (response.ok && response.data) {
+    const response = await window.xivtc.backend.call(`/api/dalamud/status?useLatestPreRelease=${useLatestPreRelease}`);
+    if (requestId !== dalamudVersionRequestId) return;
+    if (response.ok && response.data && (response.data.success === undefined || response.data.success === true)) {
       const result = response.data.success ? response.data.data : response.data;
-      document.getElementById('dalamudVersion').textContent = result.localVersion || 'Unknown';
+      renderDalamudVersion(result);
+      return;
     }
+    renderDalamudVersion();
   } catch (error) {
     console.error('[Settings] Failed to load Dalamud version:', error);
-    document.getElementById('dalamudVersion').textContent = 'Failed to load';
+    if (requestId === dalamudVersionRequestId) renderDalamudVersion();
+  }
+}
+
+function syncPreReleaseVersionVisibility() {
+  document.getElementById('dalamudPreReleaseVersionGroup').classList.toggle(
+    'hidden',
+    !document.getElementById('useLatestPreRelease').checked
+  );
+}
+
+function renderDalamudVersion(status) {
+  const version = getDalamudVersionDisplay(status);
+  if (version.error) {
+    renderDalamudVersionError();
+    return;
+  }
+  const unavailable = i18n.t(version.installed ? 'settings.dalamud.not_available' : 'settings.dalamud.not_installed');
+  document.getElementById('dalamudUpstreamVersion').textContent = version.installed
+    ? version.upstream || i18n.t('settings.dalamud.version_unknown')
+    : unavailable;
+  document.getElementById('dalamudTcVersion').textContent = version.installed
+    ? version.tcRevision === null ? i18n.t('settings.dalamud.version_unknown') : `tc.${version.tcRevision}`
+    : unavailable;
+  document.getElementById('dalamudPreReleaseVersion').textContent = version.installed
+    ? version.preReleaseRevision === null ? i18n.t('settings.dalamud.none') : `rc.${version.preReleaseRevision}`
+    : unavailable;
+}
+
+function renderDalamudVersionError() {
+  for (const id of ['dalamudUpstreamVersion', 'dalamudTcVersion', 'dalamudPreReleaseVersion']) {
+    document.getElementById(id).textContent = i18n.t('settings.dalamud.version_load_failed');
   }
 }
 
@@ -1384,6 +1435,7 @@ async function initProfileSection() {
             
             if (switchResponse.ok) {
               const oldDalamudEnabled = currentConfig?.dalamud?.enabled || false;
+              const oldUseLatestPreRelease = currentConfig?.dalamud?.useLatestPreRelease || false;
 
               if (activeEmail) await bindProfile(activeEmail, targetProfile);
 
@@ -1391,7 +1443,9 @@ async function initProfileSection() {
               await loadConfig(targetProfile, true); // true to apply theme immediately
               
               const newDalamudEnabled = currentConfig?.dalamud?.enabled || false;
-              const dalamudEnabledChanged = oldDalamudEnabled !== newDalamudEnabled;
+              const newUseLatestPreRelease = currentConfig?.dalamud?.useLatestPreRelease || false;
+              const dalamudEnabledChanged = oldDalamudEnabled !== newDalamudEnabled ||
+                (newDalamudEnabled && oldUseLatestPreRelease !== newUseLatestPreRelease);
 
               console.log('[Settings] Notifying login page of profile switch. dalamudEnabledChanged:', dalamudEnabledChanged);
               await window.xivtc.events.send('config-changed', {
@@ -1442,8 +1496,16 @@ async function initProfileSection() {
                     body: JSON.stringify({ name: 'default' })
                   });
                   if (switchResponse.ok && activeEmail) await bindProfile(activeEmail, 'default');
+                  const oldDalamudEnabled = currentConfig?.dalamud?.enabled || false;
+                  const oldUseLatestPreRelease = currentConfig?.dalamud?.useLatestPreRelease || false;
                   await loadConfig('default', true);
-                  await window.xivtc.events.send('config-changed', {});
+                  const newDalamudEnabled = currentConfig?.dalamud?.enabled || false;
+                  const newUseLatestPreRelease = currentConfig?.dalamud?.useLatestPreRelease || false;
+                  const dalamudEnabledChanged = oldDalamudEnabled !== newDalamudEnabled ||
+                    (newDalamudEnabled && oldUseLatestPreRelease !== newUseLatestPreRelease);
+                  await window.xivtc.events.send('config-changed', {
+                    dalamudEnabledChanged: dalamudEnabledChanged ? newDalamudEnabled : undefined
+                  });
                   await initProfileSection();
                 } else {
                   // Deleted a non-active profile → just reload list
@@ -1556,12 +1618,15 @@ async function initProfileSection() {
           if (activeEmail) await bindProfile(activeEmail, sanitized);
 
           const oldDalamudEnabled = currentConfig?.dalamud?.enabled || false;
+          const oldUseLatestPreRelease = currentConfig?.dalamud?.useLatestPreRelease || false;
 
           // 5. Load the new configuration and update UI
           await loadConfig(sanitized, true);
           
           const newDalamudEnabled = currentConfig?.dalamud?.enabled || false;
-          const dalamudEnabledChanged = oldDalamudEnabled !== newDalamudEnabled;
+          const newUseLatestPreRelease = currentConfig?.dalamud?.useLatestPreRelease || false;
+          const dalamudEnabledChanged = oldDalamudEnabled !== newDalamudEnabled ||
+            (newDalamudEnabled && oldUseLatestPreRelease !== newUseLatestPreRelease);
 
           console.log('[Settings] Notifying login page of profile creation switch. dalamudEnabledChanged:', dalamudEnabledChanged);
           await window.xivtc.events.send('config-changed', {

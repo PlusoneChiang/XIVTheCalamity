@@ -13,6 +13,7 @@ namespace XIVTheCalamity.Dalamud.Json;
     PropertyNameCaseInsensitive = true,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(DalamudVersionInfo))]
+[JsonSerializable(typeof(DalamudReleaseInfo))]
 [JsonSerializable(typeof(DalamudAssetManifest))]
 [JsonSerializable(typeof(DalamudAssetEntry))]
 [JsonSerializable(typeof(DalamudStatus))]

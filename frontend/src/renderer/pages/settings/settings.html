@@ -387,8 +387,12 @@
           <h2 data-i18n="settings.tab.dalamud">Dalamud</h2>
           <div class="form-group">
             <div>
-              <label data-i18n="settings.dalamud.version">Dalamud 版本</label>
-              <div class="readonly-field" id="dalamudVersion">-</div>
+              <label data-i18n="settings.dalamud.upstream_version">國際服上游版本</label>
+              <div class="readonly-field" id="dalamudUpstreamVersion">-</div>
+            </div>
+            <div>
+              <label data-i18n="settings.dalamud.tc_version">TC 修補版本</label>
+              <div class="readonly-field" id="dalamudTcVersion">-</div>
             </div>
             <div>
               <label>
@@ -427,6 +431,10 @@
                 <span data-i18n="settings.dalamud.use_prerelease">使用最新 Pre-release 版本</span>
               </label>
               <p class="help-text" data-i18n="settings.dalamud.use_prerelease_help">從 GitHub Releases 自動取得最新 pre-release 版本，無 pre-release 時 fallback 至最新 stable</p>
+              <div id="dalamudPreReleaseVersionGroup" class="hidden">
+                <label data-i18n="settings.dalamud.prerelease_version">Pre-release 版次</label>
+                <div class="readonly-field" id="dalamudPreReleaseVersion">-</div>
+              </div>
             </div>
           </div>
         </div>

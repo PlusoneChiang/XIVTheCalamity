@@ -16,14 +16,14 @@ public class LinuxDalamudInjector : WineDalamudInjector
     {
     }
 
-    protected override void PreInjectHook()
+    protected override void PreInjectHook(string workingDirectory)
     {
-        ClearLinuxCachedSignatures();
+        ClearLinuxCachedSignatures(workingDirectory);
     }
 
-    private void ClearLinuxCachedSignatures()
+    private void ClearLinuxCachedSignatures(string workingDirectory)
     {
-        var cacheDir = Path.Combine(_pathService.HooksDevPath, "cachedSigs");
+        var cacheDir = Path.Combine(workingDirectory, "cachedSigs");
         if (!Directory.Exists(cacheDir))
         {
             _logger.LogDebug("[DALAMUD-INJECT] cachedSigs directory not found: {CacheDir}", cacheDir);

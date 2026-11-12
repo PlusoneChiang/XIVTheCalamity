@@ -58,6 +58,7 @@ public static class GameEndpoints
                     {
                         NoPlugin = config.Dalamud.SafeMode,
                         NoThirdPartyPlugin = config.Dalamud.SafeMode,
+                        UseLatestPreRelease = config.Dalamud.UseLatestPreRelease,
                         PluginRepoUrl = config.Dalamud.PluginRepoUrl
                     };
 
@@ -216,6 +217,7 @@ public static class GameEndpoints
                     {
                         NoPlugin = config.Dalamud.SafeMode,
                         NoThirdPartyPlugin = config.Dalamud.SafeMode,
+                        UseLatestPreRelease = config.Dalamud.UseLatestPreRelease,
                         PluginRepoUrl = config.Dalamud.PluginRepoUrl
                     };
 
@@ -372,6 +374,7 @@ public static class GameEndpoints
                 DelayInitializeMs = dalamudConfig.InjectDelay > 0 ? dalamudConfig.InjectDelay : null,
                 NoPlugin = dalamudConfig.SafeMode,
                 NoThirdPartyPlugin = dalamudConfig.SafeMode,
+                UseLatestPreRelease = dalamudConfig.UseLatestPreRelease,
                 PluginRepoUrl = dalamudConfig.PluginRepoUrl
             };
             

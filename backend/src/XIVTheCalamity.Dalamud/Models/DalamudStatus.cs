@@ -37,6 +37,9 @@ public class DalamudStatus
     
     /// <summary>Local version (null = not installed)</summary>
     public string? LocalVersion { get; set; }
+
+    /// <summary>已安裝套件的完整版本資訊；未安裝或紀錄損壞時為 null。</summary>
+    public DalamudVersionInfo? LocalVersionInfo { get; set; }
     
     /// <summary>Remote version</summary>
     public string? RemoteVersion { get; set; }
