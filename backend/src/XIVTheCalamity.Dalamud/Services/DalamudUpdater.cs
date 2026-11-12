@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using SharpCompress.Archives;
 using SharpCompress.Archives.SevenZip;
@@ -58,6 +59,12 @@ public class DalamudUpdater
     public async Task<DalamudStatus> GetStatusAsync(bool? useLatestPreRelease = null)
     {
         MigrateOldDalamudDirectories();
+
+        if (await _updateLock.WaitAsync(0))
+        {
+            try { CleanupOldDalamudVersions(); }
+            finally { _updateLock.Release(); }
+        }
 
         var usePreRelease = useLatestPreRelease ?? (await _configService.LoadConfigAsync()).Dalamud.UseLatestPreRelease;
         var localVersionInfo = _pathService.GetLocalVersionInfo(usePreRelease);
@@ -228,8 +235,8 @@ public class DalamudUpdater
                     yield return progress;
                     currentProgress = progress;
                 }
-                CleanupOldDalamudVersions(versionInfo.AssemblyVersion);
             }
+            CleanupOldDalamudVersions();
 
             // 3. Download Runtime (if needed)
             if (versionInfo.RuntimeRequired)
@@ -306,11 +313,13 @@ public class DalamudUpdater
         yield return progress;
         
         var ext = GetArchiveExtension(versionInfo.DownloadUrl);
-        var tempFile = Path.Combine(Path.GetTempPath(), $"dalamud_{versionInfo.AssemblyVersion}{ext}");
-        var targetDir = _pathService.GetHooksVersionPath(versionInfo.AssemblyVersion);
+        var tempDir = Path.Combine(Path.GetTempPath(), $"xivtc-dalamud-{Guid.NewGuid():N}");
+        var tempFile = Path.Combine(tempDir, $"package{ext}");
+        var targetDir = Path.Combine(tempDir, "extracted");
         
         try
         {
+            Directory.CreateDirectory(tempDir);
             // 下載
             _logger.LogInformation("下載 Dalamud 從: {Url}", versionInfo.DownloadUrl);
             await foreach (var downloadProgress in DownloadFileWithProgressAsync(versionInfo.DownloadUrl, tempFile, ct))
@@ -343,8 +352,8 @@ public class DalamudUpdater
         }
         finally
         {
-            if (File.Exists(tempFile))
-                File.Delete(tempFile);
+            if (Directory.Exists(tempDir))
+                Directory.Delete(tempDir, recursive: true);
         }
     }
     
@@ -943,18 +952,22 @@ public class DalamudUpdater
         return url;
     }
 
-    private void CleanupOldDalamudVersions(string currentVersion)
+    private void CleanupOldDalamudVersions()
     {
         try
         {
             var hooksPath = _pathService.HooksPath;
             if (!Directory.Exists(hooksPath))
                 return;
+            if (!File.Exists(_pathService.GetInjectorPath(false)) && !File.Exists(_pathService.GetInjectorPath(true)))
+                return;
 
             foreach (var dir in Directory.GetDirectories(hooksPath))
             {
                 var dirName = Path.GetFileName(dir);
-                if (dirName == "dev" || dirName == "release" || dirName == currentVersion)
+                if (dirName == "dev" || dirName == "release" ||
+                    !Regex.IsMatch(dirName, @"\Av?\d+\.\d+\.\d+\.\d+-tc\.[1-9]\d*(?:-rc\.[1-9]\d*)?\z") ||
+                    !File.Exists(Path.Combine(dir, "version.json")))
                     continue;
 
                 _logger.LogInformation("刪除舊版 Dalamud 目錄: {Version}", dirName);

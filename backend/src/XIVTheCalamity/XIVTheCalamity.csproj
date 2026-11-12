@@ -5,7 +5,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>2.3.1</Version>
+    <Version>2.4.0</Version>
     <ApplicationIcon>icon.ico</ApplicationIcon>
     
     <!-- NativeAOT 配置 -->

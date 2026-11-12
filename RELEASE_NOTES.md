@@ -1,5 +1,18 @@
 # Release Notes
 
+## v2.4.0
+#### 🇹🇼 zh-TW
+- 改用原生 IPC 橋接，移除本機連接埠並加入單一實例保護。
+- Dalamud 改用 `Dalamud-TC-Patcher` 來源，分開管理正式版與 Pre-release。
+- 移除官方公告版面，統一使用本機版面。
+- 改善設定頁顯示與翻譯，修正開啟記錄資料夾功能。
+
+#### 🇺🇸 English
+- Switched to native IPC, removed the local listening port, and added single-instance protection.
+- Switched Dalamud to `Dalamud-TC-Patcher` with separate stable and Pre-release installations.
+- Removed the official announcement page in favor of the local layout.
+- Improved settings layout and translations, and fixed opening the log folder.
+
 ## v2.3.1
 #### 🇹🇼 zh-TW
 - 限制檔案存取與工具執行權限，外部網頁僅允許開啟官方 HTTPS 網域。

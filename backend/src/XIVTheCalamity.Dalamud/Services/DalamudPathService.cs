@@ -38,10 +38,6 @@ public class DalamudPathService
     /// <summary>Plugins directory (Profile-specific)</summary>
     public string PluginsPath => Path.Combine(ProfileDalamudPath, "installedPlugins");
     
-    /// <summary>Get Hooks directory for specific version</summary>
-    public string GetHooksVersionPath(string version) => 
-        Path.Combine(HooksPath, version);
-    
     /// <summary>Pre-release 安裝與執行目錄。</summary>
     public string HooksDevPath => Path.Combine(HooksPath, "dev");
 
