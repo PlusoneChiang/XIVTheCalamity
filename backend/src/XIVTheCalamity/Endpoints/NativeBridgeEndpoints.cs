@@ -182,22 +182,24 @@ public static class NativeBridgeEndpoints
         app.MapPost("/api/app/open-log-folder", () =>
         {
             try
-            {
-                var logDir = Path.GetDirectoryName(Program.GetLogFilePath());
-                if (logDir != null && Directory.Exists(logDir))
+            {   
+                var logDir = Path.GetDirectoryName(Program.GetLogFilePath())!;
+                if (Directory.Exists(logDir))
                 {
-                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    var startInfo = new ProcessStartInfo
                     {
-                        Process.Start("explorer.exe", logDir);
-                    }
-                    else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                    {
-                        Process.Start("open", logDir);
-                    }
-                    else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                    {
-                        Process.Start("xdg-open", logDir);
-                    }
+                        UseShellExecute = false,
+                        FileName = true switch
+                        {
+                            _ when OperatingSystem.IsWindows() => "explorer.exe",
+                            _ when OperatingSystem.IsMacOS() => "/usr/bin/open",
+                            _ when OperatingSystem.IsLinux() => "xdg-open",
+                            _ => "unknown"
+                        }
+                    };
+                    startInfo.ArgumentList.Add(logDir);
+                    using var process = Process.Start(startInfo)
+                        ?? throw new InvalidOperationException("無法開啟資料夾。");
                 }
                 return Results.Ok(new GenericActionResponse(true));
             }

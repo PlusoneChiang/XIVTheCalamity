@@ -342,7 +342,6 @@ async function loadGlobalConfig() {
     const response = await window.xivtc.backend.call('/api/config/global', { method: 'GET' });
     if (!response.ok || !response.data) throw new Error(response.data?.error?.message || response.statusText || 'Load failed');
     currentGlobalConfig = response.data.success ? response.data.data : response.data;
-    document.getElementById('announcementMode').value = currentGlobalConfig.announcementMode === 'official' ? 'official' : 'local';
     document.getElementById('debugLogging').checked = currentGlobalConfig.developmentMode === true;
     document.getElementById('enablePreRelease').checked = currentGlobalConfig.enablePreRelease === true;
     document.getElementById('gamePath').value = currentGlobalConfig.gamePath || '';
@@ -355,7 +354,6 @@ async function loadGlobalConfig() {
 
 function collectGlobalConfig() {
   return {
-    announcementMode: document.getElementById('announcementMode').value === 'official' ? 'official' : 'local',
     developmentMode: document.getElementById('debugLogging').checked,
     enablePreRelease: document.getElementById('enablePreRelease').checked,
     gamePath: document.getElementById('gamePath').value,
@@ -488,10 +486,11 @@ function initGlobalTab() {
     try {
       const result = await window.xivtc.openLogFolder();
       if (!result.success) {
-        console.error('[Settings] Failed to open log folder:', result.error);
+        throw new Error(result.message || i18n.t('settings.general.open_log_failed'));
       }
     } catch (error) {
       console.error('[Settings] Failed to open log folder:', error);
+      alert(`${i18n.t('settings.general.open_log_failed')}\n${error.message}`);
     }
   });
 

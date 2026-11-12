@@ -285,16 +285,6 @@ body {
     height: 630px;
 }
 
-.news-section iframe {
-    width: 540px;
-    height: 630px;
-    border: none;
-    border-radius: 16px;
-    background: #ffffff;
-    opacity: 1;
-    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
-}
-
 /* Login Section (Right 40%) */
 .login-section {
     position: absolute;

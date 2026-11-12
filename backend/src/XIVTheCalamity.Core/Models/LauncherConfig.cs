@@ -40,9 +40,6 @@ public class LauncherConfig
     /// </summary>
     public bool EnablePreRelease { get; set; } = false;
 
-    /// <summary>公告模式：local 使用本機版面；official 載入官方頁面。</summary>
-    public string AnnouncementMode { get; set; } = "local";
-
     /// <summary>
     /// UI theme (dark, light, valentine)
     /// </summary>

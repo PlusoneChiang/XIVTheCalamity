@@ -1,5 +1,4 @@
 using XIVTheCalamity.DTOs;
-using XIVTheCalamity.Services;
 using XIVTheCalamity.Core.Models;
 using XIVTheCalamity.Core.Services;
 using XIVTheCalamity.Platform;
@@ -29,7 +28,6 @@ public static class ConfigEndpoints
         });
 
         group.MapPut("/global", async (
-            HttpContext context,
             GlobalConfig global,
             ConfigService configService,
             XIVTheCalamity.Services.EventBroadcastHub eventHub,
@@ -41,8 +39,6 @@ public static class ConfigEndpoints
                 XIVTheCalamity.MainWindowContainer.UpdateDevMode(global.DevelopmentMode);
                 var config = await configService.LoadConfigAsync();
                 eventHub.Broadcast("config-updated", System.Text.Json.JsonSerializer.SerializeToElement(config, AppJsonContext.Default.AppConfig));
-                if (global.AnnouncementMode != Program.AnnouncementMode && RestartLauncher(context) is { } restartError)
-                    return restartError;
                 return Results.Json(ApiResponse<GlobalConfig>.Ok(global), AppJsonContext.Default.ApiResponseGlobalConfig);
             }
             catch (ArgumentException ex)
@@ -453,15 +449,4 @@ public static class ConfigEndpoints
             CopyDirectoryRecursive(folder, dest);
         }
     }
-    private static IResult? RestartLauncher(HttpContext context)
-    {
-        try { LauncherRestart.Schedule(context); return null; }
-        catch (Exception ex)
-        {
-            Serilog.Log.Error(ex, "設定已儲存，但無法重新啟動啟動器");
-            return Results.Json(ApiErrorResponse.Create("RESTART_FAILED", "設定已儲存，但無法自動重新啟動；請手動重新啟動啟動器。", ex.Message),
-                AppJsonContext.Default.ApiErrorResponse, statusCode: 500);
-        }
-    }
-
 }

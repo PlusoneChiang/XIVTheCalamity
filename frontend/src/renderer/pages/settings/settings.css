@@ -237,8 +237,10 @@ body {
 }
 
 /* Checkbox Group */
-.checkbox-group {
+.checkbox-group,
+.settings-section > .form-group > .checkbox-group {
   display: flex;
+  flex-direction: row;
   align-items: center;
   justify-content: space-between;
 }
@@ -251,6 +253,10 @@ body {
 
 .checkbox-group label span {
   user-select: none;
+}
+
+#openLogPathButton {
+  align-self: flex-start;
 }
 
 /* Input with Button */

@@ -29,22 +29,15 @@
           <h2 data-i18n="settings.global.basic">全域設定</h2>
           <div class="form-group">
             <div>
-              <label for="announcementMode" data-i18n="settings.general.announcement_mode">公告模式</label>
-              <select id="announcementMode">
-                <option value="local" data-i18n="settings.general.announcement_mode_local">本機版面（建議）</option>
-                <option value="official" data-i18n="settings.general.announcement_mode_official">官方公告頁</option>
-              </select>
-              <p class="help-text" data-i18n="settings.general.announcement_mode_local_help">本機版面只顯示公告資料，不執行公告頁的外部 JavaScript。</p>
-              <p class="help-text" data-i18n="settings.general.announcement_mode_official_help">官方公告頁會載入其外部內容與 JavaScript；選擇此模式代表你接受較高風險。變更公告模式並儲存或套用後，啟動器會自動重新啟動。</p>
-            </div>
-            <div class="checkbox-group">
-              <label>
-                <input type="checkbox" id="debugLogging">
-                <span data-i18n="settings.general.debug">Debug 記錄</span>
-              </label>
+              <div class="checkbox-group">
+                <label>
+                  <input type="checkbox" id="debugLogging">
+                  <span data-i18n="settings.general.debug">Debug 記錄</span>
+                </label>
+              </div>
               <button id="openLogPathButton" class="btn btn-secondary btn-sm" data-i18n="settings.general.open_log">開啟</button>
             </div>
-            <div class="checkbox-group" style="margin-top: 10px; align-items: flex-start;">
+            <div class="checkbox-group">
               <label>
                 <input type="checkbox" id="enablePreRelease">
                 <span data-i18n="settings.general.enable_pre_release">接收測試通道更新</span>

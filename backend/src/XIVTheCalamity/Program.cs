@@ -27,7 +27,6 @@ namespace XIVTheCalamity;
 public class Program
 {
     private static WebApplication? _webApp;
-    public static string AnnouncementMode { get; private set; } = "local";
     private static readonly string ApiToken = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
 
     [DllImport("libc", EntryPoint = "getuid")]
@@ -80,8 +79,6 @@ public class Program
             // 3. 確認 Kestrel 啟動成功後才開啟視窗
             MainWindowContainer.Port = port;
             StartKestrelServer(port, args, logPath);
-            var startupConfig = _webApp!.Services.GetRequiredService<ConfigService>().LoadConfigAsync().GetAwaiter().GetResult();
-            AnnouncementMode = startupConfig.Launcher.AnnouncementMode == "official" ? "official" : "local";
 
             // 4. 初始化並載入 Photino 視窗 UI
             string platformStr = "linux";
@@ -126,7 +123,7 @@ public class Program
                 })
                 .SetDevToolsEnabled(true)
                 .SetContextMenuEnabled(true)
-                .SetWebSecurityEnabled(AnnouncementMode != "official")
+                .SetWebSecurityEnabled(true)
                 .RegisterCustomSchemeHandler(vhScheme, (object sender, string scheme, string request, out string contentType) =>
                 {
                     try
@@ -143,7 +140,7 @@ public class Program
                             {
                                 // 僅注入內嵌視窗，不透過 localhost 靜態頁面暴露 API 存取權限。
                                 var html = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-                                html = html.Replace("<head>", $"<head><meta name=\"xivtc-api-token\" content=\"{ApiToken}\"><meta name=\"xivtc-announcement-mode\" content=\"{AnnouncementMode}\">");
+                                html = html.Replace("<head>", $"<head><meta name=\"xivtc-api-token\" content=\"{ApiToken}\">");
                                 return new MemoryStream(System.Text.Encoding.UTF8.GetBytes(html));
                             }
                             return response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();

@@ -223,7 +223,6 @@ public class ConfigService
         {
             var node = JsonSerializer.SerializeToNode(config, CoreJsonContext.Default.AppConfig)!.AsObject();
             node["game"]?.AsObject().Remove("gamePath");
-            node["launcher"]?.AsObject().Remove("announcementMode");
             node["launcher"]?.AsObject().Remove("developmentMode");
             node["launcher"]?.AsObject().Remove("showDalamudTab");
             node["launcher"]?.AsObject().Remove("enablePreRelease");
@@ -311,7 +310,6 @@ public class ConfigService
     {
         var global = await LoadGlobalConfigAsync();
         config.Game.GamePath = global.GamePath;
-        config.Launcher.AnnouncementMode = global.AnnouncementMode;
         config.Launcher.DevelopmentMode = global.DevelopmentMode;
         config.Launcher.ShowDalamudTab = global.ShowDalamudTab;
         config.Launcher.EnablePreRelease = global.EnablePreRelease;
@@ -327,7 +325,6 @@ public class ConfigService
         {
             GamePath = defaultLegacy.GamePath,
             ShowDalamudTab = defaultLegacy.ShowDalamudTab,
-            AnnouncementMode = activeLegacy.AnnouncementMode,
             DevelopmentMode = activeLegacy.DevelopmentMode,
             EnablePreRelease = activeLegacy.EnablePreRelease
         };
@@ -347,7 +344,6 @@ public class ConfigService
             {
                 GamePath = game.ValueKind == JsonValueKind.Object && game.TryGetProperty("gamePath", out var gamePath) ? gamePath.GetString() ?? "" : "",
                 ShowDalamudTab = launcher.ValueKind == JsonValueKind.Object && launcher.TryGetProperty("showDalamudTab", out var showTab) && showTab.ValueKind == JsonValueKind.True,
-                AnnouncementMode = launcher.ValueKind == JsonValueKind.Object && launcher.TryGetProperty("announcementMode", out var mode) && mode.GetString() == "official" ? "official" : "local",
                 DevelopmentMode = launcher.ValueKind == JsonValueKind.Object && launcher.TryGetProperty("developmentMode", out var development) && development.ValueKind == JsonValueKind.True,
                 EnablePreRelease = launcher.ValueKind == JsonValueKind.Object && launcher.TryGetProperty("enablePreRelease", out var preRelease) && preRelease.ValueKind == JsonValueKind.True
             };
@@ -361,8 +357,6 @@ public class ConfigService
 
     private static void ValidateGlobalConfig(GlobalConfig global, bool validateGamePath)
     {
-        if (global.AnnouncementMode is not ("local" or "official"))
-            throw new ArgumentException("公告模式必須是 local 或 official。");
         if (validateGamePath && !string.IsNullOrEmpty(global.GamePath) && !Directory.Exists(global.GamePath))
             throw new ArgumentException($"Game path does not exist: {global.GamePath}");
     }

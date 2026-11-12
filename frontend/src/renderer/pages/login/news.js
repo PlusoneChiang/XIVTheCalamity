@@ -1,7 +1,6 @@
 import { apiFetch } from '../../utils/polyfill.js';
 import i18n from '../../i18n/index.js';
 
-const OFFICIAL_NEWS_URL = 'https://user-cdn.ffxiv.com.tw/news/251115/launcher_left.html';
 const LOCAL_IMAGE_HOSTS = new Set(['file.ffxiv.com.tw']);
 const CATEGORIES = ['最新', '活動', '更新', '維護', '其他'];
 
@@ -223,39 +222,8 @@ async function loadLocalNews(container) {
   }
 }
 
-function setupOfficialNews(section) {
-  section.replaceChildren();
-  const frame = document.createElement('iframe');
-  frame.id = 'newsFrame';
-  frame.src = OFFICIAL_NEWS_URL;
-  frame.setAttribute('frameborder', '0');
-  frame.setAttribute('allowtransparency', 'true');
-  section.append(frame);
-  const attachListener = () => {
-    try {
-      const documentInFrame = frame.contentDocument || frame.contentWindow.document;
-      if (!documentInFrame?.documentElement || documentInFrame.documentElement.dataset.clickIntercepted) return;
-      documentInFrame.documentElement.dataset.clickIntercepted = 'true';
-      documentInFrame.addEventListener('click', event => {
-        const anchor = event.target.closest('a');
-        if (anchor?.href && isExternalUrl(anchor.href)) { event.preventDefault(); openExternal(anchor.href, isExternalUrl); }
-      });
-    } catch (error) { console.warn('[News] Cannot intercept official announcement links:', error); }
-  };
-  frame.addEventListener('load', attachListener);
-  attachListener();
-  let attempts = 0;
-  const interval = setInterval(() => {
-    attachListener();
-    if (++attempts >= 20) clearInterval(interval);
-  }, 1000);
-}
-
 export function initNews() {
-  const section = document.getElementById('newsSection');
   const local = document.getElementById('localNews');
-  if (!section || !local) return;
-  const mode = document.querySelector('meta[name="xivtc-announcement-mode"]')?.content;
-  if (mode === 'official') setupOfficialNews(section);
-  else loadLocalNews(local);
+  if (!local) return;
+  loadLocalNews(local);
 }
