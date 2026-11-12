@@ -43,7 +43,7 @@ public static class UpdateEndpoints
             }
         });
 
-        // GET /api/update/install (SSE)
+        // GET /api/update/install (IPC events)
         group.MapGet("/install", async (
             HttpContext context,
             string gamePath,
@@ -52,15 +52,15 @@ public static class UpdateEndpoints
             ILogger<Program> logger,
             CancellationToken cancellationToken) =>
         {
-            logger.LogInformation("[UPDATE-SSE] Install endpoint called, gamePath: {GamePath}", gamePath);
+            logger.LogInformation("[UPDATE-IPC] Install endpoint called, gamePath: {GamePath}", gamePath);
             
-            SseHelper.SetupSseResponse(context);
-            logger.LogInformation("[UPDATE-SSE] Headers set, starting SSE stream");
+            IpcEventHelper.SetupStream(context);
+            logger.LogInformation("[UPDATE-IPC] Starting IPC event stream");
 
             if (string.IsNullOrEmpty(gamePath) || !Directory.Exists(gamePath))
             {
-                logger.LogWarning("[UPDATE-SSE] Invalid game path: {GamePath}", gamePath);
-                await SseHelper.SendEventAsync(context.Response, "error", 
+                logger.LogWarning("[UPDATE-IPC] Invalid game path: {GamePath}", gamePath);
+                await IpcEventHelper.SendAsync(context.Response, "error",
                     new SseError("VALIDATION_FAILED", "Invalid game path"),
                     AppJsonContext.Default.SseError, cancellationToken);
                 return Results.Empty;
@@ -71,8 +71,8 @@ public static class UpdateEndpoints
                 var configuredGamePath = (await configService.LoadConfigAsync()).Game.GamePath;
                 if (!PathsEqual(gamePath, configuredGamePath))
                 {
-                    logger.LogWarning("[UPDATE-SSE] Requested game path does not match configured path: {GamePath}", gamePath);
-                    await SseHelper.SendEventAsync(context.Response, "error",
+                    logger.LogWarning("[UPDATE-IPC] Requested game path does not match configured path: {GamePath}", gamePath);
+                    await IpcEventHelper.SendAsync(context.Response, "error",
                         new SseError("VALIDATION_FAILED", "Game path does not match the configured directory"),
                         AppJsonContext.Default.SseError, cancellationToken);
                     return Results.Empty;
@@ -81,36 +81,36 @@ public static class UpdateEndpoints
                 var permissionError = await EnsureGameDirectoryWriteAccessAsync(gamePath, cancellationToken);
                 if (permissionError != null)
                 {
-                    logger.LogWarning("[UPDATE-SSE] Game directory authorization failed: {Error}", permissionError);
-                    await SseHelper.SendEventAsync(context.Response, "error",
+                    logger.LogWarning("[UPDATE-IPC] Game directory authorization failed: {Error}", permissionError);
+                    await IpcEventHelper.SendAsync(context.Response, "error",
                         new SseError("GAME_DIRECTORY_PERMISSION_DENIED", permissionError),
                         AppJsonContext.Default.SseError, cancellationToken);
                     return Results.Empty;
                 }
             }
 
-            logger.LogInformation("[UPDATE-SSE] Starting CheckAndInstallUpdatesAsync");
+            logger.LogInformation("[UPDATE-IPC] Starting CheckAndInstallUpdatesAsync");
             
             try
             {
                 await foreach (var progress in updateManager.CheckAndInstallUpdatesAsync(gamePath, cancellationToken))
                 {
-                    var eventType = SseHelper.DetermineEventType(progress.HasError, progress.IsComplete);
-                    await SseHelper.SendEventAsync(context.Response, eventType, progress,
+                    var eventType = IpcEventHelper.DetermineEventType(progress.HasError, progress.IsComplete);
+                    await IpcEventHelper.SendAsync(context.Response, eventType, progress,
                         AppJsonContext.Default.PatchProgressEvent, cancellationToken);
                 }
-                logger.LogInformation("[UPDATE-SSE] Stream completed");
+                logger.LogInformation("[UPDATE-IPC] Stream completed");
             }
             catch (OperationCanceledException)
             {
-                await SseHelper.SendEventAsync(context.Response, "cancelled", 
+                await IpcEventHelper.SendAsync(context.Response, "cancelled",
                     new SseMessage("Operation cancelled"),
                     AppJsonContext.Default.SseMessage, cancellationToken);
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "[UPDATE-SSE] Update installation failed");
-                await SseHelper.SendEventAsync(context.Response, "error",
+                logger.LogError(ex, "[UPDATE-IPC] Update installation failed");
+                await IpcEventHelper.SendAsync(context.Response, "error",
                     new SseError("UPDATE_FAILED", ex.Message),
                     AppJsonContext.Default.SseError, cancellationToken);
             }

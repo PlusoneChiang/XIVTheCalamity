@@ -4,7 +4,8 @@
  */
 
 // Import utilities
-import { apiEventSource } from '../../utils/polyfill.js';
+import '../../utils/polyfill.js';
+import { openEventStream } from '../../utils/ipc.js';
 import { toHex } from '../../utils/encoding.js';
 import { initAccountManagement, handleAutoFillOTPChange, getOTPSecretInput, cleanupAccountManagement, clearAutoFilledState, isAllAutoFilled, refreshAccountState } from './accountManagement.js';
 import { savePassword, saveOTPSecret, saveAutoFillOTP, hasOTPSecret } from '../../utils/credentialsStore.js';
@@ -964,19 +965,18 @@ function startEnvironmentInitialization() {
   progressFill.style.width = '100%';
   titleBarText.textContent = i18n.t('login.init_env');
   
-  console.log('[ENV-INIT] UI updated, connecting to SSE...');
+  console.log('[ENV-INIT] UI updated, connecting to IPC...');
   
-  // Connect to SSE endpoint
-  const baseUrl = 'http://localhost:5050';
-  const sseUrl = `${baseUrl}/api/environment/initialize`;
-  console.log('[ENV-INIT] SSE URL:', sseUrl);
+  // Connect to IPC endpoint
+  const streamPath = '/api/environment/initialize';
+  console.log('[ENV-INIT] IPC URL:', streamPath);
   
   try {
-    const eventSource = apiEventSource(sseUrl);
+    const eventSource = openEventStream(streamPath);
     console.log('[ENV-INIT] EventSource created, readyState:', eventSource.readyState);
     
     eventSource.onopen = () => {
-      console.log('[ENV-INIT] ✓ SSE connection OPENED');
+      console.log('[ENV-INIT] ✓ IPC connection OPENED');
     };
   
     eventSource.addEventListener('progress', (event) => {
@@ -1042,7 +1042,7 @@ function startEnvironmentInitialization() {
         
         console.log('[ENV-INIT] ========== Initialization COMPLETE ==========');
         
-        // Close SSE connection after a short delay to ensure all events are processed
+        // Close IPC connection after a short delay to ensure all events are processed
         setTimeout(() => {
           eventSource.close();
           console.log('[ENV-INIT] EventSource closed after completion');

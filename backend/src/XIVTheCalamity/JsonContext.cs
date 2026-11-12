@@ -6,6 +6,7 @@ using XIVTheCalamity.DTOs;
 using XIVTheCalamity.Platform.MacOS.Wine;
 using XIVTheCalamity.Platform.MacOS.Discord;
 using XIVTheCalamity.Game.Models;
+using XIVTheCalamity.Services;
 
 namespace XIVTheCalamity;
 
@@ -45,6 +46,10 @@ namespace XIVTheCalamity;
 [JsonSerializable(typeof(DalamudAssetEntry))]
 [JsonSerializable(typeof(DalamudStatus))]
 [JsonSerializable(typeof(DalamudUpdateProgress))]
+
+// IPC 訊息
+[JsonSerializable(typeof(IpcRequestMessage))]
+[JsonSerializable(typeof(IpcResponseMessage))]
 
 // API DTOs
 [JsonSerializable(typeof(LoginRequestDto))]
@@ -106,7 +111,7 @@ namespace XIVTheCalamity;
 [JsonSerializable(typeof(UpdateCheckResponse))]
 [JsonSerializable(typeof(DalamudStatusResponse))]
 
-// SSE Event Types
+// IPC 進度事件型別
 [JsonSerializable(typeof(SseMessage))]
 [JsonSerializable(typeof(SseError))]
 [JsonSerializable(typeof(ToolLaunchResult))]
@@ -153,7 +158,7 @@ public record UpdateCheckResponse(bool HasUpdates, string? BootVersion, string? 
 public record DalamudStatusResponse(DalamudStatus Status, string? Version);
 public record DalamudPathsResponse(string BasePath, string HooksPath, string RuntimePath, string AssetsPath, string ConfigPath, string PluginsPath, string InjectorPath);
 
-// SSE specific types
+// 進度事件相容型別
 public record SseMessage(string Message);
 public record SseError(string Code, string Message);
 public record ToolLaunchResult(bool Success, int ExitCode, string Stdout, string Stderr);

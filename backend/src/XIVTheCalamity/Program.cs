@@ -26,8 +26,9 @@ namespace XIVTheCalamity;
 
 public class Program
 {
-    private static WebApplication? _webApp;
-    private static readonly string ApiToken = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+    private static WebApplication? _application;
+    private static IpcBridge? _bridge;
+    private static readonly string BridgeToken = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
 
     [DllImport("libc", EntryPoint = "getuid")]
     private static extern uint GetUid();
@@ -46,8 +47,12 @@ public class Program
             Console.Error.WriteLine(ex.Message);
             return;
         }
-        var port = 5050;
         
+        var instanceName = "XIVTheCalamity-" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(HomePathService.GetRealHomePath())))[..16];
+        using var instance = new Mutex(true, instanceName, out var firstInstance);
+        if (!firstInstance) return;
+
         // 1. 配置日誌 (Configure Serilog)
         var logPath = GetLogFilePath();
         Log.Logger = new LoggerConfiguration()
@@ -76,9 +81,18 @@ public class Program
             // 2. 載入配置並決定是否啟用 Home Alias (僅 macOS 支援)
             PrepareEnvironment();
 
-            // 3. 確認 Kestrel 啟動成功後才開啟視窗
-            MainWindowContainer.Port = port;
-            StartKestrelServer(port, args, logPath);
+            // 端點只在記憶體內執行，不啟動 HTTP 伺服器。
+            _application = CreateApplication(args, logPath);
+            var dispatch = ((IApplicationBuilder)_application).Build();
+            // Photino 預設會輸出訊息內容，IPC 酬載不可寫入 console。
+            var window = new PhotinoWindow { LogVerbosity = 0 };
+            var bridge = _bridge = new IpcBridge(_application.Services, dispatch, BridgeToken, message =>
+                window.Invoke(() =>
+                {
+                    if (_bridge?.IsStopping == false) window.SendWebMessage(message);
+                }));
+            var files = new Microsoft.Extensions.FileProviders.ManifestEmbeddedFileProvider(typeof(Program).Assembly, "wwwroot");
+            var contentTypes = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider();
 
             // 4. 初始化並載入 Photino 視窗 UI
             string platformStr = "linux";
@@ -87,17 +101,12 @@ public class Program
             else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
                 platformStr = "win32";
 
-            // VirtualHost：使用自訂 scheme "xivtc" 模擬 Electron 的 baseURLForDataURL 功能
-            // macOS WKWebView 禁止攔截 https 等內建 scheme，必須使用自訂 scheme
-            // 載入 xivtc://user.ffxiv.com.tw/login.html 使 window.location.hostname = "user.ffxiv.com.tw"
-            // 讓 reCAPTCHA 驗證正確通過（與 Electron 版本行為完全相同）
-            // API 呼叫由 polyfill 直接使用 http://localhost:{port}，不透過此 handler
-            var virtualHostClient = new HttpClient { BaseAddress = new Uri($"http://localhost:{port}") };
+            // 保留 reCAPTCHA 需要的虛擬網域，頁面直接由嵌入資源提供。
+            // macOS 的 WKWebView 需使用自訂 scheme，Windows 則沿用 https。
 
             string vhScheme = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "https" : "xivtc";
             
-            var window = new PhotinoWindow()
-                .SetTitle("XIV The Calamity")
+            window.SetTitle("XIV The Calamity")
                 .SetUseOsDefaultSize(false)
                 .RegisterWindowCreatedHandler((sender, args) =>
                 {
@@ -124,6 +133,7 @@ public class Program
                 .SetDevToolsEnabled(true)
                 .SetContextMenuEnabled(true)
                 .SetWebSecurityEnabled(true)
+                .RegisterWebMessageReceivedHandler((sender, message) => bridge.Receive(message))
                 .RegisterCustomSchemeHandler(vhScheme, (object sender, string scheme, string request, out string contentType) =>
                 {
                     try
@@ -131,19 +141,21 @@ public class Program
                         var uri = new Uri(request);
                         if (uri.Host.Equals("user.ffxiv.com.tw", StringComparison.OrdinalIgnoreCase))
                         {
-                            var pathAndQuery = uri.PathAndQuery;
-                            Log.Debug("[VirtualHost] Intercepted local {Scheme} request: {PathAndQuery} -> Kestrel", scheme, pathAndQuery);
-
-                            var response = virtualHostClient.GetAsync(pathAndQuery).GetAwaiter().GetResult();
-                            contentType = response.Content.Headers.ContentType?.MediaType ?? "text/html";
-                            if ((uri.AbsolutePath == "/login.html" || uri.AbsolutePath == "/settings.html") && contentType == "text/html")
+                            var file = files.GetFileInfo(uri.AbsolutePath.TrimStart('/'));
+                            if (!file.Exists || file.IsDirectory)
                             {
-                                // 僅注入內嵌視窗，不透過 localhost 靜態頁面暴露 API 存取權限。
-                                var html = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-                                html = html.Replace("<head>", $"<head><meta name=\"xivtc-api-token\" content=\"{ApiToken}\">");
+                                contentType = "text/plain";
+                                return Stream.Null;
+                            }
+                            contentTypes.TryGetContentType(uri.AbsolutePath, out var detectedType);
+                            contentType = detectedType ?? "application/octet-stream";
+                            if (uri.AbsolutePath is "/login.html" or "/settings.html")
+                            {
+                                using var reader = new StreamReader(file.CreateReadStream());
+                                var html = reader.ReadToEnd().Replace("<head>", $"<head><meta name=\"xivtc-api-token\" content=\"{BridgeToken}\">");
                                 return new MemoryStream(System.Text.Encoding.UTF8.GetBytes(html));
                             }
-                            return response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
+                            return file.CreateReadStream();
                         }
                     }
                     catch (Exception ex)
@@ -201,14 +213,26 @@ public class Program
                 });
             }
 
-            // 監聽視窗關閉以優雅停止 Kestrel 伺服器
+            var closing = false;
+            var readyToClose = false;
             window.WindowClosing += (sender, e) =>
             {
-                if (_webApp != null)
+                if (readyToClose) return false;
+                if (!closing)
                 {
-                    _ = _webApp.StopAsync();
+                    closing = true;
+                    bridge.Dispose();
+                    _ = Task.Run(async () =>
+                    {
+                        await bridge.DrainAsync();
+                        window.Invoke(() =>
+                        {
+                            readyToClose = true;
+                            window.Close();
+                        });
+                    });
                 }
-                return false; // 允許關閉視窗
+                return true;
             };
 
             // 啟動主訊息循環 (會阻塞當前主執行緒)
@@ -220,7 +244,12 @@ public class Program
         }
         finally
         {
+            if (_bridge != null)
+                _bridge.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            if (_application != null)
+                _application.DisposeAsync().AsTask().GetAwaiter().GetResult();
             Log.CloseAndFlush();
+            instance.ReleaseMutex();
         }
     }
 
@@ -312,71 +341,12 @@ public class Program
         }
     }
 
-    private static void StartKestrelServer(int port, string[] args, string logPath)
+    private static WebApplication CreateApplication(string[] args, string logPath)
     {
-        var contentRoot = AppDomain.CurrentDomain.BaseDirectory;
-        var webRoot = "wwwroot";
-
-        if (!Directory.Exists(Path.Combine(contentRoot, webRoot)))
-        {
-            // macOS .app bundle: binary 在 Contents/MacOS/，wwwroot 在 Contents/Resources/
-            var resourcesDir = Path.Combine(contentRoot, "..", "Resources");
-            if (Directory.Exists(Path.Combine(resourcesDir, webRoot)))
-            {
-                contentRoot = Path.GetFullPath(resourcesDir);
-            }
-            else
-            {
-                var devContentRoot = Directory.GetCurrentDirectory();
-                if (Directory.Exists(Path.Combine(devContentRoot, webRoot)))
-                {
-                    contentRoot = devContentRoot;
-                }
-                else
-                {
-                    var parentDir = Directory.GetParent(devContentRoot)?.FullName;
-                    if (parentDir != null && Directory.Exists(Path.Combine(parentDir, webRoot)))
-                    {
-                        contentRoot = parentDir;
-                    }
-                }
-            }
-        }
-
-        // Check if we can write to or create the webRoot directory.
-        // If it is read-only (like inside a mounted AppImage), fallback to a temp directory.
-        try
-        {
-            var targetWebRoot = Path.Combine(contentRoot, webRoot);
-            if (!Directory.Exists(targetWebRoot))
-            {
-                Directory.CreateDirectory(targetWebRoot);
-            }
-        }
-        catch
-        {
-            webRoot = Path.Combine(Path.GetTempPath(), "xivtc-wwwroot");
-            try
-            {
-                if (!Directory.Exists(webRoot))
-                {
-                    Directory.CreateDirectory(webRoot);
-                }
-            }
-            catch { }
-        }
-
         var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions
         {
             Args = args,
-            ContentRootPath = contentRoot,
-            WebRootPath = webRoot
-        });
-
-        // 設定 Kestrel 監聽埠口
-        builder.WebHost.UseKestrel(options =>
-        {
-            options.ListenLocalhost(port);
+            ContentRootPath = AppContext.BaseDirectory
         });
 
         // 套用 Serilog
@@ -455,69 +425,25 @@ public class Program
         builder.Services.AddSingleton<EventBroadcastHub>();
         builder.Services.AddSingleton<AppUpdaterService>();
 
-        // CORS 設定
-        builder.Services.AddCors(options =>
-        {
-            options.AddDefaultPolicy(policy =>
-            {
-                policy.AllowAnyOrigin()
-                      .AllowAnyMethod()
-                      .AllowAnyHeader();
-            });
-        });
-
-        _webApp = builder.Build();
-
-        // 調整日誌等級
-        _ = AdjustLogLevelAsync(_webApp, logPath);
-
-        _webApp.UseCors();
-        _webApp.Use(async (context, next) =>
-        {
-            if (context.Request.Path.StartsWithSegments("/api"))
-            {
-                var token = context.Request.Headers["X-XIVTC-Token"].ToString();
-                // EventSource 無法設定 header，僅這些 SSE GET 端點接受 query token。
-                if (HttpMethods.IsGet(context.Request.Method) &&
-                    context.Request.Path.Value is "/api/events/stream" or "/api/environment/initialize" or
-                        "/api/update/install" or "/api/dalamud/update-stream")
-                {
-                    if (string.IsNullOrEmpty(token))
-                        token = context.Request.Query["access_token"].ToString();
-                }
-                if (!string.Equals(token, ApiToken, StringComparison.Ordinal))
-                {
-                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                    return;
-                }
-            }
-            await next(context);
-        });
-        _webApp.UseStaticFiles(new StaticFileOptions
-        {
-            FileProvider = new Microsoft.Extensions.FileProviders.ManifestEmbeddedFileProvider(
-                typeof(Program).Assembly,
-                "wwwroot"
-            )
-        });
+        var app = builder.Build();
+        _ = AdjustLogLevelAsync(app, logPath);
+        app.UseRouting();
 
         // 映射 API Endpoints
-        _webApp.MapConfigEndpoints();
-        _webApp.MapAuthEndpoints();
-        _webApp.MapDalamudEndpoints();
-        _webApp.MapEnvironmentEndpoints();
-        _webApp.MapGameEndpoints();
-        _webApp.MapDiscordRpcEndpoints();
-        _webApp.MapUpdateEndpoints();
-        _webApp.MapWineEndpoints();
-        _webApp.MapNativeBridgeEndpoints();
-        _webApp.MapNewsEndpoints();
+        app.MapConfigEndpoints();
+        app.MapAuthEndpoints();
+        app.MapDalamudEndpoints();
+        app.MapEnvironmentEndpoints();
+        app.MapGameEndpoints();
+        app.MapDiscordRpcEndpoints();
+        app.MapUpdateEndpoints();
+        app.MapWineEndpoints();
+        app.MapNativeBridgeEndpoints();
+        app.MapNewsEndpoints();
 
-        _webApp.MapGet("/health", () => Results.Ok(new HealthResponse("healthy", DateTime.UtcNow)))
-           .WithName("HealthCheck");
-
-        _webApp.StartAsync().GetAwaiter().GetResult();
-        Log.Information("[Kestrel] API Server and Static Files started on http://localhost:{Port}", port);
+        // 明確組裝程式內路由，不呼叫 StartAsync，也不建立監聽 socket。
+        ((IApplicationBuilder)app).UseEndpoints(_ => { });
+        return app;
     }
 
     private static async Task AdjustLogLevelAsync(WebApplication app, string logPath)

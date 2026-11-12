@@ -1,4 +1,4 @@
-import { apiFetch } from '../../utils/polyfill.js';
+import { ipcFetch } from '../../utils/ipc.js';
 import i18n from '../../i18n/index.js';
 
 const LOCAL_IMAGE_HOSTS = new Set(['file.ffxiv.com.tw']);
@@ -212,7 +212,7 @@ async function loadLocalNews(container) {
   status.textContent = localizedText('loading');
   container.append(status);
   try {
-    const response = await apiFetch('http://localhost:5050/api/news');
+    const response = await ipcFetch('/api/news');
     const payload = await response.json();
     if (!response.ok || !payload.success || !payload.data) throw new Error('News request failed');
     renderNews(container, payload.data);

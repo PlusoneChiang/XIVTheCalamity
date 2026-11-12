@@ -1,4 +1,4 @@
-import { apiEventSource } from '../../utils/polyfill.js';
+import { openEventStream } from '../../utils/ipc.js';
 /**
  * Game Update Manager
  * Handles game patch checking, downloading, and installation
@@ -101,11 +101,11 @@ export async function startUpdate() {
     // Show update progress in title bar
     showTitleBarProgress(0, 'login.checking_updates');
     
-    // 使用新的 SSE endpoint 進行更新（單一連接）
-    // Return a Promise that resolves when the SSE stream completes
+    // 使用新的 IPC endpoint 進行更新（單一連接）
+    // Return a Promise that resolves when the IPC stream completes
     return new Promise((resolve) => {
       updateResolve = resolve;
-      startUpdateWithSSE(gamePath);
+      startUpdateWithIPC(gamePath);
     });
     
   } catch (error) {
@@ -116,22 +116,22 @@ export async function startUpdate() {
 }
 
 /**
- * 使用 SSE endpoint 進行更新
+ * 使用 IPC endpoint 進行更新
  */
-function startUpdateWithSSE(gamePath) {
+function startUpdateWithIPC(gamePath) {
   if (progressEventSource) {
     console.log('[UPDATE] Closing existing EventSource');
     stopProgressMonitoring();
   }
   
-  console.log('[UPDATE] Starting update via SSE endpoint');
+  console.log('[UPDATE] Starting update via IPC endpoint');
   
   // 編碼路徑參數
   const encodedPath = encodeURIComponent(gamePath);
-  const url = `http://localhost:5050/api/update/install?gamePath=${encodedPath}`;
-  console.log('[UPDATE] SSE URL:', url);
+  const url = `/api/update/install?gamePath=${encodedPath}`;
+  console.log('[UPDATE] IPC URL:', url);
   
-  progressEventSource = apiEventSource(url);
+  progressEventSource = openEventStream(url);
   console.log('[UPDATE] EventSource created, readyState:', progressEventSource.readyState);
   
   // 處理進度事件
@@ -196,10 +196,10 @@ function startUpdateWithSSE(gamePath) {
           alert(errorData.message);
         }
       } else {
-        console.error('[UPDATE] SSE connection error (no data)');
+        console.error('[UPDATE] IPC connection error (no data)');
       }
     } catch (parseError) {
-      console.error('[UPDATE] SSE error event (parse failed):', parseError);
+      console.error('[UPDATE] IPC error event (parse failed):', parseError);
     }
     
     stopProgressMonitoring();
@@ -209,7 +209,7 @@ function startUpdateWithSSE(gamePath) {
   });
   
   progressEventSource.addEventListener('open', () => {
-    console.log('[UPDATE] SSE connection opened successfully');
+    console.log('[UPDATE] IPC connection opened successfully');
   });
 }
 

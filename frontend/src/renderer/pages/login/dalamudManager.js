@@ -1,4 +1,4 @@
-import { apiEventSource } from '../../utils/polyfill.js';
+import { openEventStream } from '../../utils/ipc.js';
 /**
  * Dalamud Update Manager
  * Handles Dalamud download, update and status checking
@@ -100,8 +100,8 @@ export async function startDalamudUpdate() {
     console.log('[DALAMUD] Starting update...');
     showTitleBarProgress(0, 'login.dalamud_checking');
     
-    // 使用 SSE 監聽進度
-    return await startDalamudUpdateWithSSE();
+    // 使用 IPC 監聽進度
+    return await startDalamudUpdateWithIPC();
     
   } catch (error) {
     console.error('[DALAMUD] Update check error:', error);
@@ -112,18 +112,18 @@ export async function startDalamudUpdate() {
 }
 
 /**
- * 使用 SSE 執行 Dalamud 更新
+ * 使用 IPC 執行 Dalamud 更新
  */
-function startDalamudUpdateWithSSE() {
+function startDalamudUpdateWithIPC() {
   return new Promise((resolve) => {
-    const sseUrl = 'http://localhost:5050/api/dalamud/update-stream';
-    console.log('[DALAMUD] Connecting to SSE:', sseUrl);
+    const streamPath = '/api/dalamud/update-stream';
+    console.log('[DALAMUD] Connecting to IPC:', streamPath);
     
-    dalamudEventSource = apiEventSource(sseUrl);
+    dalamudEventSource = openEventStream(streamPath);
     
     dalamudEventSource.addEventListener('progress', (event) => {
       if (dalamudCheckCancelled) {
-        closeDalamudSSE();
+        closeDalamudIPC();
         resolve(false);
         return;
       }
@@ -170,7 +170,7 @@ function startDalamudUpdateWithSSE() {
         
         showTitleBarProgress(100, 'login.dalamud_complete');
         setTimeout(() => {
-          closeDalamudSSE();
+          closeDalamudIPC();
           hideTitleBarProgress();
           isDalamudChecking = false;
           
@@ -182,24 +182,19 @@ function startDalamudUpdateWithSSE() {
     });
     
     dalamudEventSource.addEventListener('error', (event) => {
-      // readyState 2 = CLOSED，這是正常的連接關閉
-      if (dalamudEventSource?.readyState === 2) {
-        console.log('[DALAMUD] SSE connection closed (normal)');
-        closeDalamudSSE();
-        // 如果已經完成，不需要再處理
-        if (!isDalamudChecking) {
-          return;
-        }
-        hideTitleBarProgress();
-        isDalamudChecking = false;
-        resolve(false);
-      } else {
-        console.error('[DALAMUD] SSE error:', event);
-      }
+      let message = '';
+      try { message = JSON.parse(event.data || 'null')?.message || ''; } catch (_) {}
+      console.error('[DALAMUD] IPC error:', message || event);
+      if (message) alert(message);
+      closeDalamudIPC();
+      if (!isDalamudChecking) return;
+      hideTitleBarProgress();
+      isDalamudChecking = false;
+      resolve(false);
     });
     
     dalamudEventSource.addEventListener('open', () => {
-      console.log('[DALAMUD] SSE connection opened');
+      console.log('[DALAMUD] IPC connection opened');
     });
   });
 }
@@ -223,11 +218,11 @@ function getDalamudStageMessage(stage) {
 }
 
 /**
- * 關閉 SSE 連接
+ * 關閉 IPC 連接
  */
-function closeDalamudSSE() {
+function closeDalamudIPC() {
   if (dalamudEventSource) {
-    console.log('[DALAMUD] Closing SSE connection');
+    console.log('[DALAMUD] Closing IPC connection');
     dalamudEventSource.close();
     dalamudEventSource = null;
   }
@@ -243,7 +238,7 @@ export async function cancelDalamudUpdate() {
   
   console.log('[DALAMUD] Cancelling update...');
   dalamudCheckCancelled = true;
-  closeDalamudSSE();
+  closeDalamudIPC();
   console.log('[DALAMUD] Update cancelled');
   
   isDalamudChecking = false;

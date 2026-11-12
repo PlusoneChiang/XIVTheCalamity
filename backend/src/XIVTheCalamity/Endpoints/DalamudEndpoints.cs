@@ -32,36 +32,36 @@ public static class DalamudEndpoints
             }
         });
 
-        // GET /api/dalamud/update-stream (SSE)
+        // GET /api/dalamud/update-stream (IPC events)
         group.MapGet("/update-stream", async (
             HttpContext context,
             DalamudUpdater updater,
             ILogger<Program> logger,
             CancellationToken cancellationToken) =>
         {
-            SseHelper.SetupSseResponse(context);
+            IpcEventHelper.SetupStream(context);
             
-            logger.LogInformation("Starting Dalamud update via SSE");
+            logger.LogInformation("Starting Dalamud update via IPC events");
             
             try
             {
                 await foreach (var progress in updater.UpdateAsync(cancellationToken))
                 {
-                    var eventType = SseHelper.DetermineEventType(progress.HasError, progress.IsComplete);
-                    await SseHelper.SendEventAsync(context.Response, eventType, progress,
+                    var eventType = IpcEventHelper.DetermineEventType(progress.HasError, progress.IsComplete);
+                    await IpcEventHelper.SendAsync(context.Response, eventType, progress,
                         AppJsonContext.Default.DalamudUpdateProgress, cancellationToken);
                 }
             }
             catch (OperationCanceledException)
             {
-                await SseHelper.SendEventAsync(context.Response, "cancelled",
+                await IpcEventHelper.SendAsync(context.Response, "cancelled",
                     new SseMessage("Operation cancelled"),
                     AppJsonContext.Default.SseMessage, cancellationToken);
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Dalamud update failed");
-                await SseHelper.SendEventAsync(context.Response, "error",
+                await IpcEventHelper.SendAsync(context.Response, "error",
                     new SseError("DALAMUD_UPDATE_FAILED", ex.Message),
                     AppJsonContext.Default.SseError, cancellationToken);
             }

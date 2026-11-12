@@ -92,11 +92,11 @@
 │    ├─ Assets: Embedded Resources    │
 │    └─ i18n: zh-TW, en-US            │
 └─────────────────┬───────────────────┘
-                  │ In-Process / REST API
+                  │ Photino IPC
 ┌─────────────────┴───────────────────┐
 │     ASP.NET Core 10 (NativeAOT)      │
 │    ├─ Runtime: .NET 10 NativeAOT     │
-│    ├─ API: RESTful                  │
+│    ├─ Commands: In-Process          │
 │    └─ Logging: Serilog              │
 └─────────────────┬───────────────────┘
                   │
@@ -125,6 +125,8 @@
 | **Wine (macOS)** | Wine Crossover (Fork) | macOS Wine 運行環境 |
 | **Wine (Linux)** | GE-Proton 11 | Linux Wine 運行環境（自動下載 AppImage 包裝）|
 
+前後端透過 Photino 原生訊息橋接溝通。ASP.NET Core 僅負責程式內路由、DI 與 JSON 處理，不啟動 Kestrel 或監聽本機連接埠；頁面由自訂 scheme 直接讀取嵌入資源。設定頁 iframe 共用父頁的 IPC 通道，長任務進度以 IPC 事件傳送。
+
 ### 專案架構
 
 ```
@@ -135,7 +137,8 @@ XIVTheCalamity/
 │
 ├── backend/               # .NET 10 NativeAOT 後端
 │   └── src/
-│       ├── XIVTheCalamity.Api.NativeAOT/ # NativeAOT REST API 主機
+│       ├── XIVTheCalamity/               # Photino 桌面入口與 IPC 橋接
+│       ├── XIVTheCalamity.Api.NativeAOT/ # 舊版獨立 HTTP 主機，非桌面入口
 │       ├── XIVTheCalamity.Core/           # 核心模型與配置邏輯
 │       ├── XIVTheCalamity.Game/           # 遊戲下載與 Patch 邏輯
 │       ├── XIVTheCalamity.Dalamud/        # Dalamud 整合與更新

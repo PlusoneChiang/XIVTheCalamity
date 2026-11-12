@@ -1,25 +1,14 @@
 import { Buffer } from 'buffer';
-// Token 僅由原生視窗注入，每次啟動都會重新產生。
-const apiToken = document.querySelector('meta[name="xivtc-api-token"]')?.content || '';
+import { ipcFetch, openEventStream } from './ipc.js';
 
-export function apiFetch(url, options = {}) {
-  const headers = new Headers(options.headers);
-  headers.set('X-XIVTC-Token', apiToken);
-  return fetch(url, { ...options, headers });
-}
-
-export function apiEventSource(url) {
-  const endpoint = new URL(url);
-  endpoint.searchParams.set('access_token', apiToken);
-  return new EventSource(endpoint.href);
+export function apiFetch(path, options = {}) {
+  return ipcFetch(path, options);
 }
 
 window.Buffer = Buffer;
 console.log('[Polyfill] Global Buffer initialized');
 
 if (!window.xivtc) {
-  const backendUrl = 'http://localhost:5050'; // Absolute URL required when page is served via custom scheme (xivtc://)
-
   async function apiCall(path, method = 'POST', body = null) {
     const options = {
       method: method,
@@ -31,7 +20,7 @@ if (!window.xivtc) {
       options.body = JSON.stringify(body);
     }
     try {
-      const res = await apiFetch(`${backendUrl}${path}`, options);
+      const res = await apiFetch(path, options);
       if (!res.ok) {
         let errData;
         try { errData = await res.json(); } catch(e) {}
@@ -56,7 +45,7 @@ if (!window.xivtc) {
         success: false,
         ok: false,
         status: 500,
-        statusText: 'Network Error',
+        statusText: 'IPC Error',
         error: e.message
       };
     }
@@ -157,7 +146,7 @@ if (!window.xivtc) {
       },
       on: (eventName, callback) => {
         if (!window.__photinoEventSource) {
-          window.__photinoEventSource = apiEventSource(`http://localhost:5050/api/events/stream`);
+          window.__photinoEventSource = openEventStream('/api/events/stream');
           window.__photinoEventListeners = {};
           window.__photinoEventSource.onmessage = (e) => {
             try {
@@ -277,7 +266,7 @@ if (!window.xivtc) {
   }
 
   // Fetch initial configuration from backend
-  apiFetch(`${backendUrl}/api/config`)
+  apiFetch('/api/config')
     .then(res => res.json())
     .then(json => {
       if (json && json.success && json.data) {

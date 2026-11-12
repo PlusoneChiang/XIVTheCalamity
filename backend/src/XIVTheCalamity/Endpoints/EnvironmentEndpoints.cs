@@ -20,7 +20,7 @@ public static class EnvironmentEndpoints
         if (OperatingSystem.IsMacOS() && RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
             MapRosettaEndpoints(group);
 
-        // GET /api/environment/initialize (SSE)
+        // GET /api/environment/initialize (IPC events)
         group.MapGet("/initialize", async (
             HttpContext context,
             IEnvironmentService? environmentService,
@@ -29,13 +29,12 @@ public static class EnvironmentEndpoints
         {
             logger.LogInformation("[ENV-INIT] Environment Initialize API Called");
             
-            SseHelper.SetupSseResponse(context);
-            await context.Response.Body.FlushAsync(cancellationToken);
+            IpcEventHelper.SetupStream(context);
 
             if (environmentService == null)
             {
                 logger.LogWarning("[ENV-INIT] IEnvironmentService is not available");
-                await SseHelper.SendEventAsync(context.Response, "error",
+                await IpcEventHelper.SendAsync(context.Response, "error",
                     new SseError("SERVICE_UNAVAILABLE", "Environment service not available"),
                     AppJsonContext.Default.SseError, cancellationToken);
                 return Results.Empty;
@@ -47,22 +46,22 @@ public static class EnvironmentEndpoints
             {
                 await foreach (var progress in environmentService.InitializeAsync(cancellationToken))
                 {
-                    var eventType = SseHelper.DetermineEventType(progress.HasError, progress.IsComplete);
-                    await SseHelper.SendEventAsync(context.Response, eventType, progress,
+                    var eventType = IpcEventHelper.DetermineEventType(progress.HasError, progress.IsComplete);
+                    await IpcEventHelper.SendAsync(context.Response, eventType, progress,
                         AppJsonContext.Default.EnvironmentProgressEvent, cancellationToken);
                 }
                 logger.LogInformation("[ENV-INIT] Completed Successfully");
             }
             catch (OperationCanceledException)
             {
-                await SseHelper.SendEventAsync(context.Response, "cancelled",
+                await IpcEventHelper.SendAsync(context.Response, "cancelled",
                     new SseMessage("Operation cancelled"),
                     AppJsonContext.Default.SseMessage, cancellationToken);
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "[ENV-INIT] Initialization failed");
-                await SseHelper.SendEventAsync(context.Response, "error",
+                await IpcEventHelper.SendAsync(context.Response, "error",
                     new SseError("INIT_FAILED", ex.Message),
                     AppJsonContext.Default.SseError, cancellationToken);
             }

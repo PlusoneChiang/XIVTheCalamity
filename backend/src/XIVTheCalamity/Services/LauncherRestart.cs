@@ -7,7 +7,7 @@ public static class LauncherRestart
     private const string WaitArgument = "--restart-after";
     private static int _scheduled;
 
-    // 新程序先等待舊程序退出，再開啟視窗與本機 API，避免連接埠衝突。
+    // 新程序先等待舊程序退出，再取得單一實例鎖並開啟視窗。
     public static string[] WaitForPreviousProcess(string[] args)
     {
         if (args.Length == 0 || args[0] != WaitArgument) return args;

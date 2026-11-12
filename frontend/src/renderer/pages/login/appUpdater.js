@@ -1,4 +1,4 @@
-import { apiFetch } from '../../utils/polyfill.js';
+import { ipcFetch } from '../../utils/ipc.js';
 /**
  * App Auto-Update UI Manager
  * Handles launcher self-update notifications as a floating dialog.
@@ -268,7 +268,7 @@ export function isAppUpdateDownloading() {
 // Rosetta 安裝提示，沿用更新視窗樣式。
 
 async function postRosettaAction(path) {
-  const response = await apiFetch(`http://localhost:5050${path}`, {
+  const response = await ipcFetch(path, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'

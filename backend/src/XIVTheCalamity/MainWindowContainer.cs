@@ -8,7 +8,6 @@ namespace XIVTheCalamity;
 public static class MainWindowContainer
 {
     public static PhotinoWindow? MainWindow { get; set; }
-    public static int Port { get; set; }
 
     public static Task<string[]> ShowOpenFolderAsync()
     {

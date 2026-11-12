@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using XIVTheCalamity.DTOs;
+using XIVTheCalamity.Helpers;
 using XIVTheCalamity.Services;
 
 namespace XIVTheCalamity.Endpoints;
@@ -83,11 +84,15 @@ public static class NativeBridgeEndpoints
 
 
 
-        app.MapPost("/api/window/close", () =>
+        app.MapPost("/api/window/close", (HttpContext context) =>
         {
-            MainWindowContainer.MainWindow?.Invoke(() =>
+            context.Response.OnCompleted(() =>
             {
-                MainWindowContainer.MainWindow.Close();
+                MainWindowContainer.MainWindow?.Invoke(() =>
+                {
+                    MainWindowContainer.MainWindow.Close();
+                });
+                return Task.CompletedTask;
             });
             return Results.Ok(new GenericActionResponse(true));
         });
@@ -256,24 +261,17 @@ public static class NativeBridgeEndpoints
             EventBroadcastHub hub,
             CancellationToken cancellationToken) =>
         {
-            context.Response.ContentType = "text/event-stream";
-            context.Response.Headers.CacheControl = "no-cache";
-            context.Response.Headers.Connection = "keep-alive";
-
             var channel = System.Threading.Channels.Channel.CreateUnbounded<EventStreamItem>();
             var id = hub.Subscribe(channel);
 
             try
             {
-                await context.Response.WriteAsync("retry: 1000\n\n", cancellationToken);
-                await context.Response.Body.FlushAsync(cancellationToken);
-
+                IpcEventHelper.SetupStream(context);
                 while (!cancellationToken.IsCancellationRequested)
                 {
                     var item = await channel.Reader.ReadAsync(cancellationToken);
-                    var json = JsonSerializer.Serialize(item, AppJsonContext.Default.EventStreamItem);
-                    await context.Response.WriteAsync($"data: {json}\n\n", cancellationToken);
-                    await context.Response.Body.FlushAsync(cancellationToken);
+                    await IpcEventHelper.SendAsync(context.Response, "message", item,
+                        AppJsonContext.Default.EventStreamItem, cancellationToken);
                 }
             }
             catch (OperationCanceledException)
