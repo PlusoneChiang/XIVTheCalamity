@@ -413,15 +413,17 @@ async function persistConfig(closeWindow) {
         method: 'POST'
       });
       
-      if (!applyResponse.ok) {
+      if (!applyResponse.ok && applyResponse.data?.error?.code !== 'METALSHARP_UNSUPPORTED') {
         console.error('[Settings] Failed to apply Wine settings:', applyResponse.data?.message);
         hideLoadingOverlay();
         showError(i18n.t('settings.apply_wine_failed'));
         return;
       }
       
-      console.log('[Settings] Wine settings applied successfully');
-      await refreshDiscordRpcStatus();
+      if (applyResponse.ok) {
+        console.log('[Settings] Wine settings applied successfully');
+        await refreshDiscordRpcStatus();
+      }
     }
 
     // 全域設定最後儲存；公告模式變更可能會讓啟動器重新啟動。

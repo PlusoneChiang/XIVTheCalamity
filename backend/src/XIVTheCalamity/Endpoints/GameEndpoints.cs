@@ -1,3 +1,4 @@
+using XIVTheCalamity.Platform.MacOS.MetalSharp;
 using System.Runtime.InteropServices;
 using XIVTheCalamity.DTOs;
 using XIVTheCalamity.Core.Models;
@@ -37,6 +38,9 @@ public static class GameEndpoints
                 {
                     return Results.BadRequest(ApiErrorResponse.Create("GAME_PATH_NOT_CONFIGURED", "Game path not configured"));
                 }
+
+                if (environmentService is MetalSharpEnvironmentService && config.Dalamud.Enabled)
+                    return Results.BadRequest(ApiErrorResponse.Create("METALSHARP_UNSUPPORTED", "請先在設定中關閉 Dalamud，再用 MetalSharp Wine 啟動遊戲。"));
 
                 string? dalamudRuntimePath = null;
                 if (config.Dalamud.Enabled)
@@ -196,7 +200,11 @@ public static class GameEndpoints
                     return Results.BadRequest(ApiErrorResponse.Create("GAME_PATH_NOT_CONFIGURED", "Game path not configured"));
                 }
 
-                await discordRpcBridgeService.RefreshIpcPathIfInstalledAsync(cancellationToken);
+                if (environmentService is not MetalSharpEnvironmentService)
+                    await discordRpcBridgeService.RefreshIpcPathIfInstalledAsync(cancellationToken);
+
+                if (environmentService is MetalSharpEnvironmentService && config.Dalamud.Enabled)
+                    return Results.BadRequest(ApiErrorResponse.Create("METALSHARP_UNSUPPORTED", "請先在設定中關閉 Dalamud，再用 MetalSharp Wine 啟動遊戲。"));
 
                 string? dalamudRuntimePath = null;
                 if (config.Dalamud.Enabled)

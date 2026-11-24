@@ -7,9 +7,16 @@ namespace XIVTheCalamity.Endpoints;
 
 public static class WineEndpoints
 {
-    public static void MapWineEndpoints(this WebApplication app)
+    public static void MapWineEndpoints(this WebApplication app, bool metalSharpEnabled)
     {
         var group = app.MapGroup("/api/wine");
+        if (metalSharpEnabled)
+        {
+            group.AddEndpointFilter((_, _) => ValueTask.FromResult<object?>(
+                Results.Json(ApiErrorResponse.Create("METALSHARP_UNSUPPORTED", "MetalSharp Wine 實驗模式目前不支援Wine 工具與設定套用。"),
+                    AppJsonContext.Default.ApiErrorResponse, statusCode: 409)));
+        }
+
 
         // POST /api/wine/launch/{tool}
         group.MapPost("/launch/{tool}", async (

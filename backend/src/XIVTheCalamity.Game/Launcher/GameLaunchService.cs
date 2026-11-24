@@ -8,6 +8,7 @@ using XIVTheCalamity.Core.Models;
 using XIVTheCalamity.Core.Services;
 using XIVTheCalamity.Game.Launcher.Encryption;
 using XIVTheCalamity.Platform;
+using XIVTheCalamity.Platform.MacOS.MetalSharp;
 
 namespace XIVTheCalamity.Game.Launcher;
 
@@ -177,6 +178,9 @@ public class GameLaunchService
                     };
                 }
                 
+                if (_environmentService is MetalSharpEnvironmentService metalSharp)
+                    await metalSharp.EnsurePrefixAsync(cancellationToken);
+
                 // Get environment variables
                 var baseEnvironment = _environmentService.GetEnvironment();
 
@@ -267,9 +271,11 @@ public class GameLaunchService
     /// <summary>
     /// Get game config directory (ffxivConfig)
     /// </summary>
-    private static string GetFfxivConfigPath()
+    private string GetFfxivConfigPath()
     {
-        var path = PlatformPathService.Instance.GetFfxivConfigDirectory();
+        var path = _environmentService is MetalSharpEnvironmentService metalSharp
+            ? metalSharp.GetFfxivConfigDirectory()
+            : PlatformPathService.Instance.GetFfxivConfigDirectory();
         Directory.CreateDirectory(path);
         return path;
     }

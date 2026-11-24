@@ -7,9 +7,16 @@ namespace XIVTheCalamity.Endpoints;
 
 public static class DiscordRpcEndpoints
 {
-    public static void MapDiscordRpcEndpoints(this WebApplication app)
+    public static void MapDiscordRpcEndpoints(this WebApplication app, bool metalSharpEnabled)
     {
         var group = app.MapGroup("/api/discord-rpc");
+        if (metalSharpEnabled)
+        {
+            group.AddEndpointFilter((_, _) => ValueTask.FromResult<object?>(
+                Results.Json(ApiErrorResponse.Create("METALSHARP_UNSUPPORTED", "MetalSharp Wine 實驗模式目前不支援Discord RPC。"),
+                    AppJsonContext.Default.ApiErrorResponse, statusCode: 409)));
+        }
+
 
         group.MapGet("/status", async (
             DiscordRpcBridgeService bridgeService,

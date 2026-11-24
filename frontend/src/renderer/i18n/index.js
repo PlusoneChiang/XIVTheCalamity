@@ -76,6 +76,7 @@ const translations = {
     
     // Error Messages
     'error.wine_download_failed': 'Wine 下載失敗',
+    'error.metalsharp_init_failed': 'MetalSharp Wine 初始化失敗。{message}',
     'error.rosetta_required': '目前的 Wine 需要 Rosetta 2，但此 Mac 尚未安裝 Rosetta。\n\n請開啟「終端機」，執行以下指令並依照畫面指示完成安裝：\nsoftwareupdate --install-rosetta\n\n安裝完成後，請完全結束並重新啟動 XIVTheCalamity。',
     'error.dxvk_download_failed': 'DXVK 下載失敗',
     'error.init_failed': '初始化失敗',
@@ -566,6 +567,7 @@ const translations = {
     
     // Error Messages
     'error.wine_download_failed': 'Wine download failed',
+    'error.metalsharp_init_failed': 'MetalSharp Wine initialization failed. {message}',
     'error.rosetta_required': 'The current Wine runtime requires Rosetta 2, but Rosetta is not installed on this Mac.\n\nOpen Terminal, run the following command, and follow the installation instructions:\nsoftwareupdate --install-rosetta\n\nAfter installation, fully quit and restart XIVTheCalamity.',
     'error.dxvk_download_failed': 'DXVK download failed',
     'error.init_failed': 'Initialization failed',

@@ -13,11 +13,11 @@ public static class EnvironmentEndpoints
 {
     private static readonly SemaphoreSlim RosettaInstallLock = new(1, 1);
 
-    public static void MapEnvironmentEndpoints(this WebApplication app)
+    public static void MapEnvironmentEndpoints(this WebApplication app, bool metalSharpEnabled)
     {
         var group = app.MapGroup("/api/environment");
 
-        if (OperatingSystem.IsMacOS() && RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+        if (!metalSharpEnabled && OperatingSystem.IsMacOS() && RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
             MapRosettaEndpoints(group);
 
         // GET /api/environment/initialize (IPC events)

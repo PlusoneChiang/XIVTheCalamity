@@ -14,6 +14,7 @@ using Photino.NET;
 using XIVTheCalamity.Endpoints;
 using XIVTheCalamity.Core.Services;
 using XIVTheCalamity.Platform.MacOS.Wine;
+using XIVTheCalamity.Platform.MacOS.MetalSharp;
 using XIVTheCalamity.Platform.MacOS.Discord;
 using XIVTheCalamity.Game.Services;
 using XIVTheCalamity.Game.Launcher;
@@ -363,6 +364,8 @@ public class Program
         builder.Services.AddSingleton<ConfigService>();
         builder.Services.AddSingleton<DiscordRpcBridgeService>();
 
+        var metalSharpRuntime = MetalSharpEnvironmentService.GetRequestedRuntimePath();
+
         // 平台相依服務
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
@@ -371,9 +374,16 @@ public class Program
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
-            builder.Services.AddSingleton<XIVTheCalamity.Platform.IEnvironmentService, 
-                XIVTheCalamity.Platform.MacOS.Wine.WineEnvironmentService>();
-            builder.Services.AddSingleton<WineMacOSDownloadService>();
+            if (metalSharpRuntime is null)
+            {
+                builder.Services.AddSingleton<XIVTheCalamity.Platform.IEnvironmentService, WineEnvironmentService>();
+                builder.Services.AddSingleton<WineMacOSDownloadService>();
+            }
+            else
+            {
+                builder.Services.AddSingleton<XIVTheCalamity.Platform.IEnvironmentService>(services =>
+                    new MetalSharpEnvironmentService(metalSharpRuntime, services.GetRequiredService<ILogger<MetalSharpEnvironmentService>>()));
+            }
             builder.Services.AddSingleton<WinePrefixService>();
             builder.Services.AddSingleton<WineConfigService>();
         }
@@ -433,11 +443,11 @@ public class Program
         app.MapConfigEndpoints();
         app.MapAuthEndpoints();
         app.MapDalamudEndpoints();
-        app.MapEnvironmentEndpoints();
+        app.MapEnvironmentEndpoints(metalSharpRuntime is not null);
         app.MapGameEndpoints();
-        app.MapDiscordRpcEndpoints();
+        app.MapDiscordRpcEndpoints(metalSharpRuntime is not null);
         app.MapUpdateEndpoints();
-        app.MapWineEndpoints();
+        app.MapWineEndpoints(metalSharpRuntime is not null);
         app.MapNativeBridgeEndpoints();
         app.MapNewsEndpoints();
 
